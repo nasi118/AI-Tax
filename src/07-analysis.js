@@ -119,16 +119,18 @@ function analyzeScenario(s, status, year) {
       const b = largestBiz(c.schedC);
       if (!b) return;
       const net = businessNet(b),
-        comp = Math.max(0, Math.round(net * 0.45 / 1000) * 1000);
+        comp = Math.max(0, Math.round(net * 0.45 / 1000) * 1000),
+        employerFICA = Math.min(comp, TY[year].ssWageBase) * 0.062 + comp * 0.0145,
+        k1 = net - comp - employerFICA;
       c.sCorpComp = num(c.sCorpComp) + comp;
-      c.sCorpK1 = num(c.sCorpK1) + (net - comp);
+      c.sCorpK1 = num(c.sCorpK1) + k1;
       c.schedC.businesses = c.schedC.businesses.filter(x => x.id !== b.id);
       c.qbi = {
         ...c.qbi,
         entities: [...(c.qbi.entities || []), {
           id: "probe",
           name: b.name,
-          income: net - comp,
+          income: k1,
           w2: comp,
           ubia: num(b.ubia),
           sstb: false,
@@ -289,21 +291,47 @@ function analyzeScenario(s, status, year) {
     });
   }
   if (charity > 0) {
-    const bunch = probe(s, status, year, c => {
+    /* Bunching is a MULTI-YEAR strategy, so it is modeled over two full years
+       rather than doubling one year and calling the change an annual benefit.
+         Spread: the entered gift in year 1 and again in year 2.
+         Bunch:  two years of gifts in year 1, none in year 2.
+       Year 2 uses the following year's statutory parameters when they exist
+       (TY2026 after TY2025); otherwise the same year's parameters are reused
+       and the comparison is a same-law approximation. */
+    const year2 = TY[year + 1] ? year + 1 : year;
+    const withCharity = (amt, forceItemize) => {
+      const c = structuredClone(s);
       c.scheduleA = {
         ...c.scheduleA,
-        charityCash: num(c.scheduleA.charityCash) * 2
+        charityCash: amt
       };
-      c.deductionMode = "itemized";
-    });
-    if (bunch > 500) {
+      if (forceItemize) c.deductionMode = "itemized";else c.deductionMode = "auto";
+      return c;
+    };
+    let bunchDetail = null;
+    try {
+      const spreadY1 = computeScenario(withCharity(charity, false), status, year).totalTax;
+      const spreadY2 = computeScenario(withCharity(charity, false), status, year2).totalTax;
+      const bunchY1 = computeScenario(withCharity(charity * 2, true), status, year).totalTax;
+      const bunchY2 = computeScenario(withCharity(0, false), status, year2).totalTax;
+      const spreadTotalTax = spreadY1 + spreadY2;
+      const bunchTotalTax = bunchY1 + bunchY2;
+      bunchDetail = {
+        twoYearBenefit: spreadTotalTax - bunchTotalTax,
+        annualizedBenefit: (spreadTotalTax - bunchTotalTax) / 2,
+        bunchYearReduction: spreadY1 - bunchY1,
+        offYearIncrease: bunchY2 - spreadY2,
+        year2
+      };
+    } catch (e) {}
+    if (bunchDetail && bunchDetail.twoYearBenefit > 500) {
       add({
         id: "bunch",
         cat: "Charitable",
         risk: "med",
-        savings: bunch,
+        savings: bunchDetail.annualizedBenefit,
         title: "Charitable giving is spread evenly rather than bunched",
-        why: "Concentrating roughly two years of giving into one itemizing year through a donor-advised fund accelerates the deduction " + "and clears the 0.5% floor once rather than twice.",
+        why: "Modeled over the two-year window " + TY[year].label + "–" + TY[bunchDetail.year2].label + ": total two-year benefit " + usd$(bunchDetail.twoYearBenefit) + " (average " + usd$(bunchDetail.annualizedBenefit) + " per year). The bunch year's tax falls by " + usd$(bunchDetail.bunchYearReduction) + " while the off year's tax rises by " + usd$(bunchDetail.offYearIncrease) + " when the standard deduction replaces itemizing. Cash-flow timing: two years of gifts leave in year 1. The model includes the standard-vs-itemized switch, the AGI limits and floors of each year, and the QBI taxable-income interaction, because both years run through the full engine.",
         action: "Fund a donor-advised fund in the bunch year and grant out over time; take the standard deduction in the off year.",
         ref: "IRC §170 · Form 8283 · 60% AGI limit on cash"
       });

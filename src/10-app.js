@@ -115,7 +115,7 @@ function ReportPage({
   }) => /*#__PURE__*/React.createElement("option", {
     key: s.id,
     value: s.id
-  }, s.name, s.id === bestId ? "  ★ lowest tax" : ""))))), /*#__PURE__*/React.createElement("div", {
+  }, s.name, s.id === bestId ? "  ★ lowest modeled tax" : ""))))), /*#__PURE__*/React.createElement("div", {
     className: "tp-rp-actions"
   }, /*#__PURE__*/React.createElement("button", {
     className: "tp-btn solid",
@@ -144,9 +144,25 @@ function ReportPage({
     className: "rp-kpis"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, "Total income"), /*#__PURE__*/React.createElement("strong", null, usd$(A.grossIncome))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, "Adjusted gross income"), /*#__PURE__*/React.createElement("strong", null, usd$(A.agi))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, A.deductionKind, " deduction"), /*#__PURE__*/React.createElement("strong", null, usd$(A.deductionUsed))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, "QBI deduction"), /*#__PURE__*/React.createElement("strong", null, usd$(A.qbi.deduction))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, "Taxable income"), /*#__PURE__*/React.createElement("strong", null, usd$(A.taxableIncome))), /*#__PURE__*/React.createElement("div", {
     className: "hi"
-  }, /*#__PURE__*/React.createElement("span", null, "Total tax"), /*#__PURE__*/React.createElement("strong", null, usd$(A.totalTax))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, "Ordinary bracket"), /*#__PURE__*/React.createElement("strong", null, pct(A.marginal, 0))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, "Effective rate"), /*#__PURE__*/React.createElement("strong", null, pct(A.effectiveRate)))), /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement("span", null, "Total modeled federal tax"), /*#__PURE__*/React.createElement("strong", null, usd$(A.totalTax))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, "Ordinary bracket"), /*#__PURE__*/React.createElement("strong", null, pct(A.marginal, 0))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, "Effective rate"), /*#__PURE__*/React.createElement("strong", null, pct(A.effectiveRate)))), /*#__PURE__*/React.createElement("p", {
     className: "rp-note"
-  }, "Total tax combines federal income tax net of nonrefundable credits with employment taxes and the net investment income tax. The effective rate is measured against total income of ", usd$(A.grossIncome), ".")), /*#__PURE__*/React.createElement("section", {
+  }, "Total modeled federal tax combines federal income tax net of nonrefundable credits with employment taxes and the net investment income tax. The effective rate is measured against total income of ", usd$(A.grossIncome), ".")), /*#__PURE__*/React.createElement("section", {
+    className: "rp-sec"
+  }, /*#__PURE__*/React.createElement("h2", null, "Tax reconciliation"), /*#__PURE__*/React.createElement("table", {
+    className: "rp-tbl"
+  }, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Form 1040 tax liability (income tax, SE tax, Additional Medicare, NIIT)"), /*#__PURE__*/React.createElement("td", {
+    className: "num"
+  }, usd$(A.form1040Tax))), A.sCorpFICA > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Modeled S-corporation payroll taxes (employee and employer halves \u2014 the employer half is the corporation's expense, not part of the Form 1040 balance due)"), /*#__PURE__*/React.createElement("td", {
+    className: "num"
+  }, usd$(A.sCorpFICA))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("strong", null, "Total modeled federal economic tax")), /*#__PURE__*/React.createElement("td", {
+    className: "num"
+  }, /*#__PURE__*/React.createElement("strong", null, usd$(A.totalTax)))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Payments and withholding"), /*#__PURE__*/React.createElement("td", {
+    className: "num"
+  }, usd$(A.payments))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, A.balanceDue >= 0 ? "Estimated balance due (Form 1040 basis)" : "Estimated overpayment (Form 1040 basis)"), /*#__PURE__*/React.createElement("td", {
+    className: "num"
+  }, usd$(Math.abs(A.balanceDue)))))), /*#__PURE__*/React.createElement("p", {
+    className: "rp-note"
+  }, "Figures are modeled estimates from the planning engine, subject to eligibility, documentation and final-year data \u2014 they are not a filed return.")), /*#__PURE__*/React.createElement("section", {
     className: "rp-sec"
   }, /*#__PURE__*/React.createElement("h2", null, "Income"), /*#__PURE__*/React.createElement("table", {
     className: "rp-tbl"
@@ -224,7 +240,7 @@ function ReportPage({
     className: "sm"
   }, b.note))), /*#__PURE__*/React.createElement("tr", {
     className: "tot"
-  }, /*#__PURE__*/React.createElement("td", null, "Total tax"), /*#__PURE__*/React.createElement("td", {
+  }, /*#__PURE__*/React.createElement("td", null, "Total modeled federal tax"), /*#__PURE__*/React.createElement("td", {
     className: "num"
   }, usd$(A.totalTax)), /*#__PURE__*/React.createElement("td", {
     className: "num"
@@ -238,7 +254,7 @@ function ReportPage({
     className: "num"
   }, "Taxable income"), /*#__PURE__*/React.createElement("th", {
     className: "num"
-  }, "Total tax"), /*#__PURE__*/React.createElement("th", {
+  }, "Total modeled federal tax"), /*#__PURE__*/React.createElement("th", {
     className: "num"
   }, "Effective"), /*#__PURE__*/React.createElement("th", {
     className: "num"
@@ -429,10 +445,14 @@ function App() {
       [which]: top + 1
     };
   });
-  const results = useMemo(() => scenarios.map(s => ({
-    s,
-    r: computeScenario(s, status, year)
-  })), [scenarios, status, year]);
+  const results = useMemo(() => scenarios.map(s => {
+    const r = computeScenario(s, status, year);
+    return {
+      s,
+      r,
+      v: validateScenario(s, r, status, year)
+    };
+  }), [scenarios, status, year]);
   const bestId = useMemo(() => {
     if (!results.length) return null;
     return results.reduce((a, b) => b.r.totalTax < a.r.totalTax ? b : a).s.id;
@@ -524,6 +544,38 @@ function App() {
     setScenarios(sc => sc.map(s => s.id === id ? after : s));
   };
   const updateActive = (field, value) => update(activeIdSafe, field, value);
+  /* AI Tax Reviewer approvals: change the INPUT, let the engine re-run, and
+     record both the field-level diff (recordChange, via update) and an
+     explicit AI-approval entry in the audit trail. AI output itself is never
+     stored as a tax number. */
+  const applyAIChange = (path, value, reason) => {
+    const sc = scenarios.find(x => x.id === activeIdSafe);
+    if (!sc) return;
+    const parts = String(path).split(".");
+    if (parts.length === 1) {
+      update(activeIdSafe, parts[0], value);
+    } else {
+      const root = parts[0];
+      const obj = JSON.parse(JSON.stringify(sc[root] || {}));
+      let cur = obj;
+      for (let i = 1; i < parts.length - 1; i++) {
+        cur[parts[i]] = {
+          ...(cur[parts[i]] || {})
+        };
+        cur = cur[parts[i]];
+      }
+      cur[parts[parts.length - 1]] = value;
+      update(activeIdSafe, root, obj);
+    }
+    logEvent({
+      label: "AI-proposed change approved: " + path,
+      kind: "ai",
+      scenarioId: activeIdSafe,
+      scenarioName: sc.name,
+      from: "",
+      to: String(value) + (reason ? " — " + reason : "")
+    });
+  };
   const addScenario = () => {
     const c = deepClone(scenarios[scenarios.length - 1], "Scenario " + (scenarios.length + 1));
     logEvent({
@@ -590,13 +642,26 @@ function App() {
   };
   const setScenariosLogged = fnOrArr => setScenarios(fnOrArr);
   const moduleTabs = ["se", "magi", "qbi", "health"];
+  const [navOpen, setNavOpen] = useState(false);
+  const pickTab = id => {
+    setTab(id);
+    setNavOpen(false);
+  };
   const t = TABS.find(x => x.id === tab);
   return /*#__PURE__*/React.createElement("div", {
     className: "tp-root"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "tp-navtoggle",
+    onClick: () => setNavOpen(v => !v),
+    "aria-label": "Toggle navigation",
+    title: "Menu"
+  }, "\u2630"), navOpen && /*#__PURE__*/React.createElement("div", {
+    className: "tp-navoverlay",
+    onClick: () => setNavOpen(false)
+  }), /*#__PURE__*/React.createElement("div", {
     className: "tp-shell"
   }, /*#__PURE__*/React.createElement("aside", {
-    className: "tp-side"
+    className: "tp-side" + (navOpen ? " open" : "")
   }, /*#__PURE__*/React.createElement("div", {
     className: "tp-brand"
   }, /*#__PURE__*/React.createElement("div", {
@@ -606,7 +671,7 @@ function App() {
   }, TABS.map(x => /*#__PURE__*/React.createElement("button", {
     key: x.id,
     className: "tp-navitem " + (tab === x.id ? "on" : ""),
-    onClick: () => setTab(x.id)
+    onClick: () => pickTab(x.id)
   }, x.icon, " ", x.label))), /*#__PURE__*/React.createElement("div", {
     className: "tp-side-controls"
   }, /*#__PURE__*/React.createElement("label", {
@@ -634,9 +699,9 @@ function App() {
     className: "tp-side-foot"
   }, /*#__PURE__*/React.createElement("div", {
     className: "tp-sidestat"
-  }, /*#__PURE__*/React.createElement("span", null, "Lowest tax scenario"), /*#__PURE__*/React.createElement("strong", null, results.find(x => x.s.id === bestId).s.name)), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "Lowest modeled tax scenario"), /*#__PURE__*/React.createElement("strong", null, results.find(x => x.s.id === bestId).s.name)), /*#__PURE__*/React.createElement("div", {
     className: "tp-sidestat"
-  }, /*#__PURE__*/React.createElement("span", null, "Total tax"), /*#__PURE__*/React.createElement("strong", {
+  }, /*#__PURE__*/React.createElement("span", null, "Total modeled federal tax"), /*#__PURE__*/React.createElement("strong", {
     className: "green"
   }, usd$(results.find(x => x.s.id === bestId).r.totalTax))))), /*#__PURE__*/React.createElement("main", {
     className: "tp-main"
@@ -650,7 +715,18 @@ function App() {
   }, scenarios.map(s => /*#__PURE__*/React.createElement("option", {
     key: s.id,
     value: s.id
-  }, s.name))))), tab === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, {
+  }, s.name))))), results[activeIdx].v.all.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "tp-validbar"
+  }, /*#__PURE__*/React.createElement("strong", null, active.name, ": "), results[activeIdx].v.errors.map((v, i) => /*#__PURE__*/React.createElement("span", {
+    key: "e" + i,
+    className: "tp-vchip err"
+  }, "Blocking: ", v.msg)), results[activeIdx].v.warnings.map((v, i) => /*#__PURE__*/React.createElement("span", {
+    key: "w" + i,
+    className: "tp-vchip warn"
+  }, v.msg)), results[activeIdx].v.infos.map((v, i) => /*#__PURE__*/React.createElement("span", {
+    key: "i" + i,
+    className: "tp-vchip info"
+  }, v.msg))), tab === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, {
     results: results,
     bestId: bestId,
     baseline: baseline,
@@ -748,8 +824,8 @@ function App() {
       setShowAI(v => !v);
       raise("ai");
     },
-    title: "AI Advisor"
-  }, I.chat, /*#__PURE__*/React.createElement("span", null, "AI Advisor"))), showCalc && /*#__PURE__*/React.createElement(Calculator, {
+    title: "Ask AI"
+  }, I.chat, /*#__PURE__*/React.createElement("span", null, "Ask AI"))), showCalc && /*#__PURE__*/React.createElement(Calculator, {
     onClose: () => setShowCalc(false),
     result: activeResult,
     scenarioName: active.name,
@@ -770,19 +846,20 @@ function App() {
     z: zTop.notes,
     draft: noteDraft,
     setDraft: setNoteDraft
-  }), showAI && /*#__PURE__*/React.createElement(AIChat, {
+  }), showAI && /*#__PURE__*/React.createElement(AIReviewer, {
     onClose: () => setShowAI(false),
     result: activeResult,
+    scenario: active,
     scenarioName: active.name,
     status: status,
     year: year,
-    onFocus: () => raise("ai"),
-    z: zTop.ai,
+    validation: results[activeIdx].v,
     onSendToNotes: text => {
       setNoteDraft(d => (d ? d + "\n\n" : "") + text);
       setShowNotes(true);
       raise("notes");
-    }
+    },
+    onApplyChange: applyAIChange
   }));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));

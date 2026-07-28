@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "start": "npx --yes serve -l 3000 .",
-    "build:standalone": "node tools/build-standalone.mjs"
+    "build:standalone": "node tools/build-standalone.mjs",
+    "test": "node tests/golden.test.mjs"
   }
 }

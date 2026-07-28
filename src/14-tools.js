@@ -265,7 +265,7 @@ function Calculator({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-  const grabs = result ? [["AGI", result.agi], ["Taxable income", result.taxableIncome], ["Total tax", result.totalTax], ["Marginal rate", result.marginal], ["Sch C net", result.schedC], ["SE tax", result.seTax]].filter(g => g[1] !== 0) : [];
+  const grabs = result ? [["AGI", result.agi], ["Taxable income", result.taxableIncome], ["Total modeled federal tax", result.totalTax], ["Marginal rate", result.marginal], ["Sch C net", result.schedC], ["SE tax", result.seTax]].filter(g => g[1] !== 0) : [];
   const tapeText = () => tape.map(t => t.text).join("\n");
   return /*#__PURE__*/React.createElement(ToolWindow, {
     title: "Calculator",

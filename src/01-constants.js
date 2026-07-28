@@ -72,6 +72,17 @@ const TY = {
       }
     },
     ssWageBase: 176100,
+    /* Sec. 221 student loan interest — statutory maximum and MAGI phase-out
+       range by filing status; MFS is disallowed entirely (range: null). */
+    studentLoan: {
+      max: 2500,
+      range: {
+        single: [85000, 100000],
+        hoh: [85000, 100000],
+        mfj: [170000, 200000],
+        mfs: null
+      }
+    },
     // Retirement
     deferral402g: 23500,
     catchup50: 7500,
@@ -279,6 +290,17 @@ const TY = {
       }
     },
     ssWageBase: 184500,
+    /* Sec. 221 student loan interest — statutory maximum and MAGI phase-out
+       range by filing status; MFS is disallowed entirely (range: null). */
+    studentLoan: {
+      max: 2500,
+      range: {
+        single: [85000, 100000],
+        hoh: [85000, 100000],
+        mfj: [170000, 200000],
+        mfs: null
+      }
+    },
     deferral402g: 24500,
     catchup50: 8000,
     superCatchup6063: 11250,
@@ -537,3 +559,67 @@ const APPLICABLE_PCT_2026 = [{
 }];
 const num = v => v === "" || v === "-" || v == null || isNaN(v) ? 0 : Number(v);
 const clamp0 = v => Math.max(0, v);
+
+/* ============================================================================
+   NIIT ACTIVITY CLASSIFICATIONS — Sec. 1411
+   One passive/nonpassive checkbox cannot carry Sec. 1411 treatment. Each
+   passthrough activity gets a controlled classification; "include" drives the
+   net investment income base and "review" forces a human-review warning.
+   ========================================================================== */
+const NIIT_CLASSES = [{
+  v: "portfolio",
+  l: "Portfolio income",
+  include: true,
+  review: false
+}, {
+  v: "passive",
+  l: "Passive trade or business",
+  include: true,
+  review: false
+}, {
+  v: "nonpassive",
+  l: "Nonpassive trade or business — excluded under §1411",
+  include: false,
+  review: false
+}, {
+  v: "nonpassive-rental",
+  l: "Nonpassive rental — potentially excluded under §1411",
+  include: false,
+  review: true
+}, {
+  v: "rental-niit",
+  l: "Rental included in NIIT",
+  include: true,
+  review: false
+}, {
+  v: "trader",
+  l: "Trader activity subject to NIIT",
+  include: true,
+  review: false
+}, {
+  v: "self-rental",
+  l: "Self-rental",
+  include: false,
+  review: true
+}, {
+  v: "working-capital",
+  l: "Working-capital investment income",
+  include: true,
+  review: false
+}, {
+  v: "excluded",
+  l: "Excluded from NIIT",
+  include: false,
+  review: false
+}, {
+  v: "review",
+  l: "Human review required",
+  include: true,
+  review: true
+}];
+const niitClassInfo = v => NIIT_CLASSES.find(c => c.v === v) || null;
+
+/* Version identifiers — carried on exports, reports and AI snapshots so any
+   number can be traced to the engine build and rules vintage that made it. */
+const ENGINE_VERSION = "2.0.0";
+const RULES_VERSION = "OBBBA-TY2025/TY2026-2026-07";

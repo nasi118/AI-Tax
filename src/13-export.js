@@ -1129,7 +1129,7 @@ function buildTaxWorkbook(opts) {
     }].concat(scenarios.map((s, i) => ({
       f: "=" + IXn("planning.age", i),
       v: num(s.planning.age),
-      s: ST.num
+      s: ST.money
     })))
   });
   ret.add({
@@ -2506,7 +2506,7 @@ function buildTaxWorkbook(opts) {
     id: "f_tax",
     cells: ref => [{
       t: "s",
-      v: "Total tax",
+      v: "Total modeled federal tax",
       s: ST.label
     }, {
       t: "s",
@@ -2658,6 +2658,119 @@ function buildTaxWorkbook(opts) {
   sheets.push(mg);
 
   /* ----------------------------------------------------------- AUDIT TRAIL */
+  /* ------------------------------------------------- ECONOMICS & VALIDATION */
+  const ec = Sheet("Economics & Validation", {
+    cols: [44].concat(scenarios.map(() => 18)),
+    freeze: 3
+  });
+  ec.add({
+    cells: [{
+      t: "s",
+      v: "Economic-income and cash-flow reconciliation \u00b7 validation results",
+      s: ST.title
+    }]
+  });
+  ec.add({
+    cells: [{
+      t: "s",
+      v: "Values in this sheet are engine outputs (not formulas). After-tax economic income = gross economic income \u2212 total modeled federal tax. Spendable after-tax cash further removes retirement, HSA and charitable cash outflows. Employer payroll tax already reduced the K-1, so it is never subtracted twice.",
+      s: ST.small
+    }]
+  });
+  ec.add({
+    cells: [{
+      t: "s",
+      v: "Line",
+      s: ST.colHdr
+    }].concat(scenarios.map(sc => ({
+      t: "s",
+      v: sc.name,
+      s: ST.colHdr
+    })))
+  });
+  const ecRow = (label, get) => ec.add({
+    cells: [{
+      t: "s",
+      v: label,
+      s: ST.label
+    }].concat(results.map(x => ({
+      v: Math.round(get(x.r)),
+      s: ST.money
+    })))
+  });
+  ecRow("Gross economic income", r => r.economicIncome);
+  ecRow("Form 1040 total income", r => r.grossIncome);
+  ecRow("Adjusted gross income", r => r.agi);
+  ecRow("Taxable income", r => r.taxableIncome);
+  ecRow("Federal income tax less credits", r => Math.max(0, r.fedIncomeTax - r.creditsApplied));
+  ecRow("Self-employment tax", r => r.seTax);
+  ecRow("Employee payroll tax (S corp)", r => r.employeeFICA);
+  ecRow("Employer payroll tax (S corp)", r => r.employerFICA);
+  ecRow("Additional Medicare Tax", r => r.addlMedicare);
+  ecRow("Net investment income tax", r => r.niit);
+  ecRow("Form 1040 tax liability", r => r.form1040Tax);
+  ecRow("Total modeled federal tax", r => r.totalTax);
+  ecRow("Payments and withholding", r => r.payments);
+  ecRow("Estimated balance due / (refund)", r => r.balanceDue);
+  ecRow("Retirement contributions", r => r.cashOutflows.retirement);
+  ecRow("HSA contributions", r => r.cashOutflows.hsa);
+  ecRow("Charitable cash outflow", r => r.cashOutflows.charitable);
+  ecRow("After-tax economic income", r => r.afterTaxCash);
+  ecRow("Spendable after-tax cash", r => r.spendableAfterTaxCash);
+  ec.add({
+    cells: []
+  });
+  ec.add({
+    cells: [{
+      t: "s",
+      v: "Validation results \u2014 blocking errors, material warnings, informational review points",
+      s: ST.sectionHdr
+    }]
+  });
+  results.forEach(x => {
+    const list = x.v && x.v.all || [];
+    ec.add({
+      cells: [{
+        t: "s",
+        v: x.s.name + (list.length ? "" : " \u2014 no findings"),
+        s: ST.label
+      }]
+    });
+    list.forEach(vv => ec.add({
+      cells: [{
+        t: "s",
+        v: "  [" + vv.level.toUpperCase() + "] " + vv.msg,
+        s: ST.small
+      }]
+    }));
+  });
+  ec.add({
+    cells: []
+  });
+  ec.add({
+    cells: [{
+      t: "s",
+      v: "Engine version",
+      s: ST.label
+    }, {
+      t: "s",
+      v: ENGINE_VERSION,
+      s: ST.small
+    }]
+  });
+  ec.add({
+    cells: [{
+      t: "s",
+      v: "Rules version",
+      s: ST.label
+    }, {
+      t: "s",
+      v: RULES_VERSION,
+      s: ST.small
+    }]
+  });
+  sheets.push(ec);
+
   const au = Sheet("Audit Trail", {
     cols: [19, 26, 34, 17, 17, 17, 40],
     freeze: 3

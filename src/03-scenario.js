@@ -7,7 +7,9 @@ const businessNet = b => num(b.grossReceipts) - num(b.returns) - num(b.cogs) - (
 const schedCTotal = sc => (sc && sc.businesses || []).reduce((a, b) => a + businessNet(b), 0);
 const ptTotal = pt => (pt && pt.entities || []).reduce((a, e) => a + num(e.ordinary) + num(e.rental), 0);
 const s1IncomeTotal = s1 => num(s1.stateRefund) + num(s1.unemployment) + num(s1.gambling) + num(s1.cancellationDebt) + num(s1.otherIncome);
-const s1OtherAdjTotal = s1 => num(s1.studentLoanInterest) + num(s1.educatorExpenses) + num(s1.earlyWithdrawalPenalty) + num(s1.alimonyPaid) + num(s1.otherAdjustments);
+/* Student loan interest is handled by computeStudentLoanInterest (cap, MAGI
+   phase-out, MFS disallowance) — it must NOT flow in here at face value. */
+const s1OtherAdjTotal = s1 => num(s1.educatorExpenses) + num(s1.earlyWithdrawalPenalty) + num(s1.alimonyPaid) + num(s1.otherAdjustments);
 
 /* ============================================================================
    S CORPORATIONS
@@ -114,6 +116,24 @@ function computeScenario(s, status, year) {
   const sCorpFICA = employerFICA + employeeFICA;
   const AM = computeAddlMedicare(wagesW2 + sCorpComp, SE.netSE, status, C);
 
+  /* Component breakdown of the modeled S-corp payroll taxes. The wage base is
+     applied per entity (each employer withholds to the base independently);
+     Social Security and Medicare are reported separately for each side. */
+  const legacySS = legacyComp > 0 ? Math.min(legacyComp, C.ssWageBase) * 0.062 : 0;
+  const legacyMed = legacyComp > 0 ? legacyComp * 0.0145 : 0;
+  const payrollSS = SCORPS.reduce((a, x) => a + x.oasdi, 0) + legacySS;
+  const payrollMed = SCORPS.reduce((a, x) => a + x.hi, 0) + legacyMed;
+  const payroll = {
+    employeeSS: payrollSS,
+    employeeMedicare: payrollMed,
+    employerSS: payrollSS,
+    employerMedicare: payrollMed,
+    additionalMedicare: AM.total,
+    employeeTotal: employeeFICA,
+    employerTotal: employerFICA,
+    combined: sCorpFICA + AM.total
+  };
+
   /* ---- 3-4. Retirement plan deduction ---- */
   const P = s.planning || {};
   const RET = computeRetirementOptions(schedC, SE.halfDeduction, num(P.age), C, {
@@ -156,20 +176,26 @@ function computeScenario(s, status, year) {
   const compensationForIRA = wagesW2 + sCorpComp + clamp0(schedC - SE.halfDeduction - retirementDeduction);
   const IRA = computeIRA(s.ira || {}, agiBeforeIRA, compensationForIRA, status, C);
   const iraDeduction = s.ira && s.ira.enabled ? IRA.deductible : 0;
-  const adjustments = adjustmentsBeforeIRA + iraDeduction;
+
+  /* Student loan interest: its own MAGI is AGI computed without this
+     deduction, so it is applied last, after every other adjustment. */
+  const foreignExclusionEarly = num(s.foreignExclusion);
+  const magiBeforeStudentLoan = grossIncome - adjustmentsBeforeIRA - iraDeduction + foreignExclusionEarly;
+  const SL = computeStudentLoanInterest((s.schedule1 || {}).studentLoanInterest, magiBeforeStudentLoan, status, C);
+  const adjustments = adjustmentsBeforeIRA + iraDeduction + SL.allowed;
   const agi = grossIncome - adjustments;
 
   /* ---- 9. MAGI variants ---- */
   const foreignExclusion = num(s.foreignExclusion);
   /* Each provision's MAGI is AGI computed WITHOUT the deduction that provision
      governs, so the deduction is added back before testing its own phase-out. */
-  const studentLoanDeduction = num((s.schedule1 || {}).studentLoanInterest);
+  const studentLoanDeduction = SL.allowed;
   const magi = {
     general: agi + foreignExclusion,
     niit: agi + foreignExclusion,
     roth: agi + foreignExclusion + iraDeduction + studentLoanDeduction - rothConversion,
     studentLoan: agi + foreignExclusion + studentLoanDeduction,
-    ira: agiBeforeIRA + foreignExclusion + studentLoanDeduction,
+    ira: agiBeforeIRA + foreignExclusion,
     aca: agi + foreignExclusion + taxExemptInterest + clamp0(socialSecurityTotal - socialSecurityTaxable),
     irmaa: agi + foreignExclusion + taxExemptInterest
   };
@@ -211,12 +237,24 @@ function computeScenario(s, status, year) {
       if (!b) return e;
       const net = businessNet(b);
       const share = positiveSchedC > 0 ? clamp0(net) / positiveSchedC : 0;
+      /* Deductions attributable to self-employment reduce QBI. They are
+         allocated across businesses in proportion to each business's share
+         of positive Schedule C profit, and the allocation is carried on the
+         entity so the methodology is visible, not inferred. */
       return {
         ...e,
         income: net - seRelatedDeductions * share,
         w2: num(b.w2wages),
         ubia: num(b.ubia),
-        _derived: true
+        _derived: true,
+        _alloc: {
+          method: "Proportional to this business's share of positive Schedule C profit",
+          share,
+          seTaxHalf: SE.halfDeduction * share,
+          retirement: retirementDeduction * share,
+          sehi: SEHI.deduction * share,
+          total: seRelatedDeductions * share
+        }
       };
     }
     if (link.indexOf("scorp:") === 0) {
@@ -291,10 +329,37 @@ function computeScenario(s, status, year) {
   const fedIncomeTax = ordTax + cgTax;
 
   /* ---- 15. Surtaxes ---- */
-  /* Net investment income: portfolio income plus net capital gain, plus rental
-     and other passive passthrough income. Non-passive trade or business income
-     is excluded by Sec. 1411(c)(2)(A), so only entities flagged passive count. */
-  const passivePassthrough = (s.passthrough && s.passthrough.entities || []).reduce((a, e) => a + (e.passive === false ? num(e.rental) : num(e.ordinary) + num(e.rental)), 0);
+  /* Net investment income: portfolio income plus net capital gain, plus
+     passthrough income according to each activity's Sec. 1411 classification.
+     A single passive checkbox is only the legacy fallback: an entity with no
+     explicit classification keeps its old treatment (nonpassive excludes the
+     ordinary income but the rental stays in NIIT) and is flagged for human
+     review, because rental income should leave the base only after the
+     activity has actually been classified. */
+  const niitDetail = [];
+  const niitReview = [];
+  const passivePassthrough = (s.passthrough && s.passthrough.entities || []).reduce((a, e) => {
+    const amt = num(e.ordinary) + num(e.rental);
+    const cls = e.niitClass ? niitClassInfo(e.niitClass) : null;
+    let included, label, review;
+    if (cls) {
+      included = cls.include ? amt : 0;
+      label = cls.l;
+      review = cls.review;
+    } else {
+      included = e.passive === false ? num(e.rental) : amt;
+      label = e.passive === false ? "Legacy nonpassive checkbox — rental portion retained in NIIT" : "Legacy passive checkbox";
+      review = e.passive === false && num(e.rental) !== 0;
+    }
+    niitDetail.push({
+      name: e.name || "Passthrough entity",
+      classification: label,
+      amount: amt,
+      included
+    });
+    if (review) niitReview.push((e.name || "Passthrough entity") + ": Sec. 1411 facts are insufficient — classify the activity (material participation, rental status, trade-or-business status) before relying on the NIIT result.");
+    return a + included;
+  }, 0);
   const passiveSCorp = SCORPS.filter(x => !x.active).reduce((a, x) => a + x.k1, 0);
   const investmentIncome = clamp0(interest + ordDiv + capitalIncluded + clamp0(passivePassthrough) + clamp0(passiveSCorp));
   const niit = 0.038 * Math.min(investmentIncome, clamp0(magi.niit - C.niitThreshold[status]));
@@ -316,6 +381,22 @@ function computeScenario(s, status, year) {
      It is excluded from the Form 1040 balance due, which it does not belong to. */
   const totalTax = clamp0(fedIncomeTax - creditsApplied) + SE.total + sCorpFICA + AM.total + niit;
   const economicIncome = grossIncome + employerFICA;
+
+  /* ---- Cash-flow view ----
+     After-tax economic income treats taxes as the only outflow. Spendable
+     cash then removes the money the plan itself consumes: retirement and HSA
+     funding (still the client's assets, but not spendable this year) and
+     charitable cash actually given. S-corporation employer plan contributions
+     and administrative costs already reduced the K-1, so they must not be
+     subtracted again here. */
+  const charitableCashOutflow = num((s.scheduleA || {}).charityCash);
+  const cashOutflows = {
+    retirement: retirementDeduction,
+    hsa,
+    charitable: charitableCashOutflow,
+    other: 0,
+    total: retirementDeduction + hsa + charitableCashOutflow
+  };
   const form1040Tax = clamp0(fedIncomeTax - creditsApplied) + SE.total + AM.total + niit;
   const payments = num(s.withholding) + num(s.estimatedPayments);
   return {
@@ -343,6 +424,7 @@ function computeScenario(s, status, year) {
     IRA,
     iraDeduction,
     s1AdjOther,
+    studentLoan: SL,
     adjustments,
     agi,
     agiBeforeIRA,
@@ -366,6 +448,8 @@ function computeScenario(s, status, year) {
     cgTax,
     fedIncomeTax,
     niit,
+    niitDetail,
+    niitReview,
     investmentIncome,
     ctc,
     ctcGross,
@@ -386,12 +470,15 @@ function computeScenario(s, status, year) {
     scorpProfitBeforeComp,
     employerFICA,
     employeeFICA,
+    payroll,
     /* Employer FICA is the corporation's expense and has already reduced the
        K-1, so adding it back restores the pre-tax business economics. That is
        the only base against which a sole proprietorship and an S corporation
        can be compared honestly. */
     economicIncome,
     afterTaxCash: economicIncome - totalTax,
+    cashOutflows,
+    spendableAfterTaxCash: economicIncome - totalTax - cashOutflows.total,
     effectiveRate: economicIncome > 0 ? totalTax / economicIncome : 0,
     effectiveRateOn1040: grossIncome > 0 ? totalTax / grossIncome : 0,
     afterTax: economicIncome - totalTax,

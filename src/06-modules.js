@@ -527,7 +527,9 @@ function QBIModule({
   }, "No entities. Add one to compute the deduction."))))), /*#__PURE__*/React.createElement("button", {
     className: "tp-addbtn",
     onClick: add
-  }, I.plus, " Add entity")), /*#__PURE__*/React.createElement("div", {
+  }, I.plus, " Add entity"), (Q.entities || []).filter(d => d.e._alloc && d.e._alloc.total > 0).map(d => /*#__PURE__*/React.createElement(Note, {
+    key: "alloc-" + d.e.id
+  }, /*#__PURE__*/React.createElement("strong", null, d.e.name, " — deductions allocated against QBI: "), "half SE tax ", usd$(d.e._alloc.seTaxHalf), ", retirement ", usd$(d.e._alloc.retirement), ", SEHI ", usd$(d.e._alloc.sehi), " (total ", usd$(d.e._alloc.total), "). Method: ", d.e._alloc.method.toLowerCase(), " (", pct(d.e._alloc.share, 1), "))."))), /*#__PURE__*/React.createElement("div", {
     className: "tp-grid3",
     style: {
       marginTop: 14
@@ -544,14 +546,14 @@ function QBIModule({
     style: {
       marginTop: 16
     }
-  }, "The three limitations, computed independently"), /*#__PURE__*/React.createElement("div", {
+  }, "QBI diagnostic amounts and applicable cap"), /*#__PURE__*/React.createElement("div", {
     className: "tp-limits"
   }, (Q.limits || []).map(l => {
     const isBinding = Q.binding && l.key === Q.binding.key;
     return /*#__PURE__*/React.createElement("div", {
       key: l.key,
       className: "tp-limit" + (isBinding ? " on" : "")
-    }, /*#__PURE__*/React.createElement("span", null, l.label), /*#__PURE__*/React.createElement("strong", null, usd$(l.amount)), /*#__PURE__*/React.createElement("em", null, isBinding ? "binding — this is the deduction" : "not binding"));
+    }, /*#__PURE__*/React.createElement("span", null, l.label), /*#__PURE__*/React.createElement("strong", null, l.applicable === false ? "N/A" : usd$(l.amount)), /*#__PURE__*/React.createElement("em", null, l.applicable === false ? "not applicable below the threshold" : isBinding ? "matches the allowed deduction" : "diagnostic amount"));
   })), /*#__PURE__*/React.createElement("table", {
     className: "tp-tbl",
     style: {
@@ -571,11 +573,11 @@ function QBIModule({
     className: "num"
   }, usd$(C.qbiMinDeduction))), /*#__PURE__*/React.createElement("tr", {
     className: "tot"
-  }, /*#__PURE__*/React.createElement("td", null, "QBI deduction allowed — the least of the three"), /*#__PURE__*/React.createElement("td", {
+  }, /*#__PURE__*/React.createElement("td", null, "QBI deduction allowed after entity-level rules and taxable-income cap"), /*#__PURE__*/React.createElement("td", {
     className: "num"
   }, usd$(Q.deduction))))), /*#__PURE__*/React.createElement(Note, null, "The allowed deduction is ", /*#__PURE__*/React.createElement("code", {
     className: "tp-code"
-  }, "MIN(20% of QBI, wage/UBIA limitation, 20% of taxable income net of capital gain)"), ". All three are computed independently above so the binding constraint is visible rather than inferred. A business with no W-2 wages and no UBIA has a wage limitation of zero, which takes the whole deduction to zero once taxable income clears the phase-in ceiling — that is the single largest reason an S election changes the answer."), Q.negative && /*#__PURE__*/React.createElement(Note, {
+  }, "MIN(entity-level QBI component after applicable wage/UBIA and SSTB rules, 20% taxable-income cap)"), ". The wage and UBIA rule is applied by entity and phased in above the threshold; below the threshold it is not applicable. A business with no W-2 wages and no UBIA can lose the deduction only after taxable income moves through the phase-in range — that interaction is the single largest reason an S election changes the answer."), Q.negative && /*#__PURE__*/React.createElement(Note, {
     kind: "bad"
   }, "Net QBI is negative. No deduction is allowed this year, and ", usd$(Q.carryforwardOut), " carries forward to offset future positive QBI. File Form 8995 anyway to memorialize the carryforward — omitting it is a common and expensive error."), Q.component > Q.deduction + 1 && !Q.negative && /*#__PURE__*/React.createElement(Note, {
     kind: "warn"

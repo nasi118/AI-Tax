@@ -509,12 +509,18 @@ function StackedBars({
         height: bh,
         fill: s.color
       }, /*#__PURE__*/React.createElement("title", null, s.label + ": " + format(v))) : null;
-    }), /*#__PURE__*/React.createElement("text", {
+    }), /*#__PURE__*/React.createElement("title", null, d.name + (i === 0 ? " (base scenario)" : "") + " \u2014 total " + format(series.reduce((a, sr) => a + Math.max(0, d[sr.key] || 0), 0))), /*#__PURE__*/React.createElement("text", {
       x: cx,
       y: h - padB + 16,
       textAnchor: "middle",
       className: "tp-svg-lab"
-    }, d.name.length > 18 ? d.name.slice(0, 17) + "…" : d.name), /*#__PURE__*/React.createElement("text", {
+    }, (() => {
+      /* Numbered aliases keep long names distinguishable; the number survives
+         truncation and the full name is on hover. The base scenario is marked. */
+      const maxChars = Math.max(6, Math.floor(iw / data.length / 6.4));
+      const alias = (i + 1) + ". " + d.name + (i === 0 ? " (base)" : "");
+      return alias.length > maxChars ? alias.slice(0, maxChars - 1) + "\u2026" : alias;
+    })()), /*#__PURE__*/React.createElement("text", {
       x: cx,
       y: h - padB + 28,
       textAnchor: "middle",

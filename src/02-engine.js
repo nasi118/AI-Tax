@@ -492,20 +492,27 @@ function computeQBI(qbi, taxableIncomeBeforeQBI, netCapGain, status, C) {
     deduction = Math.min(C.qbiMinDeduction, cap);
     minApplied = true;
   }
+  const wageLimitApplicable = taxableIncomeBeforeQBI > C.qbiThreshold[status];
   const limits = [{
     key: "tentative",
-    label: "20% of qualified business income",
-    amount: tentativeTotal
+    label: "20% of net qualified business income",
+    amount: tentativeTotal,
+    applicable: true
   }, {
     key: "wage",
-    label: "W-2 wage and UBIA limitation",
-    amount: wageLimitTotal
+    label: "W-2 wage and UBIA amount",
+    amount: wageLimitTotal,
+    applicable: wageLimitApplicable
   }, {
     key: "cap",
-    label: "20% of taxable income net of capital gain",
-    amount: cap
+    label: "20% taxable-income cap, net of capital gain",
+    amount: cap,
+    applicable: true
   }];
-  const binding = limits.reduce((a, b) => b.amount < a.amount ? b : a);
+  /* During the phase-in, the wage rule is blended into the entity component;
+     it is not always a stand-alone minimum. Mark a card as binding only when
+     it actually equals the allowed deduction. */
+  const binding = limits.find(l => l.applicable !== false && Math.abs(l.amount - deduction) < 0.5) || null;
   return {
     deduction,
     component,
@@ -532,7 +539,12 @@ function computeQBI(qbi, taxableIncomeBeforeQBI, netCapGain, status, C) {
 function schedATotal(a, agi, status, C, taxableIncomeBeforeItemized) {
   const medItems = (a.medical || []).reduce((x, i) => x + num(i.amount), 0);
   const medical = clamp0(medItems - 0.075 * agi);
-  const saltRaw = num(a.stateIncomeTax) + num(a.realEstateTax) + num(a.personalPropertyTax) + num(a.salesTax);
+  /* Schedule A permits either state/local income tax or general sales tax,
+     not both. In the absence of an explicit election input, elect the larger
+     entered amount and surface which election was used. */
+  const electedIncomeOrSalesTax = Math.max(num(a.stateIncomeTax), num(a.salesTax));
+  const saltElection = num(a.salesTax) > num(a.stateIncomeTax) ? "General sales tax elected" : "State income tax elected";
+  const saltRaw = electedIncomeOrSalesTax + num(a.realEstateTax) + num(a.personalPropertyTax);
   let cap = C.saltCap[status];
   cap = Math.max(C.saltFloor[status], cap - C.saltPhaseRate * clamp0(agi - C.saltThreshold[status]));
   const salt = Math.min(saltRaw, cap);
@@ -558,6 +570,8 @@ function schedATotal(a, agi, status, C, taxableIncomeBeforeItemized) {
     salt,
     saltCap: cap,
     saltRaw,
+    saltElection,
+    electedIncomeOrSalesTax,
     interest,
     charity,
     charityRaw,
@@ -566,6 +580,40 @@ function schedATotal(a, agi, status, C, taxableIncomeBeforeItemized) {
     beforeCap,
     reduction
   };
+}
+
+/* ============================================================================
+   SEC. 221 — STUDENT LOAN INTEREST
+   Capped at the statutory maximum, phased out over the applicable MAGI range,
+   and disallowed entirely for married filing separately. MAGI here is AGI
+   computed WITHOUT this deduction, so the caller passes that figure in.
+   ========================================================================== */
+function computeStudentLoanInterest(interestPaid, magiBefore, status, C) {
+  const p = C.studentLoan;
+  const entered = num(interestPaid);
+  const out = {
+    entered,
+    max: p.max,
+    magi: magiBefore,
+    range: p.range[status],
+    allowedBeforePhaseout: 0,
+    phaseoutFraction: 0,
+    allowed: 0,
+    reason: null
+  };
+  if (entered <= 0) return out;
+  if (!p.range[status]) {
+    out.phaseoutFraction = 1;
+    out.reason = "Not available when married filing separately.";
+    return out;
+  }
+  out.allowedBeforePhaseout = Math.min(entered, p.max);
+  const [lo, hi] = p.range[status];
+  const keep = magiBefore <= lo ? 1 : magiBefore >= hi ? 0 : (hi - magiBefore) / (hi - lo);
+  out.phaseoutFraction = 1 - keep;
+  out.allowed = Math.round(out.allowedBeforePhaseout * keep);
+  if (keep === 0) out.reason = "Fully phased out — MAGI is at or above " + hi.toLocaleString() + ".";
+  return out;
 }
 
 /* ============================================================================
@@ -581,8 +629,16 @@ function computeSchedule1A(s, magi, status, C) {
     overtime: 0,
     autoLoan: 0,
     total: 0,
-    detail: []
+    detail: [],
+    ineligibleReason: null
   };
+
+  /* Married taxpayers must file jointly to claim the Schedule 1-A
+     deductions — block them up front rather than computing and hiding. */
+  if (status === "mfs") {
+    out.ineligibleReason = "Not available when married filing separately.";
+    return out;
+  }
 
   /* All three statutes read "for each $1,000 (or fraction thereof)", so a
      partial thousand of excess MAGI still costs a full step. */
@@ -606,14 +662,15 @@ function computeSchedule1A(s, magi, status, C) {
     return allowed;
   };
 
-  /* The 6% phase-out applies to EACH qualifying individual's $6,000, so on a
-     joint return with two qualifying spouses the reduction is doubled. */
+  /* The maximum deduction is $6,000 per qualifying individual, but the
+     joint-return phaseout is 6% of excess MAGI applied once — not 6%
+     separately for each spouse. */
   const sd = C.seniorDeduction;
   const seniorCount = Math.min(num(P.seniorCount), status === "mfj" ? 2 : 1);
   if (seniorCount > 0) {
     const eligible = sd.amount * seniorCount;
     const excess = clamp0(magi - sd.threshold[status]);
-    const reduction = sd.rate * excess * seniorCount;
+    const reduction = sd.rate * excess;
     out.senior = clamp0(eligible - reduction);
     out.detail.push({
       label: "Senior deduction (age 65+)",

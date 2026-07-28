@@ -66,7 +66,7 @@ function Dashboard({
   }) => /*#__PURE__*/React.createElement("option", {
     key: s.id,
     value: s.id
-  }, s.name, s.id === bestId ? "  ★ lowest tax" : "")))), /*#__PURE__*/React.createElement("button", {
+  }, s.name, s.id === bestId ? "  ★ lowest modeled tax" : "")))), /*#__PURE__*/React.createElement("button", {
     className: "tp-btn ghost",
     onClick: () => goto("scenarios")
   }, "Edit inputs ", I.chevR)), /*#__PURE__*/React.createElement("div", {
@@ -75,12 +75,12 @@ function Dashboard({
     className: "tp-kpi"
   }, /*#__PURE__*/React.createElement("span", null, "Total income"), /*#__PURE__*/React.createElement("strong", null, usd$(A.grossIncome)), /*#__PURE__*/React.createElement("em", null, A.C.label, " · ", STATUSES.find(x => x.v === status).l)), /*#__PURE__*/React.createElement("div", {
     className: "tp-kpi"
-  }, /*#__PURE__*/React.createElement("span", null, "Total tax"), /*#__PURE__*/React.createElement("strong", null, usd$(A.totalTax)), /*#__PURE__*/React.createElement("em", null, pct(A.effectiveRate), " effective · ", pct(A.marginal), " ordinary bracket")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "Total modeled federal tax"), /*#__PURE__*/React.createElement("strong", null, usd$(A.totalTax)), /*#__PURE__*/React.createElement("em", null, pct(A.effectiveRate), " effective · ", pct(A.marginal), " ordinary bracket")), /*#__PURE__*/React.createElement("div", {
     className: "tp-kpi"
   }, /*#__PURE__*/React.createElement("span", null, "Taxable income"), /*#__PURE__*/React.createElement("strong", null, usd$(A.taxableIncome)), /*#__PURE__*/React.createElement("em", null, A.deductionKind.toLowerCase(), " deduction ", usd$(A.deductionUsed))), /*#__PURE__*/React.createElement("div", {
     className: "tp-kpi " + (totalOpportunity > 0 ? "warn" : "good")
   }, /*#__PURE__*/React.createElement("span", null, "Quantified opportunity"), /*#__PURE__*/React.createElement("strong", null, usd$(totalOpportunity)), /*#__PURE__*/React.createElement("em", null, quantified.length, " sized · ", flagged.length, " to review"))), /*#__PURE__*/React.createElement(Card, {
-    title: "Total tax by scenario",
+    title: "Total modeled federal tax by scenario",
     right: /*#__PURE__*/React.createElement("div", {
       className: "tp-legend"
     }, /*#__PURE__*/React.createElement("i", null, /*#__PURE__*/React.createElement("span", {
@@ -392,16 +392,21 @@ function ScenariosPage({
     className: "tp-verdict"
   }, results.map(({
     s,
-    r
+    r,
+    v
   }, i) => {
     const isBest = s.id === bestId;
+    const isRichest = results.length > 1 && results.reduce((a, b) => b.r.spendableAfterTaxCash > a.r.spendableAfterTaxCash ? b : a).s.id === s.id;
+    const comparable = !baseline || Math.abs(r.economicIncome - baseline.r.economicIncome) <= 1;
     const delta = baseline ? r.totalTax - baseline.r.totalTax : 0;
     return /*#__PURE__*/React.createElement("div", {
       key: s.id,
       className: "tp-vcard " + (isBest ? "best" : "")
     }, isBest && /*#__PURE__*/React.createElement("div", {
       className: "tp-badge"
-    }, I.award, " Lowest tax"), /*#__PURE__*/React.createElement("div", {
+    }, I.award, " Lowest modeled tax"), isRichest && /*#__PURE__*/React.createElement("div", {
+      className: "tp-badge alt"
+    }, "Highest modeled spendable cash"), /*#__PURE__*/React.createElement("div", {
       className: "tp-vname"
     }, s.name), /*#__PURE__*/React.createElement("div", {
       className: "tp-vtotal"
@@ -409,7 +414,13 @@ function ScenariosPage({
       className: "tp-vsub"
     }, pct(r.effectiveRate), " effective · AGI ", usd$(r.agi)), /*#__PURE__*/React.createElement("div", {
       className: "tp-vdelta " + (delta < 0 ? "save" : delta > 0 ? "cost" : "base")
-    }, i === 0 ? "baseline" : delta === 0 ? "same as baseline" : (delta < 0 ? "saves " : "costs ") + usd$(Math.abs(delta)) + " vs. " + baseline.s.name));
+    }, i === 0 ? "baseline" : delta === 0 ? "same as baseline" : (delta < 0 ? "saves " : "costs ") + usd$(Math.abs(delta)) + " vs. " + baseline.s.name), i > 0 && !comparable && /*#__PURE__*/React.createElement("div", {
+      className: "tp-vcompat"
+    }, "Not directly comparable \u2014 economic inputs differ."), v && v.blocking && /*#__PURE__*/React.createElement("div", {
+      className: "tp-vcompat err"
+    }, "Blocking validation error \u2014 resolve before relying on this scenario."), v && !v.blocking && v.warnings.length > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "tp-vcompat"
+    }, "Requires human review"));
   })), /*#__PURE__*/React.createElement("div", {
     className: "tp-ledger-wrap"
   }, /*#__PURE__*/React.createElement("div", {
@@ -673,7 +684,7 @@ function ScenariosPage({
     get: r => r.niit,
     results: results
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
-    label: "Total tax",
+    label: "Total modeled federal tax",
     cls: "grand",
     get: r => r.totalTax,
     results: results
@@ -694,9 +705,38 @@ function ScenariosPage({
     get: r => r.economicIncome,
     results: results
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
-    label: "After-tax cash",
+    label: "After-tax economic income",
     cls: "aftertax",
     get: r => r.afterTaxCash,
+    results: results
+  }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
+    label: "Retirement and HSA funding",
+    get: r => r.cashOutflows.retirement + r.cashOutflows.hsa,
+    results: results
+  }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
+    label: "Charitable cash outflow",
+    get: r => r.cashOutflows.charitable,
+    results: results
+  }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
+    label: "Spendable after-tax cash",
+    cls: "aftertax",
+    get: r => r.spendableAfterTaxCash,
+    results: results
+  }), /*#__PURE__*/React.createElement(LedgerDeltaRow, {
+    label: "Tax change vs base",
+    get: r => r.totalTax,
+    favorable: "down",
+    guard: (r, b) => Math.abs(r.economicIncome - b.economicIncome) <= 1,
+    results: results
+  }), /*#__PURE__*/React.createElement(LedgerDeltaRow, {
+    label: "Economic-income change vs base",
+    get: r => r.economicIncome,
+    favorable: "up",
+    results: results
+  }), /*#__PURE__*/React.createElement(LedgerDeltaRow, {
+    label: "Spendable-cash change vs base",
+    get: r => r.spendableAfterTaxCash,
+    favorable: "up",
     results: results
   })), /*#__PURE__*/React.createElement("div", {
     className: "tp-add-row"
@@ -771,6 +811,35 @@ function LedgerCalcRow({
     className: "tp-tag"
   }, tags(r)))));
 }
+function LedgerDeltaRow({
+  label,
+  get,
+  favorable,
+  guard,
+  results
+}) {
+  const base = results[0];
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "tp-cell tp-lab calc delta"
+  }, label), results.map(({
+    s,
+    r
+  }, i) => {
+    if (i === 0) return /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      className: "tp-cell tp-calc delta"
+    }, "base");
+    const d = get(r) - get(base.r);
+    const comparable = !guard || guard(r, base.r);
+    const good = favorable === "down" ? d < -0.5 : d > 0.5;
+    const bad = favorable === "down" ? d > 0.5 : d < -0.5;
+    return /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      className: "tp-cell tp-calc delta " + (good && comparable ? "save" : bad ? "cost" : ""),
+      title: comparable ? "" : "Not directly comparable \u2014 economic inputs differ."
+    }, (d > 0 ? "+" : "") + (Math.round(d) === 0 ? "0" : usd(Math.round(d))), !comparable && "\u2020");
+  }));
+}
 function LedgerDrillRow({
   label,
   hint,
@@ -836,7 +905,8 @@ function DrillModal({
     update: update
   }), type === "passthrough" && /*#__PURE__*/React.createElement(PassthroughEditor, {
     scenario: scenario,
-    update: update
+    update: update,
+    result: result
   }), type === "scorp" && /*#__PURE__*/React.createElement(SCorpEditor, {
     scenario: scenario,
     update: update,
@@ -982,7 +1052,8 @@ function SchedCEditor({
 }
 function PassthroughEditor({
   scenario,
-  update
+  update,
+  result
 }) {
   const pt = scenario.passthrough;
   const set = (id, k, v) => update("passthrough", {
@@ -1006,7 +1077,7 @@ function PassthroughEditor({
     className: "num"
   }, "UBIA"), /*#__PURE__*/React.createElement("th", {
     className: "ctr"
-  }, "Passive"), /*#__PURE__*/React.createElement("th", null))), /*#__PURE__*/React.createElement("tbody", null, pt.entities.map(e => /*#__PURE__*/React.createElement("tr", {
+  }, "§1411 classification"), /*#__PURE__*/React.createElement("th", null))), /*#__PURE__*/React.createElement("tbody", null, pt.entities.map(e => /*#__PURE__*/React.createElement("tr", {
     key: e.id
   }, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("input", {
     className: "tp-txt",
@@ -1024,14 +1095,13 @@ function PassthroughEditor({
   })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement(Money, {
     value: e.ubia,
     onChange: v => set(e.id, "ubia", v)
-  })), /*#__PURE__*/React.createElement("td", {
-    className: "ctr"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "checkbox",
-    checked: e.passive !== false,
-    onChange: ev => set(e.id, "passive", ev.target.checked),
-    title: "Passive income counts toward net investment income"
-  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("select", {
+    className: "tp-txt",
+    style: { minWidth: 170 },
+    value: e.niitClass || "",
+    onChange: ev => set(e.id, "niitClass", ev.target.value || null),
+    title: "Sec. 1411 net investment income classification for this activity"
+  }, /*#__PURE__*/React.createElement("option", { value: "" }, "Unclassified — review required"), NIIT_CLASSES.map(c => /*#__PURE__*/React.createElement("option", { key: c.v, value: c.v }, c.l)))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
     className: "tp-iconbtn",
     onClick: () => update("passthrough", {
       ...pt,
@@ -1055,7 +1125,13 @@ function PassthroughEditor({
     })
   }, I.plus, " Add entity"), /*#__PURE__*/React.createElement("div", {
     className: "tp-editor-total"
-  }, /*#__PURE__*/React.createElement("span", null, "Total passthrough income, not subject to SE tax"), /*#__PURE__*/React.createElement("strong", null, usd$(ptTotal(pt)))), /*#__PURE__*/React.createElement(Note, null, "Tick ", /*#__PURE__*/React.createElement("strong", null, "Passive"), " for income that counts toward net investment income. Non-passive trade or business income is excluded from the 3.8% surtax by §1411(c)(2)(A); rental income is included unless the taxpayer qualifies as a real estate professional."));
+  }, /*#__PURE__*/React.createElement("span", null, "Total passthrough income, not subject to SE tax"), /*#__PURE__*/React.createElement("strong", null, usd$(ptTotal(pt)))), /*#__PURE__*/React.createElement(Note, null, "Each activity carries its own §1411 classification — the controlled list drives whether the income enters the 3.8% net investment income base. Nonpassive trade-or-business income is excluded by §1411(c)(2)(A); rental income leaves the base only once the activity is affirmatively classified. Unclassified activities keep the legacy treatment and are flagged for human review."), result && (result.niitDetail || []).length > 0 && /*#__PURE__*/React.createElement("table", {
+    className: "tp-tbl",
+    style: { marginTop: 10 }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Activity"), /*#__PURE__*/React.createElement("th", null, "\u00a71411 treatment"), /*#__PURE__*/React.createElement("th", { className: "num" }, "Income"), /*#__PURE__*/React.createElement("th", { className: "num" }, "In NIIT base"))), /*#__PURE__*/React.createElement("tbody", null, result.niitDetail.map((d, i) => /*#__PURE__*/React.createElement("tr", { key: i }, /*#__PURE__*/React.createElement("td", null, d.name), /*#__PURE__*/React.createElement("td", null, d.classification), /*#__PURE__*/React.createElement("td", { className: "num" }, usd$(d.amount)), /*#__PURE__*/React.createElement("td", { className: "num" }, usd$(d.included)))))), result && (result.niitReview || []).map((w, i) => /*#__PURE__*/React.createElement(Note, {
+    kind: "warn",
+    key: "nr" + i
+  }, "Human review required: ", w)));
 }
 
 /* ---- S corporations: compensation, derived K-1, and §199A attributes ---- */
@@ -1161,7 +1237,7 @@ function SCorpEditor({
       className: "ind"
     }, "Less employer payroll tax", /*#__PURE__*/React.createElement("em", {
       className: "tp-rownote"
-    }, "6.2% OASDI to the wage base plus 1.45% Medicare — the corporation's expense")), /*#__PURE__*/React.createElement("td", {
+    }, "Social Security ", usd$(r.oasdi), " (6.2% to the wage base) + Medicare ", usd$(r.hi), " (1.45%) — the corporation's expense")), /*#__PURE__*/React.createElement("td", {
       className: "num"
     }, "(", usd(r.employerFICA), ")")), r.otherExp > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
       className: "ind"
@@ -1175,9 +1251,11 @@ function SCorpEditor({
       className: "sep"
     }, /*#__PURE__*/React.createElement("td", null, "Employee payroll tax", /*#__PURE__*/React.createElement("em", {
       className: "tp-rownote"
-    }, "withheld from the owner's wages")), /*#__PURE__*/React.createElement("td", {
+    }, "Social Security ", usd$(r.oasdi), " + Medicare ", usd$(r.hi), " — withheld from the owner's wages; Additional Medicare Tax is computed at the return level")), /*#__PURE__*/React.createElement("td", {
       className: "num"
-    }, usd$(r.employeeFICA))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Total payroll tax on this compensation"), /*#__PURE__*/React.createElement("td", {
+    }, usd$(r.employeeFICA))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Combined payroll-tax burden on this compensation", /*#__PURE__*/React.createElement("em", {
+      className: "tp-rownote"
+    }, "employee half is withheld; employer half already reduced the K-1 and is never part of the Form 1040 balance due")), /*#__PURE__*/React.createElement("td", {
       className: "num"
     }, usd$(r.totalFICA))), /*#__PURE__*/React.createElement("tr", {
       className: "sep"
@@ -1276,7 +1354,23 @@ function Schedule1Editor({
     label: "Other adjustments",
     value: s1.otherAdjustments,
     onChange: v => set("otherAdjustments", v)
-  })), /*#__PURE__*/React.createElement("div", {
+  })), num(s1.studentLoanInterest) > 0 && result.studentLoan && /*#__PURE__*/React.createElement("div", {
+    className: "tp-sublist"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "tp-minihead"
+  }, "Student loan interest — Sec. 221 limitation"), /*#__PURE__*/React.createElement("div", {
+    className: "tp-subline"
+  }, /*#__PURE__*/React.createElement("span", null, "Interest entered"), /*#__PURE__*/React.createElement("strong", null, usd$(result.studentLoan.entered))), /*#__PURE__*/React.createElement("div", {
+    className: "tp-subline"
+  }, /*#__PURE__*/React.createElement("span", null, "Maximum deduction"), /*#__PURE__*/React.createElement("strong", null, usd$(result.studentLoan.max))), /*#__PURE__*/React.createElement("div", {
+    className: "tp-subline"
+  }, /*#__PURE__*/React.createElement("span", null, "MAGI before this deduction"), /*#__PURE__*/React.createElement("strong", null, usd$(result.studentLoan.magi))), /*#__PURE__*/React.createElement("div", {
+    className: "tp-subline"
+  }, /*#__PURE__*/React.createElement("span", null, "Phase-out applied"), /*#__PURE__*/React.createElement("strong", null, pct(result.studentLoan.phaseoutFraction, 1))), /*#__PURE__*/React.createElement("div", {
+    className: "tp-subline"
+  }, /*#__PURE__*/React.createElement("span", null, "Allowed deduction"), /*#__PURE__*/React.createElement("strong", null, usd$(result.studentLoan.allowed))), result.studentLoan.reason && /*#__PURE__*/React.createElement(Note, {
+    kind: "warn"
+  }, result.studentLoan.reason)), /*#__PURE__*/React.createElement("div", {
     className: "tp-editor-total"
   }, /*#__PURE__*/React.createElement("span", null, "Total adjustments to income"), /*#__PURE__*/React.createElement("strong", null, usd$(result.adjustments))));
 }
@@ -1325,7 +1419,9 @@ function ScheduleAEditor({
     onChange: v => set("salesTax", v)
   })), /*#__PURE__*/React.createElement("div", {
     className: "tp-subline"
-  }, /*#__PURE__*/React.createElement("span", null, "SALT after the cap of ", usd$(A.saltCap)), /*#__PURE__*/React.createElement("strong", null, usd$(A.salt))), A.saltCap < C.saltCap[result.status] && /*#__PURE__*/React.createElement(Note, {
+  }, /*#__PURE__*/React.createElement("span", null, "SALT after the cap of ", usd$(A.saltCap), /*#__PURE__*/React.createElement("em", {
+    className: "tp-rownote"
+  }, A.saltElection, " — income and sales tax are alternatives, not additive")), /*#__PURE__*/React.createElement("strong", null, usd$(A.salt))), A.saltCap < C.saltCap[result.status] && /*#__PURE__*/React.createElement(Note, {
     kind: "warn"
   }, "The cap is phased down from ", usd$(C.saltCap[result.status]), " because MAGI exceeds ", usd$(C.saltThreshold[result.status]), ". It falls 30 cents per dollar of excess MAGI, with a floor of ", usd$(C.saltFloor[result.status]), "."), /*#__PURE__*/React.createElement("div", {
     className: "tp-minihead"
@@ -1395,7 +1491,9 @@ function Sched1AEditor({
     className: "tp-stack"
   }, /*#__PURE__*/React.createElement(Note, {
     kind: "warn"
-  }, "These four OBBBA deductions run 2025 through 2028 and are available whether or not the taxpayer itemizes. Critically, they are reported ", /*#__PURE__*/React.createElement("strong", null, "below the line"), " on Form 1040 line 13b — they reduce taxable income but ", /*#__PURE__*/React.createElement("strong", null, "not AGI"), ", so they never relieve any AGI-driven phase-out, IRMAA tier, or the net investment income tax."), /*#__PURE__*/React.createElement("div", {
+  }, "These four OBBBA deductions run 2025 through 2028 and are available whether or not the taxpayer itemizes. Critically, they are reported ", /*#__PURE__*/React.createElement("strong", null, "below the line"), " on Form 1040 line 13b — they reduce taxable income but ", /*#__PURE__*/React.createElement("strong", null, "not AGI"), ", so they never relieve any AGI-driven phase-out, IRMAA tier, or the net investment income tax."), S.ineligibleReason && /*#__PURE__*/React.createElement(Note, {
+    kind: "bad"
+  }, /*#__PURE__*/React.createElement("strong", null, S.ineligibleReason), " The senior, tip, overtime, and vehicle-loan-interest deductions require a joint return for married taxpayers. Amounts entered below are retained but no deduction is allowed while the filing status is married filing separately."), /*#__PURE__*/React.createElement("div", {
     className: "tp-grid3"
   }, /*#__PURE__*/React.createElement(Field, {
     label: "Individuals age 65 or older",
