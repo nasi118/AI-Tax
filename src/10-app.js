@@ -416,13 +416,18 @@ function App() {
   const [noteDraft, setNoteDraft] = useState("");
   const [showCalc, setShowCalc] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [showAI, setShowAI] = useState(false);
   const [zTop, setZTop] = useState({
     calc: 61,
-    notes: 60
+    notes: 60,
+    ai: 62
   });
-  const raise = which => setZTop(z => z[which] >= Math.max(z.calc, z.notes) ? z : {
-    ...z,
-    [which]: Math.max(z.calc, z.notes) + 1
+  const raise = which => setZTop(z => {
+    const top = Math.max(z.calc, z.notes, z.ai);
+    return z[which] >= top ? z : {
+      ...z,
+      [which]: top + 1
+    };
   });
   const results = useMemo(() => scenarios.map(s => ({
     s,
@@ -737,7 +742,14 @@ function App() {
       raise("notes");
     },
     title: "Notes"
-  }, I.note, /*#__PURE__*/React.createElement("span", null, "Notes", notes.length ? " (" + notes.length + ")" : ""))), showCalc && /*#__PURE__*/React.createElement(Calculator, {
+  }, I.note, /*#__PURE__*/React.createElement("span", null, "Notes", notes.length ? " (" + notes.length + ")" : "")), /*#__PURE__*/React.createElement("button", {
+    className: "tp-dockbtn " + (showAI ? "on" : ""),
+    onClick: () => {
+      setShowAI(v => !v);
+      raise("ai");
+    },
+    title: "AI Advisor"
+  }, I.chat, /*#__PURE__*/React.createElement("span", null, "AI Advisor"))), showCalc && /*#__PURE__*/React.createElement(Calculator, {
     onClose: () => setShowCalc(false),
     result: activeResult,
     scenarioName: active.name,
@@ -758,6 +770,19 @@ function App() {
     z: zTop.notes,
     draft: noteDraft,
     setDraft: setNoteDraft
+  }), showAI && /*#__PURE__*/React.createElement(AIChat, {
+    onClose: () => setShowAI(false),
+    result: activeResult,
+    scenarioName: active.name,
+    status: status,
+    year: year,
+    onFocus: () => raise("ai"),
+    z: zTop.ai,
+    onSendToNotes: text => {
+      setNoteDraft(d => (d ? d + "\n\n" : "") + text);
+      setShowNotes(true);
+      raise("notes");
+    }
   }));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));
