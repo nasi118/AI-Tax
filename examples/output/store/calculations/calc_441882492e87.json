@@ -1,0 +1,4536 @@
+{
+ "calculation_id": "calc_441882492e87",
+ "case_id": "case_example",
+ "target_id": "scn_5caa3be35670",
+ "target_kind": "scenario",
+ "scenario_version": 2,
+ "engine_version": "engine-0.1.0",
+ "schema_version": "schema-0.1.0",
+ "ruleset_versions": {
+  "2025": "us-federal-2025-v1",
+  "2026": "us-federal-2026-v1",
+  "2027": "us-federal-2027-v1",
+  "2028": "us-federal-2028-v1",
+  "2029": "us-federal-2029-v1"
+ },
+ "input_snapshot_hash": "sha256:7a4e9e200639721eab4e1f5431918cf166613b382abf2838ec476a5e237c4288",
+ "calculated_at": "2026-07-28T02:15:44+00:00",
+ "years": {
+  "2025": {
+   "tax_year": 2025,
+   "ruleset_id": "us-federal-2025-v1",
+   "ruleset_status": "enacted",
+   "summary": {
+    "total_income": "278000",
+    "agi": "247000",
+    "deduction": "39500",
+    "taxable_income": "207500",
+    "regular_tax": "33378",
+    "child_tax_credit": "500",
+    "niit": "0",
+    "total_tax": "32878",
+    "total_payments": "41000",
+    "balance_due": "0",
+    "refund": "8122",
+    "effective_rate": "0.1331",
+    "marginal_ordinary_rate": "0.22"
+   },
+   "forms": {
+    "F1040": [
+     {
+      "line_id": "F1040.L1",
+      "label": "Wages",
+      "value": "240000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.income.wages"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L2b",
+      "label": "Taxable interest",
+      "value": "6000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.income.taxable_interest"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L3a",
+      "label": "Qualified dividends",
+      "value": "12000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.income.qualified_dividends"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L3b",
+      "label": "Ordinary dividends",
+      "value": "14000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.income.ordinary_dividends"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L4b",
+      "label": "Taxable IRA distributions (incl. Roth conversion)",
+      "value": "0",
+      "formula": "income.ira_distribution + income.ira_conversion",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.income.ira_distribution",
+       "years.2025.income.ira_conversion"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L7",
+      "label": "Capital gain/(loss)",
+      "value": "18000",
+      "formula": "SCHD.L21",
+      "upstream_line_ids": [
+       "SCHD.L21"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L8",
+      "label": "Other income from Schedule 1",
+      "value": "0",
+      "formula": "SCH1.L10",
+      "upstream_line_ids": [
+       "SCH1.L10"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L9",
+      "label": "Total income",
+      "value": "278000",
+      "formula": "L1 + L2b + L3b + L4b + L7 + L8",
+      "upstream_line_ids": [
+       "F1040.L1",
+       "F1040.L2b",
+       "F1040.L3b",
+       "F1040.L4b",
+       "F1040.L7",
+       "F1040.L8"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L10",
+      "label": "Adjustments to income",
+      "value": "31000",
+      "formula": "SCH1.L20 + SCH1.L24",
+      "upstream_line_ids": [
+       "SCH1.L20",
+       "SCH1.L24"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L11",
+      "label": "Adjusted gross income",
+      "value": "247000",
+      "formula": "L9 - L10",
+      "upstream_line_ids": [
+       "F1040.L9",
+       "F1040.L10"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L12",
+      "label": "Deduction (standard or itemized)",
+      "value": "39500",
+      "formula": "SCHA.L17 elected",
+      "upstream_line_ids": [
+       "SCHA.L17"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.elections.itemize_deductions"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L15",
+      "label": "Taxable income",
+      "value": "207500",
+      "formula": "max(0, L11 - L12)",
+      "upstream_line_ids": [
+       "F1040.L11",
+       "F1040.L12"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L16",
+      "label": "Tax (QDCGT worksheet)",
+      "value": "33378",
+      "formula": "min(bracket tax on ordinary part + preferential-rate tax, bracket tax on all income)",
+      "upstream_line_ids": [
+       "QDCGT.L7",
+       "QDCGT.L20",
+       "QDCGT.L21",
+       "QDCGT.L22"
+      ],
+      "parameter_ids": [
+       "us-federal-2025-v1:ordinary_brackets.married_filing_jointly",
+       "us-federal-2025-v1:ltcg_rates"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L19",
+      "label": "Child tax credit / credit for other dependents",
+      "value": "500",
+      "formula": "S8812.L14",
+      "upstream_line_ids": [
+       "S8812.L14"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L22",
+      "label": "Tax after credits",
+      "value": "32878",
+      "formula": "max(0, L16 - L19)",
+      "upstream_line_ids": [
+       "F1040.L16",
+       "F1040.L19"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L23",
+      "label": "Other taxes (NIIT)",
+      "value": "0",
+      "formula": "F8960.L17",
+      "upstream_line_ids": [
+       "F8960.L17"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L24",
+      "label": "Total tax",
+      "value": "32878",
+      "formula": "L22 + L23",
+      "upstream_line_ids": [
+       "F1040.L22",
+       "F1040.L23"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L25",
+      "label": "Federal income tax withheld",
+      "value": "41000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.payments.federal_withholding"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L26",
+      "label": "Estimated tax payments",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.payments.estimated_payments"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L33",
+      "label": "Total payments",
+      "value": "41000",
+      "formula": "L25 + L26",
+      "upstream_line_ids": [
+       "F1040.L25",
+       "F1040.L26"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L34",
+      "label": "Refund",
+      "value": "8122",
+      "formula": "L33 - L24",
+      "upstream_line_ids": [
+       "F1040.L24",
+       "F1040.L33"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L37",
+      "label": "Amount you owe",
+      "value": "0",
+      "formula": "not applicable",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     }
+    ],
+    "SCH1": [
+     {
+      "line_id": "SCH1.L10",
+      "label": "Other income (Schedule 1)",
+      "value": "0",
+      "formula": "income.other_income + income.self_employment_income",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.income.other_income",
+       "years.2025.income.self_employment_income"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     },
+     {
+      "line_id": "SCH1.L20",
+      "label": "Traditional IRA deduction",
+      "value": "0",
+      "formula": "min(input, 8000)",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2025-v1:ira_contribution_limit"
+      ],
+      "source_input_ids": [
+       "years.2025.adjustments.traditional_ira_contribution"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     },
+     {
+      "line_id": "SCH1.L24",
+      "label": "Pre-tax 401(k) deferral (modeled as adjustment)",
+      "value": "31000",
+      "formula": "min(input, 31000)",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2025-v1:limit_401k"
+      ],
+      "source_input_ids": [
+       "years.2025.adjustments.pretax_401k_contribution"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     }
+    ],
+    "SCHA": [
+     {
+      "line_id": "SCHA.L7",
+      "label": "State and local taxes (capped)",
+      "value": "22000",
+      "formula": "min(input, cap 40000)",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2025-v1:salt_cap.married_filing_jointly"
+      ],
+      "source_input_ids": [
+       "years.2025.itemized.state_local_taxes_paid"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L8e",
+      "label": "Home mortgage interest",
+      "value": "9500",
+      "formula": "input (acquisition-debt limit not modeled)",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.itemized.mortgage_interest"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L14",
+      "label": "Charitable contributions (cash)",
+      "value": "8000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.itemized.charitable_cash"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L4",
+      "label": "Medical expenses above AGI floor",
+      "value": "0",
+      "formula": "max(0, input - 0.075 * AGI)",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2025-v1:medical_agi_floor_rate"
+      ],
+      "source_input_ids": [
+       "years.2025.itemized.medical_expenses"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L17",
+      "label": "Total itemized deductions",
+      "value": "39500",
+      "formula": "SCHA.L4 + L7 + L8e + L14",
+      "upstream_line_ids": [
+       "SCHA.L4",
+       "SCHA.L7",
+       "SCHA.L8e",
+       "SCHA.L14"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     }
+    ],
+    "SCHD": [
+     {
+      "line_id": "SCHD.L7",
+      "label": "Net short-term capital gain/(loss)",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.income.short_term_capital_gain"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L15",
+      "label": "Net long-term capital gain/(loss)",
+      "value": "18000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2025.income.long_term_capital_gain"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L16",
+      "label": "Combined net gain/(loss)",
+      "value": "18000",
+      "formula": "SCHD.L7 + SCHD.L15",
+      "upstream_line_ids": [
+       "SCHD.L7",
+       "SCHD.L15"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L21",
+      "label": "Allowed capital gain/(loss) to Form 1040",
+      "value": "18000",
+      "formula": "max(SCHD.L16, -3000)",
+      "upstream_line_ids": [
+       "SCHD.L16"
+      ],
+      "parameter_ids": [
+       "us-federal-2025-v1:capital_loss_limit.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     }
+    ],
+    "S8812": [
+     {
+      "line_id": "S8812.L5",
+      "label": "Credit before phaseout",
+      "value": "500",
+      "formula": "ctc_per_child * children + odc * other dependents",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2025-v1:ctc_per_child",
+       "us-federal-2025-v1:odc_per_dependent"
+      ],
+      "source_input_ids": [
+       "household.ctc_qualifying_children",
+       "household.other_dependents"
+      ],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     },
+     {
+      "line_id": "S8812.L10",
+      "label": "Phaseout reduction",
+      "value": "0",
+      "formula": "50 per 1,000 (or part) of MAGI over threshold",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2025-v1:ctc_phaseout_threshold.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     },
+     {
+      "line_id": "S8812.L14",
+      "label": "Allowed CTC/ODC (nonrefundable)",
+      "value": "500",
+      "formula": "min(max(0, L5 - L10), F1040.L16)",
+      "upstream_line_ids": [
+       "S8812.L5",
+       "S8812.L10",
+       "F1040.L16"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     }
+    ],
+    "F8960": [
+     {
+      "line_id": "F8960.L17",
+      "label": "Net investment income tax",
+      "value": "0",
+      "formula": "3.8% * min(net investment income, max(0, MAGI - threshold))",
+      "upstream_line_ids": [
+       "F1040.L2b",
+       "F1040.L3b",
+       "SCHD.L21",
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2025-v1:niit_rate",
+       "us-federal-2025-v1:niit_magi_threshold.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F8960"
+     }
+    ]
+   },
+   "worksheets": {
+    "QDCGT": [
+     {
+      "line_id": "QDCGT.L7",
+      "label": "Taxable income taxed at ordinary rates",
+      "value": "177500",
+      "formula": "L15 - preferential income",
+      "upstream_line_ids": [
+       "F1040.L15",
+       "F1040.L3a",
+       "SCHD.L21"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L6",
+      "label": "Preferential-rate income (QD + net LTCG)",
+      "value": "30000",
+      "formula": "min(L15, qualified dividends + net LT gain)",
+      "upstream_line_ids": [
+       "F1040.L15",
+       "F1040.L3a",
+       "SCHD.L15"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L20",
+      "label": "0%-rate amount",
+      "value": "0",
+      "formula": "min(0% ceiling, L15) - ordinary part",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2025-v1:ltcg_0_top.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L21",
+      "label": "15%-rate amount",
+      "value": "30000",
+      "formula": "up to 15% ceiling",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2025-v1:ltcg_15_top.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L22",
+      "label": "20%-rate amount",
+      "value": "0",
+      "formula": "remainder of preferential income",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     }
+    ]
+   },
+   "diagnostics": [],
+   "reconciliation": [
+    {
+     "check_id": "REC-INC-001",
+     "description": "Total income equals the sum of income lines",
+     "status": "passed",
+     "expected": "278000",
+     "actual": "278000",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L1",
+      "F1040.L2b",
+      "F1040.L3b",
+      "F1040.L4b",
+      "F1040.L7",
+      "F1040.L8",
+      "F1040.L9"
+     ]
+    },
+    {
+     "check_id": "REC-CG-001",
+     "description": "Form 1040 capital gain equals Schedule D allowed amount",
+     "status": "passed",
+     "expected": "18000",
+     "actual": "18000",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCHD.L21",
+      "F1040.L7"
+     ]
+    },
+    {
+     "check_id": "REC-ADJ-001",
+     "description": "Adjustments equal Schedule 1 detail",
+     "status": "passed",
+     "expected": "31000",
+     "actual": "31000",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCH1.L20",
+      "SCH1.L24",
+      "F1040.L10"
+     ]
+    },
+    {
+     "check_id": "REC-AGI-001",
+     "description": "AGI equals total income minus adjustments",
+     "status": "passed",
+     "expected": "247000",
+     "actual": "247000",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L9",
+      "F1040.L10",
+      "F1040.L11"
+     ]
+    },
+    {
+     "check_id": "REC-DED-001",
+     "description": "Itemized total equals Schedule A detail",
+     "status": "passed",
+     "expected": "39500",
+     "actual": "39500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCHA.L4",
+      "SCHA.L7",
+      "SCHA.L8e",
+      "SCHA.L14",
+      "SCHA.L17"
+     ]
+    },
+    {
+     "check_id": "REC-TI-001",
+     "description": "Taxable income follows the prescribed sequence",
+     "status": "passed",
+     "expected": "207500",
+     "actual": "207500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L11",
+      "F1040.L12",
+      "F1040.L15"
+     ]
+    },
+    {
+     "check_id": "REC-CTC-001",
+     "description": "CTC on Form 1040 equals Schedule 8812",
+     "status": "passed",
+     "expected": "500",
+     "actual": "500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "S8812.L14",
+      "F1040.L19"
+     ]
+    },
+    {
+     "check_id": "REC-TAX-001",
+     "description": "Tax after credits equals tax minus credits",
+     "status": "passed",
+     "expected": "32878",
+     "actual": "32878",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L16",
+      "F1040.L19",
+      "F1040.L22"
+     ]
+    },
+    {
+     "check_id": "REC-TAX-002",
+     "description": "Total tax equals tax after credits plus other taxes",
+     "status": "passed",
+     "expected": "32878",
+     "actual": "32878",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L22",
+      "F1040.L23",
+      "F1040.L24"
+     ]
+    },
+    {
+     "check_id": "REC-PAY-001",
+     "description": "Total payments equal withholding plus estimates",
+     "status": "passed",
+     "expected": "41000",
+     "actual": "41000",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L25",
+      "F1040.L26",
+      "F1040.L33"
+     ]
+    },
+    {
+     "check_id": "REC-BAL-001",
+     "description": "Balance due / refund follows from total tax and payments",
+     "status": "passed",
+     "expected": "-8122",
+     "actual": "-8122",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L24",
+      "F1040.L33",
+      "F1040.L34",
+      "F1040.L37"
+     ]
+    },
+    {
+     "check_id": "REC-SUM-001",
+     "description": "Summary total tax matches Form 1040",
+     "status": "passed",
+     "expected": "32878",
+     "actual": "32878",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L24"
+     ]
+    },
+    {
+     "check_id": "REC-SUM-002",
+     "description": "Summary taxable income matches Form 1040",
+     "status": "passed",
+     "expected": "207500",
+     "actual": "207500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L15"
+     ]
+    }
+   ],
+   "calculation_trace": [
+    "SCHD.L7 = 0 (input)",
+    "SCHD.L15 = 18000 (input)",
+    "SCHD.L16 = 18000 (SCHD.L7 + SCHD.L15)",
+    "SCHD.L21 = 18000 (max(SCHD.L16, -3000))",
+    "F1040.L1 = 240000 (input)",
+    "F1040.L2b = 6000 (input)",
+    "F1040.L3a = 12000 (input)",
+    "F1040.L3b = 14000 (input)",
+    "F1040.L4b = 0 (income.ira_distribution + income.ira_conversion)",
+    "F1040.L7 = 18000 (SCHD.L21)",
+    "SCH1.L10 = 0 (income.other_income + income.self_employment_income)",
+    "F1040.L8 = 0 (SCH1.L10)",
+    "F1040.L9 = 278000 (L1 + L2b + L3b + L4b + L7 + L8)",
+    "SCH1.L20 = 0 (min(input, 8000))",
+    "SCH1.L24 = 31000 (min(input, 31000))",
+    "F1040.L10 = 31000 (SCH1.L20 + SCH1.L24)",
+    "F1040.L11 = 247000 (L9 - L10)",
+    "SCHA.L7 = 22000 (min(input, cap 40000))",
+    "SCHA.L8e = 9500 (input (acquisition-debt limit not modeled))",
+    "SCHA.L14 = 8000 (input)",
+    "SCHA.L4 = 0 (max(0, input - 0.075 * AGI))",
+    "SCHA.L17 = 39500 (SCHA.L4 + L7 + L8e + L14)",
+    "F1040.L12 = 39500 (SCHA.L17 elected)",
+    "F1040.L15 = 207500 (max(0, L11 - L12))",
+    "QDCGT.L7 = 177500 (L15 - preferential income)",
+    "QDCGT.L6 = 30000 (min(L15, qualified dividends + net LT gain))",
+    "QDCGT.L20 = 0 (min(0% ceiling, L15) - ordinary part)",
+    "QDCGT.L21 = 30000 (up to 15% ceiling)",
+    "QDCGT.L22 = 0 (remainder of preferential income)",
+    "F1040.L16 = 33378 (min(bracket tax on ordinary part + preferential-rate tax, bracket tax on all income))",
+    "S8812.L5 = 500 (ctc_per_child * children + odc * other dependents)",
+    "S8812.L10 = 0 (50 per 1,000 (or part) of MAGI over threshold)",
+    "S8812.L14 = 500 (min(max(0, L5 - L10), F1040.L16))",
+    "F1040.L19 = 500 (S8812.L14)",
+    "F1040.L22 = 32878 (max(0, L16 - L19))",
+    "F8960.L17 = 0 (3.8% * min(net investment income, max(0, MAGI - threshold)))",
+    "F1040.L23 = 0 (F8960.L17)",
+    "F1040.L24 = 32878 (L22 + L23)",
+    "F1040.L25 = 41000 (input)",
+    "F1040.L26 = 0 (input)",
+    "F1040.L33 = 41000 (L25 + L26)",
+    "F1040.L34 = 8122 (L33 - L24)",
+    "F1040.L37 = 0 (not applicable)"
+   ]
+  },
+  "2026": {
+   "tax_year": 2026,
+   "ruleset_id": "us-federal-2026-v1",
+   "ruleset_status": "provisional",
+   "summary": {
+    "total_income": "267200",
+    "agi": "236200",
+    "deduction": "39500",
+    "taxable_income": "196700",
+    "regular_tax": "32008",
+    "child_tax_credit": "500",
+    "niit": "0",
+    "total_tax": "31508",
+    "total_payments": "42230",
+    "balance_due": "0",
+    "refund": "10722",
+    "effective_rate": "0.1334",
+    "marginal_ordinary_rate": "0.22"
+   },
+   "forms": {
+    "F1040": [
+     {
+      "line_id": "F1040.L1",
+      "label": "Wages",
+      "value": "247200",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.income.wages"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L2b",
+      "label": "Taxable interest",
+      "value": "6000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.income.taxable_interest"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L3a",
+      "label": "Qualified dividends",
+      "value": "12000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.income.qualified_dividends"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L3b",
+      "label": "Ordinary dividends",
+      "value": "14000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.income.ordinary_dividends"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L4b",
+      "label": "Taxable IRA distributions (incl. Roth conversion)",
+      "value": "0",
+      "formula": "income.ira_distribution + income.ira_conversion",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.income.ira_distribution",
+       "years.2026.income.ira_conversion"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L7",
+      "label": "Capital gain/(loss)",
+      "value": "0",
+      "formula": "SCHD.L21",
+      "upstream_line_ids": [
+       "SCHD.L21"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L8",
+      "label": "Other income from Schedule 1",
+      "value": "0",
+      "formula": "SCH1.L10",
+      "upstream_line_ids": [
+       "SCH1.L10"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L9",
+      "label": "Total income",
+      "value": "267200",
+      "formula": "L1 + L2b + L3b + L4b + L7 + L8",
+      "upstream_line_ids": [
+       "F1040.L1",
+       "F1040.L2b",
+       "F1040.L3b",
+       "F1040.L4b",
+       "F1040.L7",
+       "F1040.L8"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L10",
+      "label": "Adjustments to income",
+      "value": "31000",
+      "formula": "SCH1.L20 + SCH1.L24",
+      "upstream_line_ids": [
+       "SCH1.L20",
+       "SCH1.L24"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L11",
+      "label": "Adjusted gross income",
+      "value": "236200",
+      "formula": "L9 - L10",
+      "upstream_line_ids": [
+       "F1040.L9",
+       "F1040.L10"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L12",
+      "label": "Deduction (standard or itemized)",
+      "value": "39500",
+      "formula": "SCHA.L17 elected",
+      "upstream_line_ids": [
+       "SCHA.L17"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.elections.itemize_deductions"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L15",
+      "label": "Taxable income",
+      "value": "196700",
+      "formula": "max(0, L11 - L12)",
+      "upstream_line_ids": [
+       "F1040.L11",
+       "F1040.L12"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L16",
+      "label": "Tax (QDCGT worksheet)",
+      "value": "32008",
+      "formula": "min(bracket tax on ordinary part + preferential-rate tax, bracket tax on all income)",
+      "upstream_line_ids": [
+       "QDCGT.L7",
+       "QDCGT.L20",
+       "QDCGT.L21",
+       "QDCGT.L22"
+      ],
+      "parameter_ids": [
+       "us-federal-2026-v1:ordinary_brackets.married_filing_jointly",
+       "us-federal-2026-v1:ltcg_rates"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L19",
+      "label": "Child tax credit / credit for other dependents",
+      "value": "500",
+      "formula": "S8812.L14",
+      "upstream_line_ids": [
+       "S8812.L14"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L22",
+      "label": "Tax after credits",
+      "value": "31508",
+      "formula": "max(0, L16 - L19)",
+      "upstream_line_ids": [
+       "F1040.L16",
+       "F1040.L19"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L23",
+      "label": "Other taxes (NIIT)",
+      "value": "0",
+      "formula": "F8960.L17",
+      "upstream_line_ids": [
+       "F8960.L17"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L24",
+      "label": "Total tax",
+      "value": "31508",
+      "formula": "L22 + L23",
+      "upstream_line_ids": [
+       "F1040.L22",
+       "F1040.L23"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L25",
+      "label": "Federal income tax withheld",
+      "value": "42230",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.payments.federal_withholding"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L26",
+      "label": "Estimated tax payments",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.payments.estimated_payments"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L33",
+      "label": "Total payments",
+      "value": "42230",
+      "formula": "L25 + L26",
+      "upstream_line_ids": [
+       "F1040.L25",
+       "F1040.L26"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L34",
+      "label": "Refund",
+      "value": "10722",
+      "formula": "L33 - L24",
+      "upstream_line_ids": [
+       "F1040.L24",
+       "F1040.L33"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L37",
+      "label": "Amount you owe",
+      "value": "0",
+      "formula": "not applicable",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     }
+    ],
+    "SCH1": [
+     {
+      "line_id": "SCH1.L10",
+      "label": "Other income (Schedule 1)",
+      "value": "0",
+      "formula": "income.other_income + income.self_employment_income",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.income.other_income",
+       "years.2026.income.self_employment_income"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     },
+     {
+      "line_id": "SCH1.L20",
+      "label": "Traditional IRA deduction",
+      "value": "0",
+      "formula": "min(input, 8000)",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2026-v1:ira_contribution_limit"
+      ],
+      "source_input_ids": [
+       "years.2026.adjustments.traditional_ira_contribution"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     },
+     {
+      "line_id": "SCH1.L24",
+      "label": "Pre-tax 401(k) deferral (modeled as adjustment)",
+      "value": "31000",
+      "formula": "min(input, 31500)",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2026-v1:limit_401k"
+      ],
+      "source_input_ids": [
+       "years.2026.adjustments.pretax_401k_contribution"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     }
+    ],
+    "SCHA": [
+     {
+      "line_id": "SCHA.L7",
+      "label": "State and local taxes (capped)",
+      "value": "22000",
+      "formula": "min(input, cap 40400)",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2026-v1:salt_cap.married_filing_jointly"
+      ],
+      "source_input_ids": [
+       "years.2026.itemized.state_local_taxes_paid"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L8e",
+      "label": "Home mortgage interest",
+      "value": "9500",
+      "formula": "input (acquisition-debt limit not modeled)",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.itemized.mortgage_interest"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L14",
+      "label": "Charitable contributions (cash)",
+      "value": "8000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.itemized.charitable_cash"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L4",
+      "label": "Medical expenses above AGI floor",
+      "value": "0",
+      "formula": "max(0, input - 0.075 * AGI)",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2026-v1:medical_agi_floor_rate"
+      ],
+      "source_input_ids": [
+       "years.2026.itemized.medical_expenses"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L17",
+      "label": "Total itemized deductions",
+      "value": "39500",
+      "formula": "SCHA.L4 + L7 + L8e + L14",
+      "upstream_line_ids": [
+       "SCHA.L4",
+       "SCHA.L7",
+       "SCHA.L8e",
+       "SCHA.L14"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     }
+    ],
+    "SCHD": [
+     {
+      "line_id": "SCHD.L7",
+      "label": "Net short-term capital gain/(loss)",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.income.short_term_capital_gain"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L15",
+      "label": "Net long-term capital gain/(loss)",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2026.income.long_term_capital_gain"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L16",
+      "label": "Combined net gain/(loss)",
+      "value": "0",
+      "formula": "SCHD.L7 + SCHD.L15",
+      "upstream_line_ids": [
+       "SCHD.L7",
+       "SCHD.L15"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L21",
+      "label": "Allowed capital gain/(loss) to Form 1040",
+      "value": "0",
+      "formula": "max(SCHD.L16, -3000)",
+      "upstream_line_ids": [
+       "SCHD.L16"
+      ],
+      "parameter_ids": [
+       "us-federal-2026-v1:capital_loss_limit.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     }
+    ],
+    "S8812": [
+     {
+      "line_id": "S8812.L5",
+      "label": "Credit before phaseout",
+      "value": "500",
+      "formula": "ctc_per_child * children + odc * other dependents",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2026-v1:ctc_per_child",
+       "us-federal-2026-v1:odc_per_dependent"
+      ],
+      "source_input_ids": [
+       "household.ctc_qualifying_children",
+       "household.other_dependents"
+      ],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     },
+     {
+      "line_id": "S8812.L10",
+      "label": "Phaseout reduction",
+      "value": "0",
+      "formula": "50 per 1,000 (or part) of MAGI over threshold",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2026-v1:ctc_phaseout_threshold.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     },
+     {
+      "line_id": "S8812.L14",
+      "label": "Allowed CTC/ODC (nonrefundable)",
+      "value": "500",
+      "formula": "min(max(0, L5 - L10), F1040.L16)",
+      "upstream_line_ids": [
+       "S8812.L5",
+       "S8812.L10",
+       "F1040.L16"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     }
+    ],
+    "F8960": [
+     {
+      "line_id": "F8960.L17",
+      "label": "Net investment income tax",
+      "value": "0",
+      "formula": "3.8% * min(net investment income, max(0, MAGI - threshold))",
+      "upstream_line_ids": [
+       "F1040.L2b",
+       "F1040.L3b",
+       "SCHD.L21",
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2026-v1:niit_rate",
+       "us-federal-2026-v1:niit_magi_threshold.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F8960"
+     }
+    ]
+   },
+   "worksheets": {
+    "QDCGT": [
+     {
+      "line_id": "QDCGT.L7",
+      "label": "Taxable income taxed at ordinary rates",
+      "value": "184700",
+      "formula": "L15 - preferential income",
+      "upstream_line_ids": [
+       "F1040.L15",
+       "F1040.L3a",
+       "SCHD.L21"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L6",
+      "label": "Preferential-rate income (QD + net LTCG)",
+      "value": "12000",
+      "formula": "min(L15, qualified dividends + net LT gain)",
+      "upstream_line_ids": [
+       "F1040.L15",
+       "F1040.L3a",
+       "SCHD.L15"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L20",
+      "label": "0%-rate amount",
+      "value": "0",
+      "formula": "min(0% ceiling, L15) - ordinary part",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2026-v1:ltcg_0_top.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L21",
+      "label": "15%-rate amount",
+      "value": "12000",
+      "formula": "up to 15% ceiling",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2026-v1:ltcg_15_top.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L22",
+      "label": "20%-rate amount",
+      "value": "0",
+      "formula": "remainder of preferential income",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     }
+    ]
+   },
+   "diagnostics": [
+    {
+     "code": "RULES-PROV-001",
+     "severity": "warning",
+     "message": "2026: calculated under PROVISIONAL ruleset us-federal-2026-v1 \u2014 Tax year 2026 parameters are PROVISIONAL projections from enacted 2025 law using an assumed 2.5% annual chained-CPI adjustment. They are NOT enacted law and official IRS figures will differ.",
+     "related_line_ids": [],
+     "requires_review": true
+    }
+   ],
+   "reconciliation": [
+    {
+     "check_id": "REC-INC-001",
+     "description": "Total income equals the sum of income lines",
+     "status": "passed",
+     "expected": "267200",
+     "actual": "267200",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L1",
+      "F1040.L2b",
+      "F1040.L3b",
+      "F1040.L4b",
+      "F1040.L7",
+      "F1040.L8",
+      "F1040.L9"
+     ]
+    },
+    {
+     "check_id": "REC-CG-001",
+     "description": "Form 1040 capital gain equals Schedule D allowed amount",
+     "status": "passed",
+     "expected": "0",
+     "actual": "0",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCHD.L21",
+      "F1040.L7"
+     ]
+    },
+    {
+     "check_id": "REC-ADJ-001",
+     "description": "Adjustments equal Schedule 1 detail",
+     "status": "passed",
+     "expected": "31000",
+     "actual": "31000",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCH1.L20",
+      "SCH1.L24",
+      "F1040.L10"
+     ]
+    },
+    {
+     "check_id": "REC-AGI-001",
+     "description": "AGI equals total income minus adjustments",
+     "status": "passed",
+     "expected": "236200",
+     "actual": "236200",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L9",
+      "F1040.L10",
+      "F1040.L11"
+     ]
+    },
+    {
+     "check_id": "REC-DED-001",
+     "description": "Itemized total equals Schedule A detail",
+     "status": "passed",
+     "expected": "39500",
+     "actual": "39500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCHA.L4",
+      "SCHA.L7",
+      "SCHA.L8e",
+      "SCHA.L14",
+      "SCHA.L17"
+     ]
+    },
+    {
+     "check_id": "REC-TI-001",
+     "description": "Taxable income follows the prescribed sequence",
+     "status": "passed",
+     "expected": "196700",
+     "actual": "196700",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L11",
+      "F1040.L12",
+      "F1040.L15"
+     ]
+    },
+    {
+     "check_id": "REC-CTC-001",
+     "description": "CTC on Form 1040 equals Schedule 8812",
+     "status": "passed",
+     "expected": "500",
+     "actual": "500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "S8812.L14",
+      "F1040.L19"
+     ]
+    },
+    {
+     "check_id": "REC-TAX-001",
+     "description": "Tax after credits equals tax minus credits",
+     "status": "passed",
+     "expected": "31508",
+     "actual": "31508",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L16",
+      "F1040.L19",
+      "F1040.L22"
+     ]
+    },
+    {
+     "check_id": "REC-TAX-002",
+     "description": "Total tax equals tax after credits plus other taxes",
+     "status": "passed",
+     "expected": "31508",
+     "actual": "31508",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L22",
+      "F1040.L23",
+      "F1040.L24"
+     ]
+    },
+    {
+     "check_id": "REC-PAY-001",
+     "description": "Total payments equal withholding plus estimates",
+     "status": "passed",
+     "expected": "42230",
+     "actual": "42230",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L25",
+      "F1040.L26",
+      "F1040.L33"
+     ]
+    },
+    {
+     "check_id": "REC-BAL-001",
+     "description": "Balance due / refund follows from total tax and payments",
+     "status": "passed",
+     "expected": "-10722",
+     "actual": "-10722",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L24",
+      "F1040.L33",
+      "F1040.L34",
+      "F1040.L37"
+     ]
+    },
+    {
+     "check_id": "REC-SUM-001",
+     "description": "Summary total tax matches Form 1040",
+     "status": "passed",
+     "expected": "31508",
+     "actual": "31508",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L24"
+     ]
+    },
+    {
+     "check_id": "REC-SUM-002",
+     "description": "Summary taxable income matches Form 1040",
+     "status": "passed",
+     "expected": "196700",
+     "actual": "196700",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L15"
+     ]
+    }
+   ],
+   "calculation_trace": [
+    "SCHD.L7 = 0 (input)",
+    "SCHD.L15 = 0 (input)",
+    "SCHD.L16 = 0 (SCHD.L7 + SCHD.L15)",
+    "SCHD.L21 = 0 (max(SCHD.L16, -3000))",
+    "F1040.L1 = 247200 (input)",
+    "F1040.L2b = 6000 (input)",
+    "F1040.L3a = 12000 (input)",
+    "F1040.L3b = 14000 (input)",
+    "F1040.L4b = 0 (income.ira_distribution + income.ira_conversion)",
+    "F1040.L7 = 0 (SCHD.L21)",
+    "SCH1.L10 = 0 (income.other_income + income.self_employment_income)",
+    "F1040.L8 = 0 (SCH1.L10)",
+    "F1040.L9 = 267200 (L1 + L2b + L3b + L4b + L7 + L8)",
+    "SCH1.L20 = 0 (min(input, 8000))",
+    "SCH1.L24 = 31000 (min(input, 31500))",
+    "F1040.L10 = 31000 (SCH1.L20 + SCH1.L24)",
+    "F1040.L11 = 236200 (L9 - L10)",
+    "SCHA.L7 = 22000 (min(input, cap 40400))",
+    "SCHA.L8e = 9500 (input (acquisition-debt limit not modeled))",
+    "SCHA.L14 = 8000 (input)",
+    "SCHA.L4 = 0 (max(0, input - 0.075 * AGI))",
+    "SCHA.L17 = 39500 (SCHA.L4 + L7 + L8e + L14)",
+    "F1040.L12 = 39500 (SCHA.L17 elected)",
+    "F1040.L15 = 196700 (max(0, L11 - L12))",
+    "QDCGT.L7 = 184700 (L15 - preferential income)",
+    "QDCGT.L6 = 12000 (min(L15, qualified dividends + net LT gain))",
+    "QDCGT.L20 = 0 (min(0% ceiling, L15) - ordinary part)",
+    "QDCGT.L21 = 12000 (up to 15% ceiling)",
+    "QDCGT.L22 = 0 (remainder of preferential income)",
+    "F1040.L16 = 32008 (min(bracket tax on ordinary part + preferential-rate tax, bracket tax on all income))",
+    "S8812.L5 = 500 (ctc_per_child * children + odc * other dependents)",
+    "S8812.L10 = 0 (50 per 1,000 (or part) of MAGI over threshold)",
+    "S8812.L14 = 500 (min(max(0, L5 - L10), F1040.L16))",
+    "F1040.L19 = 500 (S8812.L14)",
+    "F1040.L22 = 31508 (max(0, L16 - L19))",
+    "F8960.L17 = 0 (3.8% * min(net investment income, max(0, MAGI - threshold)))",
+    "F1040.L23 = 0 (F8960.L17)",
+    "F1040.L24 = 31508 (L22 + L23)",
+    "F1040.L25 = 42230 (input)",
+    "F1040.L26 = 0 (input)",
+    "F1040.L33 = 42230 (L25 + L26)",
+    "F1040.L34 = 10722 (L33 - L24)",
+    "F1040.L37 = 0 (not applicable)"
+   ]
+  },
+  "2027": {
+   "tax_year": 2027,
+   "ruleset_id": "us-federal-2027-v1",
+   "ruleset_status": "provisional",
+   "summary": {
+    "total_income": "274616",
+    "agi": "243616",
+    "deduction": "39500",
+    "taxable_income": "204116",
+    "regular_tax": "33380",
+    "child_tax_credit": "500",
+    "niit": "0",
+    "total_tax": "32880",
+    "total_payments": "43497",
+    "balance_due": "0",
+    "refund": "10617",
+    "effective_rate": "0.1350",
+    "marginal_ordinary_rate": "0.22"
+   },
+   "forms": {
+    "F1040": [
+     {
+      "line_id": "F1040.L1",
+      "label": "Wages",
+      "value": "254616",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.income.wages"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L2b",
+      "label": "Taxable interest",
+      "value": "6000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.income.taxable_interest"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L3a",
+      "label": "Qualified dividends",
+      "value": "12000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.income.qualified_dividends"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L3b",
+      "label": "Ordinary dividends",
+      "value": "14000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.income.ordinary_dividends"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L4b",
+      "label": "Taxable IRA distributions (incl. Roth conversion)",
+      "value": "0",
+      "formula": "income.ira_distribution + income.ira_conversion",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.income.ira_distribution",
+       "years.2027.income.ira_conversion"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L7",
+      "label": "Capital gain/(loss)",
+      "value": "0",
+      "formula": "SCHD.L21",
+      "upstream_line_ids": [
+       "SCHD.L21"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L8",
+      "label": "Other income from Schedule 1",
+      "value": "0",
+      "formula": "SCH1.L10",
+      "upstream_line_ids": [
+       "SCH1.L10"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L9",
+      "label": "Total income",
+      "value": "274616",
+      "formula": "L1 + L2b + L3b + L4b + L7 + L8",
+      "upstream_line_ids": [
+       "F1040.L1",
+       "F1040.L2b",
+       "F1040.L3b",
+       "F1040.L4b",
+       "F1040.L7",
+       "F1040.L8"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L10",
+      "label": "Adjustments to income",
+      "value": "31000",
+      "formula": "SCH1.L20 + SCH1.L24",
+      "upstream_line_ids": [
+       "SCH1.L20",
+       "SCH1.L24"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L11",
+      "label": "Adjusted gross income",
+      "value": "243616",
+      "formula": "L9 - L10",
+      "upstream_line_ids": [
+       "F1040.L9",
+       "F1040.L10"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L12",
+      "label": "Deduction (standard or itemized)",
+      "value": "39500",
+      "formula": "SCHA.L17 elected",
+      "upstream_line_ids": [
+       "SCHA.L17"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.elections.itemize_deductions"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L15",
+      "label": "Taxable income",
+      "value": "204116",
+      "formula": "max(0, L11 - L12)",
+      "upstream_line_ids": [
+       "F1040.L11",
+       "F1040.L12"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L16",
+      "label": "Tax (QDCGT worksheet)",
+      "value": "33380",
+      "formula": "min(bracket tax on ordinary part + preferential-rate tax, bracket tax on all income)",
+      "upstream_line_ids": [
+       "QDCGT.L7",
+       "QDCGT.L20",
+       "QDCGT.L21",
+       "QDCGT.L22"
+      ],
+      "parameter_ids": [
+       "us-federal-2027-v1:ordinary_brackets.married_filing_jointly",
+       "us-federal-2027-v1:ltcg_rates"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L19",
+      "label": "Child tax credit / credit for other dependents",
+      "value": "500",
+      "formula": "S8812.L14",
+      "upstream_line_ids": [
+       "S8812.L14"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L22",
+      "label": "Tax after credits",
+      "value": "32880",
+      "formula": "max(0, L16 - L19)",
+      "upstream_line_ids": [
+       "F1040.L16",
+       "F1040.L19"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L23",
+      "label": "Other taxes (NIIT)",
+      "value": "0",
+      "formula": "F8960.L17",
+      "upstream_line_ids": [
+       "F8960.L17"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L24",
+      "label": "Total tax",
+      "value": "32880",
+      "formula": "L22 + L23",
+      "upstream_line_ids": [
+       "F1040.L22",
+       "F1040.L23"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L25",
+      "label": "Federal income tax withheld",
+      "value": "43497",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.payments.federal_withholding"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L26",
+      "label": "Estimated tax payments",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.payments.estimated_payments"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L33",
+      "label": "Total payments",
+      "value": "43497",
+      "formula": "L25 + L26",
+      "upstream_line_ids": [
+       "F1040.L25",
+       "F1040.L26"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L34",
+      "label": "Refund",
+      "value": "10617",
+      "formula": "L33 - L24",
+      "upstream_line_ids": [
+       "F1040.L24",
+       "F1040.L33"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L37",
+      "label": "Amount you owe",
+      "value": "0",
+      "formula": "not applicable",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     }
+    ],
+    "SCH1": [
+     {
+      "line_id": "SCH1.L10",
+      "label": "Other income (Schedule 1)",
+      "value": "0",
+      "formula": "income.other_income + income.self_employment_income",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.income.other_income",
+       "years.2027.income.self_employment_income"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     },
+     {
+      "line_id": "SCH1.L20",
+      "label": "Traditional IRA deduction",
+      "value": "0",
+      "formula": "min(input, 8600)",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2027-v1:ira_contribution_limit"
+      ],
+      "source_input_ids": [
+       "years.2027.adjustments.traditional_ira_contribution"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     },
+     {
+      "line_id": "SCH1.L24",
+      "label": "Pre-tax 401(k) deferral (modeled as adjustment)",
+      "value": "31000",
+      "formula": "min(input, 32500)",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2027-v1:limit_401k"
+      ],
+      "source_input_ids": [
+       "years.2027.adjustments.pretax_401k_contribution"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     }
+    ],
+    "SCHA": [
+     {
+      "line_id": "SCHA.L7",
+      "label": "State and local taxes (capped)",
+      "value": "22000",
+      "formula": "min(input, cap 40800)",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2027-v1:salt_cap.married_filing_jointly"
+      ],
+      "source_input_ids": [
+       "years.2027.itemized.state_local_taxes_paid"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L8e",
+      "label": "Home mortgage interest",
+      "value": "9500",
+      "formula": "input (acquisition-debt limit not modeled)",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.itemized.mortgage_interest"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L14",
+      "label": "Charitable contributions (cash)",
+      "value": "8000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.itemized.charitable_cash"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L4",
+      "label": "Medical expenses above AGI floor",
+      "value": "0",
+      "formula": "max(0, input - 0.075 * AGI)",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2027-v1:medical_agi_floor_rate"
+      ],
+      "source_input_ids": [
+       "years.2027.itemized.medical_expenses"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L17",
+      "label": "Total itemized deductions",
+      "value": "39500",
+      "formula": "SCHA.L4 + L7 + L8e + L14",
+      "upstream_line_ids": [
+       "SCHA.L4",
+       "SCHA.L7",
+       "SCHA.L8e",
+       "SCHA.L14"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     }
+    ],
+    "SCHD": [
+     {
+      "line_id": "SCHD.L7",
+      "label": "Net short-term capital gain/(loss)",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.income.short_term_capital_gain"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L15",
+      "label": "Net long-term capital gain/(loss)",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2027.income.long_term_capital_gain"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L16",
+      "label": "Combined net gain/(loss)",
+      "value": "0",
+      "formula": "SCHD.L7 + SCHD.L15",
+      "upstream_line_ids": [
+       "SCHD.L7",
+       "SCHD.L15"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L21",
+      "label": "Allowed capital gain/(loss) to Form 1040",
+      "value": "0",
+      "formula": "max(SCHD.L16, -3000)",
+      "upstream_line_ids": [
+       "SCHD.L16"
+      ],
+      "parameter_ids": [
+       "us-federal-2027-v1:capital_loss_limit.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     }
+    ],
+    "S8812": [
+     {
+      "line_id": "S8812.L5",
+      "label": "Credit before phaseout",
+      "value": "500",
+      "formula": "ctc_per_child * children + odc * other dependents",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2027-v1:ctc_per_child",
+       "us-federal-2027-v1:odc_per_dependent"
+      ],
+      "source_input_ids": [
+       "household.ctc_qualifying_children",
+       "household.other_dependents"
+      ],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     },
+     {
+      "line_id": "S8812.L10",
+      "label": "Phaseout reduction",
+      "value": "0",
+      "formula": "50 per 1,000 (or part) of MAGI over threshold",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2027-v1:ctc_phaseout_threshold.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     },
+     {
+      "line_id": "S8812.L14",
+      "label": "Allowed CTC/ODC (nonrefundable)",
+      "value": "500",
+      "formula": "min(max(0, L5 - L10), F1040.L16)",
+      "upstream_line_ids": [
+       "S8812.L5",
+       "S8812.L10",
+       "F1040.L16"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     }
+    ],
+    "F8960": [
+     {
+      "line_id": "F8960.L17",
+      "label": "Net investment income tax",
+      "value": "0",
+      "formula": "3.8% * min(net investment income, max(0, MAGI - threshold))",
+      "upstream_line_ids": [
+       "F1040.L2b",
+       "F1040.L3b",
+       "SCHD.L21",
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2027-v1:niit_rate",
+       "us-federal-2027-v1:niit_magi_threshold.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F8960"
+     }
+    ]
+   },
+   "worksheets": {
+    "QDCGT": [
+     {
+      "line_id": "QDCGT.L7",
+      "label": "Taxable income taxed at ordinary rates",
+      "value": "192116",
+      "formula": "L15 - preferential income",
+      "upstream_line_ids": [
+       "F1040.L15",
+       "F1040.L3a",
+       "SCHD.L21"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L6",
+      "label": "Preferential-rate income (QD + net LTCG)",
+      "value": "12000",
+      "formula": "min(L15, qualified dividends + net LT gain)",
+      "upstream_line_ids": [
+       "F1040.L15",
+       "F1040.L3a",
+       "SCHD.L15"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L20",
+      "label": "0%-rate amount",
+      "value": "0",
+      "formula": "min(0% ceiling, L15) - ordinary part",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2027-v1:ltcg_0_top.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L21",
+      "label": "15%-rate amount",
+      "value": "12000",
+      "formula": "up to 15% ceiling",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2027-v1:ltcg_15_top.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L22",
+      "label": "20%-rate amount",
+      "value": "0",
+      "formula": "remainder of preferential income",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     }
+    ]
+   },
+   "diagnostics": [
+    {
+     "code": "RULES-PROV-001",
+     "severity": "warning",
+     "message": "2027: calculated under PROVISIONAL ruleset us-federal-2027-v1 \u2014 Tax year 2027 parameters are PROVISIONAL projections from enacted 2025 law using an assumed 2.5% annual chained-CPI adjustment. They are NOT enacted law and official IRS figures will differ.",
+     "related_line_ids": [],
+     "requires_review": true
+    }
+   ],
+   "reconciliation": [
+    {
+     "check_id": "REC-INC-001",
+     "description": "Total income equals the sum of income lines",
+     "status": "passed",
+     "expected": "274616",
+     "actual": "274616",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L1",
+      "F1040.L2b",
+      "F1040.L3b",
+      "F1040.L4b",
+      "F1040.L7",
+      "F1040.L8",
+      "F1040.L9"
+     ]
+    },
+    {
+     "check_id": "REC-CG-001",
+     "description": "Form 1040 capital gain equals Schedule D allowed amount",
+     "status": "passed",
+     "expected": "0",
+     "actual": "0",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCHD.L21",
+      "F1040.L7"
+     ]
+    },
+    {
+     "check_id": "REC-ADJ-001",
+     "description": "Adjustments equal Schedule 1 detail",
+     "status": "passed",
+     "expected": "31000",
+     "actual": "31000",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCH1.L20",
+      "SCH1.L24",
+      "F1040.L10"
+     ]
+    },
+    {
+     "check_id": "REC-AGI-001",
+     "description": "AGI equals total income minus adjustments",
+     "status": "passed",
+     "expected": "243616",
+     "actual": "243616",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L9",
+      "F1040.L10",
+      "F1040.L11"
+     ]
+    },
+    {
+     "check_id": "REC-DED-001",
+     "description": "Itemized total equals Schedule A detail",
+     "status": "passed",
+     "expected": "39500",
+     "actual": "39500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCHA.L4",
+      "SCHA.L7",
+      "SCHA.L8e",
+      "SCHA.L14",
+      "SCHA.L17"
+     ]
+    },
+    {
+     "check_id": "REC-TI-001",
+     "description": "Taxable income follows the prescribed sequence",
+     "status": "passed",
+     "expected": "204116",
+     "actual": "204116",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L11",
+      "F1040.L12",
+      "F1040.L15"
+     ]
+    },
+    {
+     "check_id": "REC-CTC-001",
+     "description": "CTC on Form 1040 equals Schedule 8812",
+     "status": "passed",
+     "expected": "500",
+     "actual": "500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "S8812.L14",
+      "F1040.L19"
+     ]
+    },
+    {
+     "check_id": "REC-TAX-001",
+     "description": "Tax after credits equals tax minus credits",
+     "status": "passed",
+     "expected": "32880",
+     "actual": "32880",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L16",
+      "F1040.L19",
+      "F1040.L22"
+     ]
+    },
+    {
+     "check_id": "REC-TAX-002",
+     "description": "Total tax equals tax after credits plus other taxes",
+     "status": "passed",
+     "expected": "32880",
+     "actual": "32880",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L22",
+      "F1040.L23",
+      "F1040.L24"
+     ]
+    },
+    {
+     "check_id": "REC-PAY-001",
+     "description": "Total payments equal withholding plus estimates",
+     "status": "passed",
+     "expected": "43497",
+     "actual": "43497",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L25",
+      "F1040.L26",
+      "F1040.L33"
+     ]
+    },
+    {
+     "check_id": "REC-BAL-001",
+     "description": "Balance due / refund follows from total tax and payments",
+     "status": "passed",
+     "expected": "-10617",
+     "actual": "-10617",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L24",
+      "F1040.L33",
+      "F1040.L34",
+      "F1040.L37"
+     ]
+    },
+    {
+     "check_id": "REC-SUM-001",
+     "description": "Summary total tax matches Form 1040",
+     "status": "passed",
+     "expected": "32880",
+     "actual": "32880",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L24"
+     ]
+    },
+    {
+     "check_id": "REC-SUM-002",
+     "description": "Summary taxable income matches Form 1040",
+     "status": "passed",
+     "expected": "204116",
+     "actual": "204116",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L15"
+     ]
+    }
+   ],
+   "calculation_trace": [
+    "SCHD.L7 = 0 (input)",
+    "SCHD.L15 = 0 (input)",
+    "SCHD.L16 = 0 (SCHD.L7 + SCHD.L15)",
+    "SCHD.L21 = 0 (max(SCHD.L16, -3000))",
+    "F1040.L1 = 254616 (input)",
+    "F1040.L2b = 6000 (input)",
+    "F1040.L3a = 12000 (input)",
+    "F1040.L3b = 14000 (input)",
+    "F1040.L4b = 0 (income.ira_distribution + income.ira_conversion)",
+    "F1040.L7 = 0 (SCHD.L21)",
+    "SCH1.L10 = 0 (income.other_income + income.self_employment_income)",
+    "F1040.L8 = 0 (SCH1.L10)",
+    "F1040.L9 = 274616 (L1 + L2b + L3b + L4b + L7 + L8)",
+    "SCH1.L20 = 0 (min(input, 8600))",
+    "SCH1.L24 = 31000 (min(input, 32500))",
+    "F1040.L10 = 31000 (SCH1.L20 + SCH1.L24)",
+    "F1040.L11 = 243616 (L9 - L10)",
+    "SCHA.L7 = 22000 (min(input, cap 40800))",
+    "SCHA.L8e = 9500 (input (acquisition-debt limit not modeled))",
+    "SCHA.L14 = 8000 (input)",
+    "SCHA.L4 = 0 (max(0, input - 0.075 * AGI))",
+    "SCHA.L17 = 39500 (SCHA.L4 + L7 + L8e + L14)",
+    "F1040.L12 = 39500 (SCHA.L17 elected)",
+    "F1040.L15 = 204116 (max(0, L11 - L12))",
+    "QDCGT.L7 = 192116 (L15 - preferential income)",
+    "QDCGT.L6 = 12000 (min(L15, qualified dividends + net LT gain))",
+    "QDCGT.L20 = 0 (min(0% ceiling, L15) - ordinary part)",
+    "QDCGT.L21 = 12000 (up to 15% ceiling)",
+    "QDCGT.L22 = 0 (remainder of preferential income)",
+    "F1040.L16 = 33380 (min(bracket tax on ordinary part + preferential-rate tax, bracket tax on all income))",
+    "S8812.L5 = 500 (ctc_per_child * children + odc * other dependents)",
+    "S8812.L10 = 0 (50 per 1,000 (or part) of MAGI over threshold)",
+    "S8812.L14 = 500 (min(max(0, L5 - L10), F1040.L16))",
+    "F1040.L19 = 500 (S8812.L14)",
+    "F1040.L22 = 32880 (max(0, L16 - L19))",
+    "F8960.L17 = 0 (3.8% * min(net investment income, max(0, MAGI - threshold)))",
+    "F1040.L23 = 0 (F8960.L17)",
+    "F1040.L24 = 32880 (L22 + L23)",
+    "F1040.L25 = 43497 (input)",
+    "F1040.L26 = 0 (input)",
+    "F1040.L33 = 43497 (L25 + L26)",
+    "F1040.L34 = 10617 (L33 - L24)",
+    "F1040.L37 = 0 (not applicable)"
+   ]
+  },
+  "2028": {
+   "tax_year": 2028,
+   "ruleset_id": "us-federal-2028-v1",
+   "ruleset_status": "provisional",
+   "summary": {
+    "total_income": "282254",
+    "agi": "251254",
+    "deduction": "39500",
+    "taxable_income": "211754",
+    "regular_tax": "34792",
+    "child_tax_credit": "500",
+    "niit": "48",
+    "total_tax": "34340",
+    "total_payments": "44802",
+    "balance_due": "0",
+    "refund": "10462",
+    "effective_rate": "0.1367",
+    "marginal_ordinary_rate": "0.22"
+   },
+   "forms": {
+    "F1040": [
+     {
+      "line_id": "F1040.L1",
+      "label": "Wages",
+      "value": "262254",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.income.wages"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L2b",
+      "label": "Taxable interest",
+      "value": "6000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.income.taxable_interest"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L3a",
+      "label": "Qualified dividends",
+      "value": "12000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.income.qualified_dividends"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L3b",
+      "label": "Ordinary dividends",
+      "value": "14000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.income.ordinary_dividends"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L4b",
+      "label": "Taxable IRA distributions (incl. Roth conversion)",
+      "value": "0",
+      "formula": "income.ira_distribution + income.ira_conversion",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.income.ira_distribution",
+       "years.2028.income.ira_conversion"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L7",
+      "label": "Capital gain/(loss)",
+      "value": "0",
+      "formula": "SCHD.L21",
+      "upstream_line_ids": [
+       "SCHD.L21"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L8",
+      "label": "Other income from Schedule 1",
+      "value": "0",
+      "formula": "SCH1.L10",
+      "upstream_line_ids": [
+       "SCH1.L10"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L9",
+      "label": "Total income",
+      "value": "282254",
+      "formula": "L1 + L2b + L3b + L4b + L7 + L8",
+      "upstream_line_ids": [
+       "F1040.L1",
+       "F1040.L2b",
+       "F1040.L3b",
+       "F1040.L4b",
+       "F1040.L7",
+       "F1040.L8"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L10",
+      "label": "Adjustments to income",
+      "value": "31000",
+      "formula": "SCH1.L20 + SCH1.L24",
+      "upstream_line_ids": [
+       "SCH1.L20",
+       "SCH1.L24"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L11",
+      "label": "Adjusted gross income",
+      "value": "251254",
+      "formula": "L9 - L10",
+      "upstream_line_ids": [
+       "F1040.L9",
+       "F1040.L10"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L12",
+      "label": "Deduction (standard or itemized)",
+      "value": "39500",
+      "formula": "SCHA.L17 elected",
+      "upstream_line_ids": [
+       "SCHA.L17"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.elections.itemize_deductions"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L15",
+      "label": "Taxable income",
+      "value": "211754",
+      "formula": "max(0, L11 - L12)",
+      "upstream_line_ids": [
+       "F1040.L11",
+       "F1040.L12"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L16",
+      "label": "Tax (QDCGT worksheet)",
+      "value": "34792",
+      "formula": "min(bracket tax on ordinary part + preferential-rate tax, bracket tax on all income)",
+      "upstream_line_ids": [
+       "QDCGT.L7",
+       "QDCGT.L20",
+       "QDCGT.L21",
+       "QDCGT.L22"
+      ],
+      "parameter_ids": [
+       "us-federal-2028-v1:ordinary_brackets.married_filing_jointly",
+       "us-federal-2028-v1:ltcg_rates"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L19",
+      "label": "Child tax credit / credit for other dependents",
+      "value": "500",
+      "formula": "S8812.L14",
+      "upstream_line_ids": [
+       "S8812.L14"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L22",
+      "label": "Tax after credits",
+      "value": "34292",
+      "formula": "max(0, L16 - L19)",
+      "upstream_line_ids": [
+       "F1040.L16",
+       "F1040.L19"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L23",
+      "label": "Other taxes (NIIT)",
+      "value": "48",
+      "formula": "F8960.L17",
+      "upstream_line_ids": [
+       "F8960.L17"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L24",
+      "label": "Total tax",
+      "value": "34340",
+      "formula": "L22 + L23",
+      "upstream_line_ids": [
+       "F1040.L22",
+       "F1040.L23"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L25",
+      "label": "Federal income tax withheld",
+      "value": "44802",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.payments.federal_withholding"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L26",
+      "label": "Estimated tax payments",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.payments.estimated_payments"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L33",
+      "label": "Total payments",
+      "value": "44802",
+      "formula": "L25 + L26",
+      "upstream_line_ids": [
+       "F1040.L25",
+       "F1040.L26"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L34",
+      "label": "Refund",
+      "value": "10462",
+      "formula": "L33 - L24",
+      "upstream_line_ids": [
+       "F1040.L24",
+       "F1040.L33"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L37",
+      "label": "Amount you owe",
+      "value": "0",
+      "formula": "not applicable",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     }
+    ],
+    "SCH1": [
+     {
+      "line_id": "SCH1.L10",
+      "label": "Other income (Schedule 1)",
+      "value": "0",
+      "formula": "income.other_income + income.self_employment_income",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.income.other_income",
+       "years.2028.income.self_employment_income"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     },
+     {
+      "line_id": "SCH1.L20",
+      "label": "Traditional IRA deduction",
+      "value": "0",
+      "formula": "min(input, 8600)",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2028-v1:ira_contribution_limit"
+      ],
+      "source_input_ids": [
+       "years.2028.adjustments.traditional_ira_contribution"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     },
+     {
+      "line_id": "SCH1.L24",
+      "label": "Pre-tax 401(k) deferral (modeled as adjustment)",
+      "value": "31000",
+      "formula": "min(input, 33500)",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2028-v1:limit_401k"
+      ],
+      "source_input_ids": [
+       "years.2028.adjustments.pretax_401k_contribution"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     }
+    ],
+    "SCHA": [
+     {
+      "line_id": "SCHA.L7",
+      "label": "State and local taxes (capped)",
+      "value": "22000",
+      "formula": "min(input, cap 41200)",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2028-v1:salt_cap.married_filing_jointly"
+      ],
+      "source_input_ids": [
+       "years.2028.itemized.state_local_taxes_paid"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L8e",
+      "label": "Home mortgage interest",
+      "value": "9500",
+      "formula": "input (acquisition-debt limit not modeled)",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.itemized.mortgage_interest"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L14",
+      "label": "Charitable contributions (cash)",
+      "value": "8000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.itemized.charitable_cash"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L4",
+      "label": "Medical expenses above AGI floor",
+      "value": "0",
+      "formula": "max(0, input - 0.075 * AGI)",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2028-v1:medical_agi_floor_rate"
+      ],
+      "source_input_ids": [
+       "years.2028.itemized.medical_expenses"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L17",
+      "label": "Total itemized deductions",
+      "value": "39500",
+      "formula": "SCHA.L4 + L7 + L8e + L14",
+      "upstream_line_ids": [
+       "SCHA.L4",
+       "SCHA.L7",
+       "SCHA.L8e",
+       "SCHA.L14"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     }
+    ],
+    "SCHD": [
+     {
+      "line_id": "SCHD.L7",
+      "label": "Net short-term capital gain/(loss)",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.income.short_term_capital_gain"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L15",
+      "label": "Net long-term capital gain/(loss)",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2028.income.long_term_capital_gain"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L16",
+      "label": "Combined net gain/(loss)",
+      "value": "0",
+      "formula": "SCHD.L7 + SCHD.L15",
+      "upstream_line_ids": [
+       "SCHD.L7",
+       "SCHD.L15"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L21",
+      "label": "Allowed capital gain/(loss) to Form 1040",
+      "value": "0",
+      "formula": "max(SCHD.L16, -3000)",
+      "upstream_line_ids": [
+       "SCHD.L16"
+      ],
+      "parameter_ids": [
+       "us-federal-2028-v1:capital_loss_limit.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     }
+    ],
+    "S8812": [
+     {
+      "line_id": "S8812.L5",
+      "label": "Credit before phaseout",
+      "value": "500",
+      "formula": "ctc_per_child * children + odc * other dependents",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2028-v1:ctc_per_child",
+       "us-federal-2028-v1:odc_per_dependent"
+      ],
+      "source_input_ids": [
+       "household.ctc_qualifying_children",
+       "household.other_dependents"
+      ],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     },
+     {
+      "line_id": "S8812.L10",
+      "label": "Phaseout reduction",
+      "value": "0",
+      "formula": "50 per 1,000 (or part) of MAGI over threshold",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2028-v1:ctc_phaseout_threshold.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     },
+     {
+      "line_id": "S8812.L14",
+      "label": "Allowed CTC/ODC (nonrefundable)",
+      "value": "500",
+      "formula": "min(max(0, L5 - L10), F1040.L16)",
+      "upstream_line_ids": [
+       "S8812.L5",
+       "S8812.L10",
+       "F1040.L16"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     }
+    ],
+    "F8960": [
+     {
+      "line_id": "F8960.L17",
+      "label": "Net investment income tax",
+      "value": "48",
+      "formula": "3.8% * min(net investment income, max(0, MAGI - threshold))",
+      "upstream_line_ids": [
+       "F1040.L2b",
+       "F1040.L3b",
+       "SCHD.L21",
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2028-v1:niit_rate",
+       "us-federal-2028-v1:niit_magi_threshold.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F8960"
+     }
+    ]
+   },
+   "worksheets": {
+    "QDCGT": [
+     {
+      "line_id": "QDCGT.L7",
+      "label": "Taxable income taxed at ordinary rates",
+      "value": "199754",
+      "formula": "L15 - preferential income",
+      "upstream_line_ids": [
+       "F1040.L15",
+       "F1040.L3a",
+       "SCHD.L21"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L6",
+      "label": "Preferential-rate income (QD + net LTCG)",
+      "value": "12000",
+      "formula": "min(L15, qualified dividends + net LT gain)",
+      "upstream_line_ids": [
+       "F1040.L15",
+       "F1040.L3a",
+       "SCHD.L15"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L20",
+      "label": "0%-rate amount",
+      "value": "0",
+      "formula": "min(0% ceiling, L15) - ordinary part",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2028-v1:ltcg_0_top.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L21",
+      "label": "15%-rate amount",
+      "value": "12000",
+      "formula": "up to 15% ceiling",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2028-v1:ltcg_15_top.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L22",
+      "label": "20%-rate amount",
+      "value": "0",
+      "formula": "remainder of preferential income",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     }
+    ]
+   },
+   "diagnostics": [
+    {
+     "code": "RULES-PROV-001",
+     "severity": "warning",
+     "message": "2028: calculated under PROVISIONAL ruleset us-federal-2028-v1 \u2014 Tax year 2028 parameters are PROVISIONAL projections from enacted 2025 law using an assumed 2.5% annual chained-CPI adjustment. They are NOT enacted law and official IRS figures will differ.",
+     "related_line_ids": [],
+     "requires_review": true
+    }
+   ],
+   "reconciliation": [
+    {
+     "check_id": "REC-INC-001",
+     "description": "Total income equals the sum of income lines",
+     "status": "passed",
+     "expected": "282254",
+     "actual": "282254",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L1",
+      "F1040.L2b",
+      "F1040.L3b",
+      "F1040.L4b",
+      "F1040.L7",
+      "F1040.L8",
+      "F1040.L9"
+     ]
+    },
+    {
+     "check_id": "REC-CG-001",
+     "description": "Form 1040 capital gain equals Schedule D allowed amount",
+     "status": "passed",
+     "expected": "0",
+     "actual": "0",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCHD.L21",
+      "F1040.L7"
+     ]
+    },
+    {
+     "check_id": "REC-ADJ-001",
+     "description": "Adjustments equal Schedule 1 detail",
+     "status": "passed",
+     "expected": "31000",
+     "actual": "31000",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCH1.L20",
+      "SCH1.L24",
+      "F1040.L10"
+     ]
+    },
+    {
+     "check_id": "REC-AGI-001",
+     "description": "AGI equals total income minus adjustments",
+     "status": "passed",
+     "expected": "251254",
+     "actual": "251254",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L9",
+      "F1040.L10",
+      "F1040.L11"
+     ]
+    },
+    {
+     "check_id": "REC-DED-001",
+     "description": "Itemized total equals Schedule A detail",
+     "status": "passed",
+     "expected": "39500",
+     "actual": "39500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCHA.L4",
+      "SCHA.L7",
+      "SCHA.L8e",
+      "SCHA.L14",
+      "SCHA.L17"
+     ]
+    },
+    {
+     "check_id": "REC-TI-001",
+     "description": "Taxable income follows the prescribed sequence",
+     "status": "passed",
+     "expected": "211754",
+     "actual": "211754",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L11",
+      "F1040.L12",
+      "F1040.L15"
+     ]
+    },
+    {
+     "check_id": "REC-CTC-001",
+     "description": "CTC on Form 1040 equals Schedule 8812",
+     "status": "passed",
+     "expected": "500",
+     "actual": "500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "S8812.L14",
+      "F1040.L19"
+     ]
+    },
+    {
+     "check_id": "REC-TAX-001",
+     "description": "Tax after credits equals tax minus credits",
+     "status": "passed",
+     "expected": "34292",
+     "actual": "34292",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L16",
+      "F1040.L19",
+      "F1040.L22"
+     ]
+    },
+    {
+     "check_id": "REC-TAX-002",
+     "description": "Total tax equals tax after credits plus other taxes",
+     "status": "passed",
+     "expected": "34340",
+     "actual": "34340",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L22",
+      "F1040.L23",
+      "F1040.L24"
+     ]
+    },
+    {
+     "check_id": "REC-PAY-001",
+     "description": "Total payments equal withholding plus estimates",
+     "status": "passed",
+     "expected": "44802",
+     "actual": "44802",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L25",
+      "F1040.L26",
+      "F1040.L33"
+     ]
+    },
+    {
+     "check_id": "REC-BAL-001",
+     "description": "Balance due / refund follows from total tax and payments",
+     "status": "passed",
+     "expected": "-10462",
+     "actual": "-10462",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L24",
+      "F1040.L33",
+      "F1040.L34",
+      "F1040.L37"
+     ]
+    },
+    {
+     "check_id": "REC-SUM-001",
+     "description": "Summary total tax matches Form 1040",
+     "status": "passed",
+     "expected": "34340",
+     "actual": "34340",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L24"
+     ]
+    },
+    {
+     "check_id": "REC-SUM-002",
+     "description": "Summary taxable income matches Form 1040",
+     "status": "passed",
+     "expected": "211754",
+     "actual": "211754",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L15"
+     ]
+    }
+   ],
+   "calculation_trace": [
+    "SCHD.L7 = 0 (input)",
+    "SCHD.L15 = 0 (input)",
+    "SCHD.L16 = 0 (SCHD.L7 + SCHD.L15)",
+    "SCHD.L21 = 0 (max(SCHD.L16, -3000))",
+    "F1040.L1 = 262254 (input)",
+    "F1040.L2b = 6000 (input)",
+    "F1040.L3a = 12000 (input)",
+    "F1040.L3b = 14000 (input)",
+    "F1040.L4b = 0 (income.ira_distribution + income.ira_conversion)",
+    "F1040.L7 = 0 (SCHD.L21)",
+    "SCH1.L10 = 0 (income.other_income + income.self_employment_income)",
+    "F1040.L8 = 0 (SCH1.L10)",
+    "F1040.L9 = 282254 (L1 + L2b + L3b + L4b + L7 + L8)",
+    "SCH1.L20 = 0 (min(input, 8600))",
+    "SCH1.L24 = 31000 (min(input, 33500))",
+    "F1040.L10 = 31000 (SCH1.L20 + SCH1.L24)",
+    "F1040.L11 = 251254 (L9 - L10)",
+    "SCHA.L7 = 22000 (min(input, cap 41200))",
+    "SCHA.L8e = 9500 (input (acquisition-debt limit not modeled))",
+    "SCHA.L14 = 8000 (input)",
+    "SCHA.L4 = 0 (max(0, input - 0.075 * AGI))",
+    "SCHA.L17 = 39500 (SCHA.L4 + L7 + L8e + L14)",
+    "F1040.L12 = 39500 (SCHA.L17 elected)",
+    "F1040.L15 = 211754 (max(0, L11 - L12))",
+    "QDCGT.L7 = 199754 (L15 - preferential income)",
+    "QDCGT.L6 = 12000 (min(L15, qualified dividends + net LT gain))",
+    "QDCGT.L20 = 0 (min(0% ceiling, L15) - ordinary part)",
+    "QDCGT.L21 = 12000 (up to 15% ceiling)",
+    "QDCGT.L22 = 0 (remainder of preferential income)",
+    "F1040.L16 = 34792 (min(bracket tax on ordinary part + preferential-rate tax, bracket tax on all income))",
+    "S8812.L5 = 500 (ctc_per_child * children + odc * other dependents)",
+    "S8812.L10 = 0 (50 per 1,000 (or part) of MAGI over threshold)",
+    "S8812.L14 = 500 (min(max(0, L5 - L10), F1040.L16))",
+    "F1040.L19 = 500 (S8812.L14)",
+    "F1040.L22 = 34292 (max(0, L16 - L19))",
+    "F8960.L17 = 48 (3.8% * min(net investment income, max(0, MAGI - threshold)))",
+    "F1040.L23 = 48 (F8960.L17)",
+    "F1040.L24 = 34340 (L22 + L23)",
+    "F1040.L25 = 44802 (input)",
+    "F1040.L26 = 0 (input)",
+    "F1040.L33 = 44802 (L25 + L26)",
+    "F1040.L34 = 10462 (L33 - L24)",
+    "F1040.L37 = 0 (not applicable)"
+   ]
+  },
+  "2029": {
+   "tax_year": 2029,
+   "ruleset_id": "us-federal-2029-v1",
+   "ruleset_status": "provisional",
+   "summary": {
+    "total_income": "290122",
+    "agi": "259122",
+    "deduction": "39500",
+    "taxable_income": "219622",
+    "regular_tax": "36248",
+    "child_tax_credit": "500",
+    "niit": "347",
+    "total_tax": "36095",
+    "total_payments": "46146",
+    "balance_due": "0",
+    "refund": "10051",
+    "effective_rate": "0.1393",
+    "marginal_ordinary_rate": "0.22"
+   },
+   "forms": {
+    "F1040": [
+     {
+      "line_id": "F1040.L1",
+      "label": "Wages",
+      "value": "270122",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.income.wages"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L2b",
+      "label": "Taxable interest",
+      "value": "6000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.income.taxable_interest"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L3a",
+      "label": "Qualified dividends",
+      "value": "12000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.income.qualified_dividends"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L3b",
+      "label": "Ordinary dividends",
+      "value": "14000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.income.ordinary_dividends"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L4b",
+      "label": "Taxable IRA distributions (incl. Roth conversion)",
+      "value": "0",
+      "formula": "income.ira_distribution + income.ira_conversion",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.income.ira_distribution",
+       "years.2029.income.ira_conversion"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L7",
+      "label": "Capital gain/(loss)",
+      "value": "0",
+      "formula": "SCHD.L21",
+      "upstream_line_ids": [
+       "SCHD.L21"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L8",
+      "label": "Other income from Schedule 1",
+      "value": "0",
+      "formula": "SCH1.L10",
+      "upstream_line_ids": [
+       "SCH1.L10"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L9",
+      "label": "Total income",
+      "value": "290122",
+      "formula": "L1 + L2b + L3b + L4b + L7 + L8",
+      "upstream_line_ids": [
+       "F1040.L1",
+       "F1040.L2b",
+       "F1040.L3b",
+       "F1040.L4b",
+       "F1040.L7",
+       "F1040.L8"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L10",
+      "label": "Adjustments to income",
+      "value": "31000",
+      "formula": "SCH1.L20 + SCH1.L24",
+      "upstream_line_ids": [
+       "SCH1.L20",
+       "SCH1.L24"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L11",
+      "label": "Adjusted gross income",
+      "value": "259122",
+      "formula": "L9 - L10",
+      "upstream_line_ids": [
+       "F1040.L9",
+       "F1040.L10"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L12",
+      "label": "Deduction (standard or itemized)",
+      "value": "39500",
+      "formula": "SCHA.L17 elected",
+      "upstream_line_ids": [
+       "SCHA.L17"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.elections.itemize_deductions"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L15",
+      "label": "Taxable income",
+      "value": "219622",
+      "formula": "max(0, L11 - L12)",
+      "upstream_line_ids": [
+       "F1040.L11",
+       "F1040.L12"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L16",
+      "label": "Tax (QDCGT worksheet)",
+      "value": "36248",
+      "formula": "min(bracket tax on ordinary part + preferential-rate tax, bracket tax on all income)",
+      "upstream_line_ids": [
+       "QDCGT.L7",
+       "QDCGT.L20",
+       "QDCGT.L21",
+       "QDCGT.L22"
+      ],
+      "parameter_ids": [
+       "us-federal-2029-v1:ordinary_brackets.married_filing_jointly",
+       "us-federal-2029-v1:ltcg_rates"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L19",
+      "label": "Child tax credit / credit for other dependents",
+      "value": "500",
+      "formula": "S8812.L14",
+      "upstream_line_ids": [
+       "S8812.L14"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L22",
+      "label": "Tax after credits",
+      "value": "35748",
+      "formula": "max(0, L16 - L19)",
+      "upstream_line_ids": [
+       "F1040.L16",
+       "F1040.L19"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L23",
+      "label": "Other taxes (NIIT)",
+      "value": "347",
+      "formula": "F8960.L17",
+      "upstream_line_ids": [
+       "F8960.L17"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L24",
+      "label": "Total tax",
+      "value": "36095",
+      "formula": "L22 + L23",
+      "upstream_line_ids": [
+       "F1040.L22",
+       "F1040.L23"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L25",
+      "label": "Federal income tax withheld",
+      "value": "46146",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.payments.federal_withholding"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L26",
+      "label": "Estimated tax payments",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.payments.estimated_payments"
+      ],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L33",
+      "label": "Total payments",
+      "value": "46146",
+      "formula": "L25 + L26",
+      "upstream_line_ids": [
+       "F1040.L25",
+       "F1040.L26"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L34",
+      "label": "Refund",
+      "value": "10051",
+      "formula": "L33 - L24",
+      "upstream_line_ids": [
+       "F1040.L24",
+       "F1040.L33"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     },
+     {
+      "line_id": "F1040.L37",
+      "label": "Amount you owe",
+      "value": "0",
+      "formula": "not applicable",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F1040"
+     }
+    ],
+    "SCH1": [
+     {
+      "line_id": "SCH1.L10",
+      "label": "Other income (Schedule 1)",
+      "value": "0",
+      "formula": "income.other_income + income.self_employment_income",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.income.other_income",
+       "years.2029.income.self_employment_income"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     },
+     {
+      "line_id": "SCH1.L20",
+      "label": "Traditional IRA deduction",
+      "value": "0",
+      "formula": "min(input, 8600)",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2029-v1:ira_contribution_limit"
+      ],
+      "source_input_ids": [
+       "years.2029.adjustments.traditional_ira_contribution"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     },
+     {
+      "line_id": "SCH1.L24",
+      "label": "Pre-tax 401(k) deferral (modeled as adjustment)",
+      "value": "31000",
+      "formula": "min(input, 34500)",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2029-v1:limit_401k"
+      ],
+      "source_input_ids": [
+       "years.2029.adjustments.pretax_401k_contribution"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCH1"
+     }
+    ],
+    "SCHA": [
+     {
+      "line_id": "SCHA.L7",
+      "label": "State and local taxes (capped)",
+      "value": "22000",
+      "formula": "min(input, cap 41600)",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2029-v1:salt_cap.married_filing_jointly"
+      ],
+      "source_input_ids": [
+       "years.2029.itemized.state_local_taxes_paid"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L8e",
+      "label": "Home mortgage interest",
+      "value": "9500",
+      "formula": "input (acquisition-debt limit not modeled)",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.itemized.mortgage_interest"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L14",
+      "label": "Charitable contributions (cash)",
+      "value": "8000",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.itemized.charitable_cash"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L4",
+      "label": "Medical expenses above AGI floor",
+      "value": "0",
+      "formula": "max(0, input - 0.075 * AGI)",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2029-v1:medical_agi_floor_rate"
+      ],
+      "source_input_ids": [
+       "years.2029.itemized.medical_expenses"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     },
+     {
+      "line_id": "SCHA.L17",
+      "label": "Total itemized deductions",
+      "value": "39500",
+      "formula": "SCHA.L4 + L7 + L8e + L14",
+      "upstream_line_ids": [
+       "SCHA.L4",
+       "SCHA.L7",
+       "SCHA.L8e",
+       "SCHA.L14"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHA"
+     }
+    ],
+    "SCHD": [
+     {
+      "line_id": "SCHD.L7",
+      "label": "Net short-term capital gain/(loss)",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.income.short_term_capital_gain"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L15",
+      "label": "Net long-term capital gain/(loss)",
+      "value": "0",
+      "formula": "input",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [
+       "years.2029.income.long_term_capital_gain"
+      ],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L16",
+      "label": "Combined net gain/(loss)",
+      "value": "0",
+      "formula": "SCHD.L7 + SCHD.L15",
+      "upstream_line_ids": [
+       "SCHD.L7",
+       "SCHD.L15"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     },
+     {
+      "line_id": "SCHD.L21",
+      "label": "Allowed capital gain/(loss) to Form 1040",
+      "value": "0",
+      "formula": "max(SCHD.L16, -3000)",
+      "upstream_line_ids": [
+       "SCHD.L16"
+      ],
+      "parameter_ids": [
+       "us-federal-2029-v1:capital_loss_limit.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "SCHD"
+     }
+    ],
+    "S8812": [
+     {
+      "line_id": "S8812.L5",
+      "label": "Credit before phaseout",
+      "value": "500",
+      "formula": "ctc_per_child * children + odc * other dependents",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2029-v1:ctc_per_child",
+       "us-federal-2029-v1:odc_per_dependent"
+      ],
+      "source_input_ids": [
+       "household.ctc_qualifying_children",
+       "household.other_dependents"
+      ],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     },
+     {
+      "line_id": "S8812.L10",
+      "label": "Phaseout reduction",
+      "value": "0",
+      "formula": "50 per 1,000 (or part) of MAGI over threshold",
+      "upstream_line_ids": [
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2029-v1:ctc_phaseout_threshold.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     },
+     {
+      "line_id": "S8812.L14",
+      "label": "Allowed CTC/ODC (nonrefundable)",
+      "value": "500",
+      "formula": "min(max(0, L5 - L10), F1040.L16)",
+      "upstream_line_ids": [
+       "S8812.L5",
+       "S8812.L10",
+       "F1040.L16"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "S8812"
+     }
+    ],
+    "F8960": [
+     {
+      "line_id": "F8960.L17",
+      "label": "Net investment income tax",
+      "value": "347",
+      "formula": "3.8% * min(net investment income, max(0, MAGI - threshold))",
+      "upstream_line_ids": [
+       "F1040.L2b",
+       "F1040.L3b",
+       "SCHD.L21",
+       "F1040.L11"
+      ],
+      "parameter_ids": [
+       "us-federal-2029-v1:niit_rate",
+       "us-federal-2029-v1:niit_magi_threshold.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "F8960"
+     }
+    ]
+   },
+   "worksheets": {
+    "QDCGT": [
+     {
+      "line_id": "QDCGT.L7",
+      "label": "Taxable income taxed at ordinary rates",
+      "value": "207622",
+      "formula": "L15 - preferential income",
+      "upstream_line_ids": [
+       "F1040.L15",
+       "F1040.L3a",
+       "SCHD.L21"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L6",
+      "label": "Preferential-rate income (QD + net LTCG)",
+      "value": "12000",
+      "formula": "min(L15, qualified dividends + net LT gain)",
+      "upstream_line_ids": [
+       "F1040.L15",
+       "F1040.L3a",
+       "SCHD.L15"
+      ],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L20",
+      "label": "0%-rate amount",
+      "value": "0",
+      "formula": "min(0% ceiling, L15) - ordinary part",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2029-v1:ltcg_0_top.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L21",
+      "label": "15%-rate amount",
+      "value": "12000",
+      "formula": "up to 15% ceiling",
+      "upstream_line_ids": [],
+      "parameter_ids": [
+       "us-federal-2029-v1:ltcg_15_top.married_filing_jointly"
+      ],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     },
+     {
+      "line_id": "QDCGT.L22",
+      "label": "20%-rate amount",
+      "value": "0",
+      "formula": "remainder of preferential income",
+      "upstream_line_ids": [],
+      "parameter_ids": [],
+      "source_input_ids": [],
+      "rounding": "whole_dollar",
+      "location": "QDCGT"
+     }
+    ]
+   },
+   "diagnostics": [
+    {
+     "code": "RULES-PROV-001",
+     "severity": "warning",
+     "message": "2029: calculated under PROVISIONAL ruleset us-federal-2029-v1 \u2014 Tax year 2029 parameters are PROVISIONAL projections from enacted 2025 law using an assumed 2.5% annual chained-CPI adjustment. They are NOT enacted law and official IRS figures will differ.",
+     "related_line_ids": [],
+     "requires_review": true
+    }
+   ],
+   "reconciliation": [
+    {
+     "check_id": "REC-INC-001",
+     "description": "Total income equals the sum of income lines",
+     "status": "passed",
+     "expected": "290122",
+     "actual": "290122",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L1",
+      "F1040.L2b",
+      "F1040.L3b",
+      "F1040.L4b",
+      "F1040.L7",
+      "F1040.L8",
+      "F1040.L9"
+     ]
+    },
+    {
+     "check_id": "REC-CG-001",
+     "description": "Form 1040 capital gain equals Schedule D allowed amount",
+     "status": "passed",
+     "expected": "0",
+     "actual": "0",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCHD.L21",
+      "F1040.L7"
+     ]
+    },
+    {
+     "check_id": "REC-ADJ-001",
+     "description": "Adjustments equal Schedule 1 detail",
+     "status": "passed",
+     "expected": "31000",
+     "actual": "31000",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCH1.L20",
+      "SCH1.L24",
+      "F1040.L10"
+     ]
+    },
+    {
+     "check_id": "REC-AGI-001",
+     "description": "AGI equals total income minus adjustments",
+     "status": "passed",
+     "expected": "259122",
+     "actual": "259122",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L9",
+      "F1040.L10",
+      "F1040.L11"
+     ]
+    },
+    {
+     "check_id": "REC-DED-001",
+     "description": "Itemized total equals Schedule A detail",
+     "status": "passed",
+     "expected": "39500",
+     "actual": "39500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "SCHA.L4",
+      "SCHA.L7",
+      "SCHA.L8e",
+      "SCHA.L14",
+      "SCHA.L17"
+     ]
+    },
+    {
+     "check_id": "REC-TI-001",
+     "description": "Taxable income follows the prescribed sequence",
+     "status": "passed",
+     "expected": "219622",
+     "actual": "219622",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L11",
+      "F1040.L12",
+      "F1040.L15"
+     ]
+    },
+    {
+     "check_id": "REC-CTC-001",
+     "description": "CTC on Form 1040 equals Schedule 8812",
+     "status": "passed",
+     "expected": "500",
+     "actual": "500",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "S8812.L14",
+      "F1040.L19"
+     ]
+    },
+    {
+     "check_id": "REC-TAX-001",
+     "description": "Tax after credits equals tax minus credits",
+     "status": "passed",
+     "expected": "35748",
+     "actual": "35748",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L16",
+      "F1040.L19",
+      "F1040.L22"
+     ]
+    },
+    {
+     "check_id": "REC-TAX-002",
+     "description": "Total tax equals tax after credits plus other taxes",
+     "status": "passed",
+     "expected": "36095",
+     "actual": "36095",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L22",
+      "F1040.L23",
+      "F1040.L24"
+     ]
+    },
+    {
+     "check_id": "REC-PAY-001",
+     "description": "Total payments equal withholding plus estimates",
+     "status": "passed",
+     "expected": "46146",
+     "actual": "46146",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L25",
+      "F1040.L26",
+      "F1040.L33"
+     ]
+    },
+    {
+     "check_id": "REC-BAL-001",
+     "description": "Balance due / refund follows from total tax and payments",
+     "status": "passed",
+     "expected": "-10051",
+     "actual": "-10051",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L24",
+      "F1040.L33",
+      "F1040.L34",
+      "F1040.L37"
+     ]
+    },
+    {
+     "check_id": "REC-SUM-001",
+     "description": "Summary total tax matches Form 1040",
+     "status": "passed",
+     "expected": "36095",
+     "actual": "36095",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L24"
+     ]
+    },
+    {
+     "check_id": "REC-SUM-002",
+     "description": "Summary taxable income matches Form 1040",
+     "status": "passed",
+     "expected": "219622",
+     "actual": "219622",
+     "difference": "0",
+     "tolerance": "0",
+     "material": true,
+     "supporting_line_ids": [
+      "F1040.L15"
+     ]
+    }
+   ],
+   "calculation_trace": [
+    "SCHD.L7 = 0 (input)",
+    "SCHD.L15 = 0 (input)",
+    "SCHD.L16 = 0 (SCHD.L7 + SCHD.L15)",
+    "SCHD.L21 = 0 (max(SCHD.L16, -3000))",
+    "F1040.L1 = 270122 (input)",
+    "F1040.L2b = 6000 (input)",
+    "F1040.L3a = 12000 (input)",
+    "F1040.L3b = 14000 (input)",
+    "F1040.L4b = 0 (income.ira_distribution + income.ira_conversion)",
+    "F1040.L7 = 0 (SCHD.L21)",
+    "SCH1.L10 = 0 (income.other_income + income.self_employment_income)",
+    "F1040.L8 = 0 (SCH1.L10)",
+    "F1040.L9 = 290122 (L1 + L2b + L3b + L4b + L7 + L8)",
+    "SCH1.L20 = 0 (min(input, 8600))",
+    "SCH1.L24 = 31000 (min(input, 34500))",
+    "F1040.L10 = 31000 (SCH1.L20 + SCH1.L24)",
+    "F1040.L11 = 259122 (L9 - L10)",
+    "SCHA.L7 = 22000 (min(input, cap 41600))",
+    "SCHA.L8e = 9500 (input (acquisition-debt limit not modeled))",
+    "SCHA.L14 = 8000 (input)",
+    "SCHA.L4 = 0 (max(0, input - 0.075 * AGI))",
+    "SCHA.L17 = 39500 (SCHA.L4 + L7 + L8e + L14)",
+    "F1040.L12 = 39500 (SCHA.L17 elected)",
+    "F1040.L15 = 219622 (max(0, L11 - L12))",
+    "QDCGT.L7 = 207622 (L15 - preferential income)",
+    "QDCGT.L6 = 12000 (min(L15, qualified dividends + net LT gain))",
+    "QDCGT.L20 = 0 (min(0% ceiling, L15) - ordinary part)",
+    "QDCGT.L21 = 12000 (up to 15% ceiling)",
+    "QDCGT.L22 = 0 (remainder of preferential income)",
+    "F1040.L16 = 36248 (min(bracket tax on ordinary part + preferential-rate tax, bracket tax on all income))",
+    "S8812.L5 = 500 (ctc_per_child * children + odc * other dependents)",
+    "S8812.L10 = 0 (50 per 1,000 (or part) of MAGI over threshold)",
+    "S8812.L14 = 500 (min(max(0, L5 - L10), F1040.L16))",
+    "F1040.L19 = 500 (S8812.L14)",
+    "F1040.L22 = 35748 (max(0, L16 - L19))",
+    "F8960.L17 = 347 (3.8% * min(net investment income, max(0, MAGI - threshold)))",
+    "F1040.L23 = 347 (F8960.L17)",
+    "F1040.L24 = 36095 (L22 + L23)",
+    "F1040.L25 = 46146 (input)",
+    "F1040.L26 = 0 (input)",
+    "F1040.L33 = 46146 (L25 + L26)",
+    "F1040.L34 = 10051 (L33 - L24)",
+    "F1040.L37 = 0 (not applicable)"
+   ]
+  }
+ },
+ "reconciliation_status": "passed",
+ "review_status": "required",
+ "provisional_years": [
+  2026,
+  2027,
+  2028,
+  2029
+ ],
+ "_result_hash": "sha256:90a4f531ab8246fa695eb2679d4e873f1ae715659425fa3cd5a5b47b88556e96"
+}

@@ -1,0 +1,24 @@
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "create_case", "target": "case_example", "detail": ""}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "create_base_version", "target": "base_1880bbe76950", "detail": ""}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "transition_base", "target": "base_1880bbe76950", "detail": "draft->ready_for_calculation 0 diagnostics"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "record_calculation", "target": "calc_7bf0469786ef", "detail": "target=base_1880bbe76950 recon=passed"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "transition_base", "target": "base_1880bbe76950", "detail": "ready_for_calculation->calculated calc_7bf0469786ef"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "request_review", "target": "rev_b4bf5f6d32b3", "detail": "calculation requires review (reconciliation failure, review-level diagnostics, or provisional rulesets)"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "transition_base", "target": "base_1880bbe76950", "detail": "calculated->ready_for_review "}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "reviewer-cpa", "action": "transition_base", "target": "base_1880bbe76950", "detail": "ready_for_review->approved "}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "reviewer-cpa", "action": "resolve_review", "target": "rev_b4bf5f6d32b3", "detail": "approved"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "put_scenario", "target": "scn_e0362edd3e75@v1", "detail": ""}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "put_scenario", "target": "scn_e0362edd3e75@v2", "detail": ""}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "record_calculation", "target": "calc_f0829c615bf8", "detail": "target=scn_e0362edd3e75 recon=passed"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "request_review", "target": "rev_a29acd29a2a1", "detail": "scenario calculation requires review"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "put_scenario", "target": "scn_5caa3be35670@v1", "detail": ""}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "put_scenario", "target": "scn_5caa3be35670@v2", "detail": ""}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "record_calculation", "target": "calc_441882492e87", "detail": "target=scn_5caa3be35670 recon=passed"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "request_review", "target": "rev_a640812e78c6", "detail": "scenario calculation requires review"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "put_scenario", "target": "scn_406a535d9f80@v1", "detail": ""}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "put_scenario", "target": "scn_406a535d9f80@v2", "detail": ""}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "record_calculation", "target": "calc_d8290d5477f0", "detail": "target=scn_406a535d9f80 recon=passed"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "request_review", "target": "rev_3a54f9eca880", "detail": "scenario calculation requires review"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "tool:generate_excel_audit_package", "target": "{\"case_id\": \"case_example\", \"calculation_ids\": [\"calc_7bf0469786ef\", \"calc_f0829c615bf8\", \"calc_441882492e87\", \"calc_d8290d5477f0\"], \"confirmed\": true, \"idempotency_key\": \"idem-package\"}", "detail": ""}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "register_package", "target": "pkg_d87ae8a3c6bb_case_example.xlsx", "detail": "sha256:4a0f7b172dccfe057c96ffc7b1f1db791f072c9b990dee7158d6d921858f09c1"}
+{"at": "2026-07-28T02:15:44+00:00", "actor": "user-nasi", "action": "tool:export_case", "target": "{\"case_id\": \"case_example\", \"format\": \"json\"}", "detail": ""}
