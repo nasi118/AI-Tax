@@ -363,7 +363,10 @@ function ScenariosPage({
   addScenario,
   duplicate,
   remove,
-  reset
+  reset,
+  onAIOptimize,
+  onAIReport,
+  onAskAI
 }) {
   const [open, setOpen] = useState({
     income: true,
@@ -388,7 +391,27 @@ function ScenariosPage({
 
   return /*#__PURE__*/React.createElement("div", {
     className: "tp-stack"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, onAIOptimize && /*#__PURE__*/React.createElement("div", {
+    className: "tp-ai-bar"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "tp-ai-bar-label"
+  }, I.chat, " AI advisory"), /*#__PURE__*/React.createElement("button", {
+    className: "tp-btn solid sm",
+    type: "button",
+    onClick: onAIOptimize
+  }, "AI Optimize"), /*#__PURE__*/React.createElement("button", {
+    className: "tp-btn ghost sm",
+    type: "button",
+    onClick: () => onAskAI({
+      scope: "all",
+      question: "Compare all scenarios. Explain what drives the differences in total modeled federal tax, after-tax economic income and spendable cash, whether the scenarios are economically comparable, and which differences are permanent versus timing.",
+      autoRun: true
+    })
+  }, "AI Compare Scenarios"), /*#__PURE__*/React.createElement("button", {
+    className: "tp-btn ghost sm",
+    type: "button",
+    onClick: onAIReport
+  }, "AI Build Report"), /*#__PURE__*/React.createElement("em", null, "Proposals require approval; the engine computes every result.")), /*#__PURE__*/React.createElement("div", {
     className: "tp-verdict"
   }, results.map(({
     s,
@@ -420,7 +443,13 @@ function ScenariosPage({
       className: "tp-vcompat err"
     }, "Blocking validation error \u2014 resolve before relying on this scenario."), v && !v.blocking && v.warnings.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "tp-vcompat"
-    }, "Requires human review"));
+    }, "Requires human review"), onAskAI && /*#__PURE__*/React.createElement(AICardMenu, {
+      scenario: s,
+      status: status,
+      year: year,
+      onAskAI: onAskAI,
+      onAIOptimize: onAIOptimize
+    }));
   })), /*#__PURE__*/React.createElement("div", {
     className: "tp-ledger-wrap"
   }, /*#__PURE__*/React.createElement("div", {

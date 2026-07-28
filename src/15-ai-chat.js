@@ -654,3 +654,262 @@ I.chat = /*#__PURE__*/React.createElement(Icon, {
     d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
   })
 });
+
+/* ============================================================================
+   AI CORE — shared by the Reviewer, the AI Analysis workspace, AI Optimize
+   and AI Build Report. Everything here follows one operating model:
+     AI identifies and proposes → human reviews → application creates a
+     scenario → deterministic engine calculates → AI explains and compares →
+     human approves → report and audit trail are updated.
+   ========================================================================== */
+
+/* ---- Controlled, de-identified data package (multi-scenario) ---- */
+function buildAIDataPackage(opts) {
+  const {
+    requestType,
+    entries,
+    status,
+    year,
+    objective,
+    includeCalcs,
+    includeWarnings,
+    multiYear
+  } = opts;
+  const pack = {
+    requestType,
+    engineVersion: ENGINE_VERSION,
+    rulesVersion: RULES_VERSION,
+    generatedAt: new Date().toISOString(),
+    clientContext: {
+      clientIdentifier: "client-1",
+      planningPeriod: multiYear ? "TY2025–TY2026" : TY[year].label,
+      filingStatus: status,
+      stateModelingStatus: "not modeled (federal only)"
+    },
+    objective: objective || null,
+    scenarios: entries.map((x, i) => {
+      const snap = buildScenarioSnapshot(x.s, x.r, x.s.name, status, year, x.v);
+      const out = {
+        scenarioId: x.s.id,
+        scenarioName: x.s.name,
+        scenarioType: x.s.aiGenerated ? "ai-proposed" : i === 0 ? "base" : "planning",
+        startingScenarioId: x.s.aiStartingScenarioId || null,
+        validationStatus: x.v ? x.v.blocking ? "blocking-errors" : x.v.warnings.length ? "warnings" : "clean" : "unknown",
+        assumptions: snap.assumptions,
+        income: snap.income,
+        adjustments: snap.adjustments,
+        deductions: snap.deductions,
+        qbi: includeCalcs ? snap.qbi : {
+          allowedDeduction: snap.qbi.allowedDeduction
+        },
+        employmentTaxes: {
+          selfEmploymentTax: snap.taxes.selfEmploymentTax,
+          employeePayrollTax: snap.taxes.employeePayrollTax,
+          employerPayrollTax: snap.taxes.employerPayrollTax,
+          additionalMedicareTax: snap.taxes.additionalMedicareTax
+        },
+        surtaxes: {
+          niit: snap.taxes.niit
+        },
+        credits: snap.taxes.credits,
+        taxResults: snap.taxes,
+        economicResults: snap.reconciliation,
+        cashFlowResults: {
+          retirementFunded: Math.round(x.r.cashOutflows.retirement),
+          hsaFunded: Math.round(x.r.cashOutflows.hsa),
+          charitableCashOutflow: Math.round(x.r.cashOutflows.charitable),
+          spendableAfterTaxCash: Math.round(x.r.spendableAfterTaxCash)
+        },
+        warnings: includeWarnings !== false && x.v ? x.v.all.map(v => "[" + v.level + "] " + v.msg) : [],
+        manualOverrides: [],
+        unresolvedFacts: includeWarnings !== false ? x.r.niitReview || [] : []
+      };
+      if (multiYear) {
+        const otherYear = year === 2025 ? 2026 : 2025;
+        try {
+          const r2 = computeScenario(x.s, status, otherYear);
+          out.otherYearResults = {
+            taxYear: otherYear,
+            totalModeledFederalTax: Math.round(r2.totalTax),
+            afterTaxEconomicIncome: Math.round(r2.afterTaxCash),
+            spendableAfterTaxCash: Math.round(r2.spendableAfterTaxCash),
+            qbiDeduction: Math.round(r2.qbi.deduction)
+          };
+        } catch (e) {}
+      }
+      return out;
+    }),
+    availablePlanningParameters: {
+      retirementPlans: ["solo401k", "sep", "simple", "dbPlan"],
+      hsaLimits: TY[year].hsa,
+      deferral402g: TY[year].deferral402g,
+      studentLoanMax: TY[year].studentLoan.max
+    },
+    modeledLimitations: ["Federal individual income tax only — no state tax", "No AMT", "Two tax years of statutory parameters (TY2025, TY2026)", "Taxable Social Security is an input, not computed", "Planning estimates, not return preparation"]
+  };
+  return pack;
+}
+
+/* ---- Core system behavior (applies to every AI capability) ---- */
+const AI_SYSTEM_CORE = "You are the AI advisory and review layer for a professional tax-planning application (Tax Advisory Pro; deterministic federal engine for TY2025/TY2026).\n" + "The deterministic tax engine is the authoritative source for all stored tax calculations. You must not replace engine calculations with your own unsupported figures.\n" + "Your responsibilities: analyze supplied scenario data and calculation results; explain material tax drivers; identify planning opportunities relevant to the supplied facts; identify arithmetic inconsistencies, tax-law concerns, missing facts, unsupported assumptions, and model limitations; propose structured scenario input changes for deterministic recalculation; compare scenarios using tax, economic income, spendable cash, timing, implementation burden, and risk; distinguish permanent tax reduction from tax deferral and cash-flow timing; produce professional narratives grounded in supplied numbers; clearly separate known facts, assumptions, estimates, and unresolved questions.\n" + "Never: invent client facts, eligibility, tax elections, basis, documentation, or legal conclusions; silently modify a scenario; describe a strategy as approved unless a human reviewer approved it; treat the lowest-tax scenario as automatically optimal; produce a final tax amount for a proposed strategy — request that the deterministic engine calculate it.\n" + "State plainly when the supplied data is insufficient: \"The current model does not contain enough information to reach a reliable conclusion.\" and list the exact missing fields.\n" + "All figures are planning estimates unless specifically validated for return preparation. Classify each modeled benefit as: permanent tax reduction, tax deferral, income shifting, cash-flow timing, conversion of income character, or uncertain/fact-dependent.\n" + "When proposing an input change use EXACTLY this plain-text block format:\nPROPOSED CHANGE\nfield: <field path>\ncurrent: <current numeric value>\nproposed: <proposed numeric value>\nreason: <one sentence>\n";
+
+const AI_ANALYZE_STRUCTURE = "Structure long-form analyses under these plain-text headings (omit headings that do not apply, keep the order):\nExecutive conclusion\nCurrent position\nKey tax drivers\nOptimization opportunities\nScenario comparison\nPotential tax impact\nCash-flow impact\nRisks and limitations\nMissing facts\nRecommended next steps\n";
+
+const AI_OPTIMIZE_SCHEMA = "Respond with ONE fenced JSON code block and nothing else, matching exactly:\n" + "{\n \"summary\": \"3-6 sentence executive summary of what was reviewed and found\",\n \"strategiesConsidered\": [{\"name\": \"...\", \"relevantBecause\": \"...\", \"pursued\": true}],\n \"validationIssues\": [\"...\"],\n \"candidates\": [{\n  \"scenarioName\": \"AI Optimization N — Short Strategy Name\",\n  \"startingScenarioId\": \"<id from the package>\",\n  \"proposedChanges\": [{\"field\": \"<whitelisted field path>\", \"currentValue\": 0, \"proposedValue\": 0, \"reason\": \"...\"}],\n  \"factsToConfirm\": [\"...\"],\n  \"expectedDirection\": \"...\",\n  \"benefitClassification\": \"permanent | deferral | income-shifting | cash-flow-timing | character-conversion | uncertain\",\n  \"risks\": [\"...\"]\n }]\n}\n" + "Allowed field paths: w2Wages, taxableInterest, taxExemptInterest, ordinaryDividends, qualifiedDividends, shortTermGains, longTermGains, rothConversion, iraDistributions, otherIncome, otherCredits, withholding, estimatedPayments, children, foreignExclusion, scheduleA.<key>, schedule1.<key>, sched1A.<key>, planning.<key>, sehi.<key>, ira.<key>. planning keys include: planType (string: solo401k|sep|simple|none), employerMode, employeeDeferral, hsaMode (off|max|manual), hsaManual, hsaCoverage (self|family), age. Do NOT invent field paths outside this list. Propose at most 4 candidates, each testing ONE coherent strategy (a combined strategy may be the last).";
+
+const AI_REPORT_SCHEMA = "Respond with ONE fenced JSON code block and nothing else: {\"sections\": [{\"id\": \"kebab-id\", \"title\": \"...\", \"body\": \"plain-text narrative, paragraphs separated by blank lines\", \"supportingFields\": [\"scenarioName.fieldPath\"]}]}. Every dollar amount you mention MUST come verbatim from the supplied package (you may compute percentages and differences of supplied amounts). Never invent amounts, eligibility, or facts.";
+
+/* ---- Transport: per-capability endpoint with BYO-key fallback ---- */
+const AI_ENDPOINTS = {
+  analyze: "/api/ai/analyze",
+  optimize: "/api/ai/optimize",
+  "build-report": "/api/ai/build-report",
+  grok: "/api/grok"
+};
+async function callAI(requestType, {
+  system,
+  messages,
+  signal,
+  ownKey
+}) {
+  if (!grokEndpointDown) {
+    try {
+      const resp = await fetch(AI_ENDPOINTS[requestType] || AI_ENDPOINTS.analyze, {
+        method: "POST",
+        signal,
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          system,
+          messages,
+          model: "grok-4.5"
+        })
+      });
+      if (resp.status === 404 || resp.status === 405 || resp.status === 501) {
+        grokEndpointDown = true;
+      } else {
+        const j = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(j.error || "AI service error (HTTP " + resp.status + ")");
+        return j.text || "";
+      }
+    } catch (e) {
+      if (e.name === "AbortError") throw e;
+      if (!grokEndpointDown) throw e;
+    }
+  }
+  // Fallback: user's own key from the Reviewer settings.
+  const settings = loadAISettings();
+  const provider = settings.provider;
+  const key = settings.keys[provider];
+  if (!key) {
+    const err = new Error("The secure AI endpoint is unavailable and no personal API key is saved. Open Ask AI → Settings to add one, or configure XAI_API_KEY on the deployment.");
+    err.needsKey = true;
+    throw err;
+  }
+  let acc = "";
+  await askOwnKey(provider, {
+    apiKey: key,
+    model: settings.models[provider] || AI_PROVIDERS[provider].defaultModel,
+    system,
+    messages,
+    signal,
+    onText: t => {
+      acc += t;
+    }
+  });
+  return acc;
+}
+
+/* ---- JSON extraction from a model reply ---- */
+function extractAIJSON(text) {
+  if (!text) return null;
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const raw = fence ? fence[1] : text.slice(text.indexOf("{"));
+  try {
+    return JSON.parse(raw);
+  } catch (e) {}
+  // Balanced-brace fallback
+  const start = text.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === "{") depth++;
+    if (text[i] === "}") depth--;
+    if (depth === 0) {
+      try {
+        return JSON.parse(text.slice(start, i + 1));
+      } catch (e) {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/* ---- Apply whitelisted proposed changes to a scenario copy (pure) ---- */
+function applyProposedChanges(scenario, changes) {
+  const clone = JSON.parse(JSON.stringify(scenario));
+  const applied = [],
+    skipped = [];
+  (changes || []).forEach(ch => {
+    const field = String(ch.field || "");
+    const value = ch.proposedValue;
+    const numeric = typeof value === "number" && isFinite(value);
+    const stringOk = typeof value === "string" && value.length < 40 && /^[\w-]*$/.test(value);
+    if (!AI_FIELD_WHITELIST.test(field) || !numeric && !stringOk) {
+      skipped.push(ch);
+      return;
+    }
+    const parts = field.split(".");
+    if (parts.length === 1) {
+      clone[parts[0]] = value;
+    } else {
+      let cur = clone;
+      for (let i = 0; i < parts.length - 1; i++) {
+        cur[parts[i]] = {
+          ...(cur[parts[i]] || {})
+        };
+        cur = cur[parts[i]];
+      }
+      cur[parts[parts.length - 1]] = value;
+    }
+    applied.push(ch);
+  });
+  return {
+    clone,
+    applied,
+    skipped
+  };
+}
+
+/* ---- Structured advisory-response renderer helpers ---- */
+const AI_SECTION_HEADINGS = ["Executive conclusion", "Current position", "Key tax drivers", "Optimization opportunities", "Scenario comparison", "Potential tax impact", "Cash-flow impact", "Risks and limitations", "Missing facts", "Recommended next steps"];
+function splitAISections(text) {
+  if (!text) return [];
+  const lines = text.split("\n");
+  const sections = [];
+  let cur = {
+    title: null,
+    body: []
+  };
+  const isHeading = l => {
+    const t = l.trim().replace(/[:*#]+$/, "").replace(/^[#*\s]+/, "");
+    return AI_SECTION_HEADINGS.find(h => h.toLowerCase() === t.toLowerCase());
+  };
+  for (const l of lines) {
+    const h = isHeading(l);
+    if (h) {
+      if (cur.title || cur.body.join("").trim()) sections.push(cur);
+      cur = {
+        title: h,
+        body: []
+      };
+    } else cur.body.push(l);
+  }
+  if (cur.title || cur.body.join("").trim()) sections.push(cur);
+  return sections.map(s => ({
+    title: s.title,
+    body: s.body.join("\n").trim()
+  })).filter(s => s.title || s.body);
+}

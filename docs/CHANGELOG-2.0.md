@@ -185,3 +185,84 @@ classifications; frozen seed-scenario totals.
 - The **taxable Social Security** amount is a direct input (the app does not
   compute the 0/50/85% inclusion worksheet); validation enforces the 85%
   ceiling.
+
+---
+
+# 2.1 — AI Optimization, AI Analysis workspace, and AI-Built Client Reports
+
+Operating model enforced end to end: **AI identifies and proposes → human
+reviews → application creates a scenario → deterministic engine calculates →
+AI explains and compares → human approves → report and audit trail update.**
+
+## Three connected AI capabilities
+- **AI Optimize** (Summary tab): validation gate (blocking errors make all
+  output provisional), objective selection (12 objectives + custom, two-year
+  option), AI strategy identification grounded in supplied facts, structured
+  candidate scenarios (whitelisted input changes + facts to confirm + benefit
+  classification), a review screen (create selected / all / cancel), engine
+  recalculation of every created scenario, and a results dashboard ranking
+  ENGINE numbers across tax, after-tax income, spendable cash, facts and
+  badges — never total tax alone. Cards: open / compare to base / add to
+  report / approve for planning / reject / request deeper analysis.
+- **AI Analysis workspace** (new nav tab): context panel (active / base /
+  selected / all / multi-year TY2025+TY2026 scope, engine and rules versions,
+  validation status, include-calculations and include-warnings toggles),
+  question box with 13 quick actions, structured collapsible advisory
+  responses (executive conclusion → recommended next steps), proposed-change
+  cards with Reject / Create-test-scenario, and a saved history with
+  workpapers / report / Word / PDF / delete actions — every run and save is
+  an audit-trail entry.
+- **AI Build Report** (Summary tab): setup (scenario set, 6 report types,
+  5 audiences, 5 tones, detail level, 13 sections, client identifier only),
+  grounded narrative generation (amounts must trace to the engine package;
+  supportingFields metadata retained per section), embedded key figures,
+  tax-composition and after-tax charts on separate scales, scenario table,
+  and a per-section editor: edit, regenerate-one (others untouched), shorten
+  / more technical / more client-friendly, hide, reorder, advisor comment,
+  restore AI wording, approve, lock, and stale-section flags when scenario
+  data changes ("never silently update an approved narrative").
+
+## Integration
+- Summary tab: AI advisory bar (AI Optimize · AI Compare Scenarios · AI
+  Build Report) and a per-scenario **AI** menu (explain / opportunities /
+  compare to base / calculation logic / missing facts / optimization start)
+  showing the analysis context before running.
+- Module tabs (SE, MAGI, QBI, SEHI): **Ask AI about this section** button
+  routes to the workspace with module + scenario context.
+- The Ask AI reviewer drawer remains for quick in-place review.
+
+## Secure backend
+- `/api/ai/analyze`, `/api/ai/optimize`, `/api/ai/build-report` (plus the
+  `/api/grok` alias) share one hardened proxy: POST-only, 400 KB cap, per-IP
+  rate limit, sanitized/truncated history, per-route timeouts, controlled
+  errors, usage logged without tax data, `XAI_API_KEY` server-side only.
+  GET returns a configuration health check. Authentication is delegated to
+  the deployment platform (Vercel SSO on previews) — a public production
+  deployment must add its own auth in front of these routes.
+- Controlled data package (§16 shape): de-identified, engine-generated,
+  multi-scenario, with objectives, validations, unresolved facts, and
+  modeled limitations; optional second-year results for multi-year analyses.
+
+## Governance and audit
+- AI-created scenarios are named, tagged (`aiGenerated`), and traced to
+  their starting scenario; every creation, analysis, report build, section
+  regeneration, and section approval writes an audit-trail entry. Proposals
+  apply only whitelisted input fields; non-whitelisted changes are skipped
+  and disclosed. No AI text is ever stored as a tax amount.
+
+## Acceptance results
+24/24 automated acceptance checks pass (scenario-level AI · optimization
+workflow · analysis workspace · report builder/editor · governance · audit),
+41/41 golden engine tests remain green, all 12 tabs render clean, and the
+key scan confirms no API key in any browser-served file.
+
+## Limitations
+- 3- and 5-year planning periods are not offered — the engine carries two
+  years of statutory parameters (TY2025/TY2026); multi-year analyses use
+  the real two-year window.
+- Word export is HTML-based (.doc); PDF export uses the browser print
+  dialog.
+- Report "replace graph" is limited to the built-in chart set; graphs are
+  engine-rendered, not AI-generated.
+- The /api rate limit is per warm serverless instance; a shared store would
+  be needed for strict global limits.

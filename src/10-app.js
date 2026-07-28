@@ -417,6 +417,11 @@ const TABS = [{
   label: "Report",
   icon: I.file,
   blurb: "Build a client-ready report, then print, save as PDF, or download."
+}, {
+  id: "ai",
+  label: "AI Analysis",
+  icon: I.chat,
+  blurb: "Central AI advisory workspace — planning questions, optimization history, and saved analyses. The engine stays authoritative."
 }];
 function App() {
   const [status, setStatus] = useState("mfj");
@@ -544,6 +549,84 @@ function App() {
     setScenarios(sc => sc.map(s => s.id === id ? after : s));
   };
   const updateActive = (field, value) => update(activeIdSafe, field, value);
+  const [aiHistory, setAiHistory] = useState([]);
+  const [aiPrefill, setAiPrefill] = useState(null);
+  const [reportInbox, setReportInbox] = useState([]);
+  const [showOptimize, setShowOptimize] = useState(false);
+  const [showAIReport, setShowAIReport] = useState(false);
+  /* AI Optimize / test scenarios: clone the starting scenario, apply ONLY the
+     whitelisted approved input changes, let the engine recompute, and record
+     everything. AI-created scenarios are always identified as such. */
+  const createAIScenarios = candidates => {
+    const madeAll = [];
+    setScenarios(sc => {
+      let next = sc.slice();
+      candidates.forEach(c => {
+        const start = next.find(x => x.id === c.startingScenarioId) || next[0];
+        const {
+          clone,
+          applied,
+          skipped
+        } = applyProposedChanges(start, c.proposedChanges);
+        clone.id = uid();
+        clone.name = c.scenarioName || "AI Optimization — " + (applied[0] ? applied[0].field : "proposal");
+        clone.aiGenerated = true;
+        clone.aiStartingScenarioId = start.id;
+        next = [...next, clone];
+        madeAll.push({
+          id: clone.id,
+          name: clone.name,
+          startingName: start.name,
+          changes: applied.map(ch => ({
+            field: ch.field,
+            proposedValue: ch.proposedValue,
+            reason: ch.reason
+          })),
+          skipped: skipped.length,
+          factsToConfirm: c.factsToConfirm || [],
+          benefitClassification: c.benefitClassification || null
+        });
+        logEvent({
+          label: "AI-proposed scenario created: " + clone.name,
+          kind: "ai",
+          scenarioId: clone.id,
+          scenarioName: clone.name,
+          from: start.name,
+          to: applied.map(ch => ch.field + " → " + ch.proposedValue).join("; ") + (skipped.length ? " (" + skipped.length + " non-whitelisted change(s) skipped)" : "")
+        });
+      });
+      return next;
+    });
+    return madeAll;
+  };
+  const askWorkspace = prefill => {
+    setAiPrefill(prefill);
+    setTab("ai");
+    setShowOptimize(false);
+  };
+  const addToReportInbox = entry => {
+    setReportInbox(list => list.find(x => x.id === entry.id) ? list : [...list, entry]);
+    logEvent({
+      label: "AI analysis added to report inbox",
+      kind: "ai",
+      scenarioName: entry.scopeLabel,
+      to: entry.question ? entry.question.slice(0, 80) : ""
+    });
+  };
+  const decideAIScenario = (id, decision) => {
+    setScenarios(sc => sc.map(x => x.id === id ? {
+      ...x,
+      aiDecision: decision
+    } : x));
+    const sc = scenarios.find(x => x.id === id);
+    logEvent({
+      label: "AI strategy " + decision + (sc ? ": " + sc.name : ""),
+      kind: "ai",
+      scenarioId: id,
+      scenarioName: sc ? sc.name : "",
+      to: decision
+    });
+  };
   /* AI Tax Reviewer approvals: change the INPUT, let the engine re-run, and
      record both the field-level diff (recordChange, via update) and an
      explicit AI-approval entry in the audit trail. AI output itself is never
@@ -715,7 +798,16 @@ function App() {
   }, scenarios.map(s => /*#__PURE__*/React.createElement("option", {
     key: s.id,
     value: s.id
-  }, s.name))))), results[activeIdx].v.all.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, s.name)))), moduleTabs.includes(tab) && /*#__PURE__*/React.createElement("button", {
+    className: "tp-btn ghost sm tp-ai-ctx",
+    type: "button",
+    title: "Ask AI about this section",
+    onClick: () => askWorkspace({
+      scenarioId: activeIdSafe,
+      question: "Analysis context: " + active.name + " \u00b7 " + t.label + ". Explain this module's calculation for the scenario, check the binding limitation, identify optimization opportunities and missing facts, and note any inconsistencies.",
+      autoRun: true
+    })
+  }, I.chat, " Ask AI about this section")), results[activeIdx].v.all.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "tp-validbar"
   }, /*#__PURE__*/React.createElement("strong", null, active.name, ": "), results[activeIdx].v.errors.map((v, i) => /*#__PURE__*/React.createElement("span", {
     key: "e" + i,
@@ -736,6 +828,9 @@ function App() {
     setFocusId: setFocusId,
     goto: setTab
   }), tab === "scenarios" && /*#__PURE__*/React.createElement(ScenariosPage, {
+    onAIOptimize: () => setShowOptimize(true),
+    onAIReport: () => setShowAIReport(true),
+    onAskAI: askWorkspace,
     scenarios: scenarios,
     results: results,
     bestId: bestId,
@@ -802,6 +897,25 @@ function App() {
     year: year,
     notes: notes,
     auditLog: auditLog
+  }), tab === "ai" && /*#__PURE__*/React.createElement(AIAnalysisPage, {
+    results: results,
+    status: status,
+    year: year,
+    activeIdx: activeIdx,
+    aiPrefill: aiPrefill,
+    clearPrefill: () => setAiPrefill(null),
+    onCreateTestScenario: c => createAIScenarios([c]),
+    onSaveToNotes: text => setNotes(n => [...n, {
+      id: uid(),
+      ts: Date.now(),
+      tsLabel: new Date().toLocaleString(),
+      scenarioName: "AI analysis",
+      text: text
+    }]),
+    onAddToReport: addToReportInbox,
+    logEvent: logEvent,
+    history: aiHistory,
+    setHistory: setAiHistory
   }))), /*#__PURE__*/React.createElement("div", {
     className: "tp-dock"
   }, /*#__PURE__*/React.createElement("button", {
@@ -846,6 +960,28 @@ function App() {
     z: zTop.notes,
     draft: noteDraft,
     setDraft: setNoteDraft
+  }), showOptimize && /*#__PURE__*/React.createElement(AIOptimizePanel, {
+    onClose: () => setShowOptimize(false),
+    results: results,
+    status: status,
+    year: year,
+    onCreateScenarios: createAIScenarios,
+    logEvent: logEvent,
+    onOpenScenario: id => {
+      setActiveId(id);
+      setTab("scenarios");
+      setShowOptimize(false);
+    },
+    onAskWorkspace: askWorkspace,
+    onAddToReport: addToReportInbox,
+    onDecide: decideAIScenario
+  }), showAIReport && /*#__PURE__*/React.createElement(AIReportPanel, {
+    onClose: () => setShowAIReport(false),
+    results: results,
+    status: status,
+    year: year,
+    reportInbox: reportInbox,
+    logEvent: logEvent
   }), showAI && /*#__PURE__*/React.createElement(AIReviewer, {
     onClose: () => setShowAI(false),
     result: activeResult,
