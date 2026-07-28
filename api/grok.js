@@ -37,6 +37,11 @@ function rateLimited(ip) {
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
+  if (req.method === "GET") {
+    // Health check: reports only whether the server-side key is configured.
+    res.status(200).json({ status: "ok", configured: !!process.env.XAI_API_KEY });
+    return;
+  }
   if (req.method !== "POST") {
     res.status(405).json({ error: "POST only" });
     return;
