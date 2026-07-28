@@ -1,0 +1,11 @@
+{
+  "name": "tax-advisory-pro",
+  "version": "1.0.0",
+  "description": "Deterministic federal individual income tax planning workbench for TY2025 and TY2026 — SE tax, retirement plan design, MAGI phase-outs, Sec. 199A QBI, SEHI and IRA modules.",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes serve -l 3000 .",
+    "build:standalone": "node tools/build-standalone.mjs",
+    "test": "node tests/golden.test.mjs"
+  }
+}
