@@ -17,13 +17,13 @@ const AI_PROVIDERS = {
   },
   openai: {
     label: "OpenAI",
-    defaultModel: "gpt-5",
+    defaultModel: "gpt-5.5",
     keyHint: "sk-...",
     keyUrl: "platform.openai.com"
   },
   grok: {
     label: "Grok",
-    defaultModel: "grok-4",
+    defaultModel: "grok-4.5",
     keyHint: "xai-...",
     keyUrl: "console.x.ai"
   }
