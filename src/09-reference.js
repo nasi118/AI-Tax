@@ -198,62 +198,148 @@ const GUIDE = [{
     meta: "OBBBA amendments to IRC §170 and §68"
   }]
 }];
-function PlanningGuide({
-  year
-}) {
-  const [openCats, setOpenCats] = useState({
-    [GUIDE[0].cat]: true
-  });
-  const [showLaw, setShowLaw] = useState(true);
-  return /*#__PURE__*/React.createElement("div", {
+/* ============================================================================
+   PLANNING GUIDE — progressive disclosure: category bubbles, search and
+   filters, compact accordions. Only the selected category renders; law-change
+   cards live in their own subtab instead of dominating the first screen.
+   ========================================================================== */
+function guideFirstSentence(text) {
+  const i = text.indexOf(". ");
+  return i > 0 && i < 130 ? text.slice(0, i + 1) : text.slice(0, 120) + (text.length > 120 ? "\u2026" : "");
+}
+function PlanningGuide({ year, onAskAI, onAddNote }) {
+  const [cat, setCat] = useUIPref("guide:cat", GUIDE[0].cat);
+  const [q, setQ] = useState("");
+  const [risk, setRisk] = useState("all");
+  const [openItems, setOpenItems] = useState({});
+  const ql = q.trim().toLowerCase();
+  const searching = ql.length > 0;
+  const matches = it => (!ql || (it.n + " " + it.b + " " + it.meta).toLowerCase().includes(ql)) && (risk === "all" || it.risk === risk);
+  const visible = searching
+    ? GUIDE.map(g => ({ cat: g.cat, items: g.items.filter(matches) })).filter(g => g.items.length)
+    : GUIDE.filter(g => g.cat === cat).map(g => ({ cat: g.cat, items: g.items.filter(matches) }));
+  const shownIds = visible.flatMap(g => g.items.map(it => g.cat + "::" + it.n));
+  const setAll = v => {
+    const m = { ...openItems };
+    shownIds.forEach(id => { m[id] = v; });
+    setOpenItems(m);
+  };
+  const lawSelected = !searching && cat === "__law";
+  return EL("div", {
     className: "tp-stack"
-  }, /*#__PURE__*/React.createElement(Card, {
+  }, EL("div", {
+    className: "tp-bubbles",
+    role: "tablist",
+    "aria-label": "Planning categories"
+  }, EL("button", {
+    type: "button",
+    role: "tab",
+    className: "tp-bubble" + (lawSelected ? " on" : ""),
+    "aria-selected": lawSelected,
+    onClick: () => { setCat("__law"); setQ(""); }
+  }, "Law Changes", EL("em", null, OBBBA.length)), GUIDE.map(g => EL("button", {
+    key: g.cat,
+    type: "button",
+    role: "tab",
+    className: "tp-bubble" + (!searching && cat === g.cat ? " on" : ""),
+    "aria-selected": !searching && cat === g.cat,
+    onClick: () => setCat(g.cat)
+  }, g.cat, EL("em", null, g.items.length)))), EL("div", {
+    className: "tp-guide-filters"
+  }, EL("input", {
+    className: "tp-search",
+    placeholder: "Search strategies across every category\u2026",
+    value: q,
+    onChange: e => setQ(e.target.value),
+    "aria-label": "Search strategies"
+  }), EL(Seg, {
+    small: true,
+    value: risk,
+    onChange: setRisk,
+    options: [{ v: "all", l: "All risk" }, { v: "low", l: "Lower" }, { v: "med", l: "Moderate" }, { v: "high", l: "Higher" }]
+  }), EL("button", {
+    className: "tp-mini",
+    type: "button",
+    onClick: () => setAll(true)
+  }, "Expand all"), EL("button", {
+    className: "tp-mini",
+    type: "button",
+    onClick: () => setAll(false)
+  }, "Collapse all"), onAskAI && !lawSelected && EL("button", {
+    className: "tp-mini ai",
+    type: "button",
+    onClick: () => onAskAI({
+      question: "Review the planning-guide category \"" + (searching ? "search: " + q : cat) + "\" against the active scenario. Which of these strategies are applicable on the modeled facts, which are not, and what facts must be confirmed?",
+      autoRun: true
+    })
+  }, I.chat, " Ask AI about this category")), lawSelected ? EL(Card, {
     title: "What changed under OBBBA",
-    right: /*#__PURE__*/React.createElement("button", {
-      className: "tp-btn ghost sm",
-      onClick: () => setShowLaw(v => !v)
-    }, showLaw ? "Hide" : "Show")
-  }, showLaw && /*#__PURE__*/React.createElement("div", {
+    sub: TY[year].label
+  }, EL("div", {
     className: "tp-lawgrid"
-  }, OBBBA.map(h => /*#__PURE__*/React.createElement("div", {
+  }, OBBBA.map(h => EL("div", {
     key: h.t,
     className: "tp-lawcard"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, EL("div", {
     className: "tp-lawwhen"
-  }, h.when), /*#__PURE__*/React.createElement("div", {
+  }, h.when), EL("div", {
     className: "tp-lawt"
-  }, h.t), /*#__PURE__*/React.createElement("div", {
+  }, h.t), EL("div", {
     className: "tp-lawd"
-  }, h.d))))), GUIDE.map(g => {
-    const isOpen = !!openCats[g.cat];
-    return /*#__PURE__*/React.createElement("div", {
-      key: g.cat,
-      className: "tp-cat"
-    }, /*#__PURE__*/React.createElement("button", {
-      className: "tp-cat-head",
-      onClick: () => setOpenCats(o => ({
-        ...o,
-        [g.cat]: !o[g.cat]
-      }))
-    }, isOpen ? I.chevD : I.chevR, /*#__PURE__*/React.createElement("span", null, g.cat), /*#__PURE__*/React.createElement("em", null, g.items.length)), isOpen && /*#__PURE__*/React.createElement("div", {
-      className: "tp-cat-body"
-    }, g.items.map(it => /*#__PURE__*/React.createElement("div", {
+  }, h.d), onAskAI && EL("button", {
+    className: "tp-mini",
+    type: "button",
+    style: { marginTop: 8 },
+    onClick: () => onAskAI({
+      question: "Explain the planning significance of this law change for the active scenario: " + h.t + " \u2014 " + h.d,
+      autoRun: true
+    })
+  }, "Open analysis"))))) : !visible.length ? EL("div", {
+    className: "tp-guide-empty"
+  }, "No strategies match", ql ? " \u201c" + q + "\u201d" : "", risk !== "all" ? " at that risk level" : "", ".") : visible.map(g => EL("div", {
+    key: g.cat
+  }, searching && EL("div", {
+    className: "tp-minihead"
+  }, g.cat), g.items.map(it => {
+    const id = g.cat + "::" + it.n;
+    const openIt = !!openItems[id];
+    return EL("div", {
       key: it.n,
-      className: "tp-consid"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "tp-consid-top"
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "tp-consid-name"
-    }, it.n), /*#__PURE__*/React.createElement("span", {
+      className: "tp-acc"
+    }, EL("button", {
+      type: "button",
+      className: "tp-acc-head",
+      onClick: () => setOpenItems(m => ({ ...m, [id]: !m[id] })),
+      "aria-expanded": openIt
+    }, EL("span", {
+      className: "tp-sec-chev" + (openIt ? " open" : "")
+    }, I.chevR), EL("span", {
+      className: "tp-acc-name"
+    }, it.n), !openIt && EL("span", {
+      className: "tp-acc-blurb"
+    }, guideFirstSentence(it.b)), EL("span", {
       className: "tp-pill " + RISK[it.risk].c
-    }, RISK[it.risk].label)), /*#__PURE__*/React.createElement("div", {
-      className: "tp-consid-b"
-    }, it.b), /*#__PURE__*/React.createElement("div", {
+    }, RISK[it.risk].label)), openIt && EL("div", {
+      className: "tp-acc-body"
+    }, it.b, EL("div", {
       className: "tp-consid-meta"
-    }, it.meta)))));
-  }), /*#__PURE__*/React.createElement("div", {
+    }, it.meta), EL("div", {
+      className: "tp-acc-actions"
+    }, onAskAI && EL("button", {
+      className: "tp-mini ai",
+      type: "button",
+      onClick: () => onAskAI({
+        question: "Assess this strategy for the active scenario and, if applicable, propose the input changes to model it: " + it.n + ". " + it.b,
+        autoRun: true
+      })
+    }, I.chat, " Model with AI"), onAddNote && EL("button", {
+      className: "tp-mini",
+      type: "button",
+      onClick: () => onAddNote("Planning guide \u2014 " + it.n + ": " + it.b + " [" + it.meta + "]")
+    }, "Save to workpapers"))));
+  }))), EL("div", {
     className: "tp-disclaimer"
-  }, /*#__PURE__*/React.createElement("strong", null, "Advisory disclaimer."), " This tool produces directional modelling to support planning conversations. It is not a filed return, a formal tax opinion, or legal advice, and it performs no verification of source documents. Figures reflect federal law as amended by the One Big Beautiful Bill Act. State treatment, including bonus depreciation add-backs and pass-through entity taxes, is not modelled at all. Several strategies described here sit in higher-scrutiny territory and are sustained or lost on contemporaneous documentation. Confirm entity facts, basis, eligibility and records before acting."));
+  }, EL("strong", null, "Advisory disclaimer."), " This tool produces directional modelling to support planning conversations. It is not a filed return, a formal tax opinion, or legal advice, and it performs no verification of source documents. Figures reflect federal law as amended by the One Big Beautiful Bill Act. State treatment, including bonus depreciation add-backs and pass-through entity taxes, is not modelled at all. Several strategies described here sit in higher-scrutiny territory and are sustained or lost on contemporaneous documentation. Confirm entity facts, basis, eligibility and records before acting."));
 }
 
 /* ============================================================================

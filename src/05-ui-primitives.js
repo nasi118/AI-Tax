@@ -320,6 +320,11 @@ function Money({
     disabled: disabled,
     value: value === 0 || value === "0" ? "" : value,
     placeholder: placeholder || "0",
+    onFocus: e => {
+      /* Remembered so the quick calculator's "Insert into input" can target
+         the money field the user last worked in. */
+      window.__tpLastMoneyInput = e.target;
+    },
     onChange: e => {
       const v = e.target.value.replace(/[^0-9.\-]/g, "");
       onChange(v === "" ? 0 : v);
@@ -453,8 +458,10 @@ function StackedBars({
   data,
   series,
   height,
-  format
+  format,
+  axisFormat
 }) {
+  const axisF = axisFormat || (v => "$" + Math.round(v / 1000) + "k");
   const h = height || 210,
     padL = 56,
     padB = 34,
@@ -490,7 +497,7 @@ function StackedBars({
       y: y + 4,
       textAnchor: "end",
       className: "tp-svg-axis"
-    }, "$" + Math.round(v / 1000) + "k"));
+    }, axisF(v)));
   }), data.map((d, i) => {
     const cx = padL + iw / data.length * (i + 0.5);
     let acc = 0;
