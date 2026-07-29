@@ -423,13 +423,40 @@ const TABS = [{
   icon: I.chat,
   blurb: "Central AI advisory workspace — planning questions, optimization history, and saved analyses. The engine stays authoritative."
 }];
+
+/* Grouped navigation: Planning / Calculations / Administration.
+   Ids reference the TABS entries above, which stay the routing source of truth. */
+const NAV_GROUPS = [{
+  key: "planning",
+  label: "Planning",
+  ids: ["dashboard", "scenarios", "ai", "guide", "report"]
+}, {
+  key: "calc",
+  label: "Calculations",
+  ids: ["se", "magi", "qbi", "health"]
+}, {
+  key: "admin",
+  label: "Administration",
+  ids: ["audit", "data", "reference"]
+}];
 function App() {
   const [status, setStatus] = useState("mfj");
   const [year, setYear] = useState(2025);
   const [scenarios, setScenarios] = useState(seed);
-  const [tab, setTab] = useState("dashboard");
-  const [activeId, setActiveId] = useState(null);
+  const [tab, setTabRaw] = useState(() => getUIPref("tab", "dashboard"));
+  const setTab = t => {
+    setTabRaw(t);
+    setUIPref("tab", t);
+  };
+  const [activeId, setActiveIdRaw] = useState(null);
+  const setActiveId = id => setActiveIdRaw(id);
   const [focusId, setFocusId] = useState(null);
+
+  /* ---- Interface preferences (never mixed with tax data) ---- */
+  const [navCollapsed, setNavCollapsed] = useUIPref("navCollapsed", false);
+  const [navGroupsOpen, setNavGroupsOpen] = useUIPref("navGroups", {});
+  const [toolsMode, setToolsMode] = useUIPref("toolsMode", "pinned"); // pinned | collapsed | hidden
+  const [openCalc, setOpenCalc] = useState(null);
 
   /* ---- Tools and records ---- */
   const [auditLog, setAuditLog] = useState([]);
@@ -599,6 +626,34 @@ function App() {
     });
     return madeAll;
   };
+  /* Contextual calculators: "Create test scenario" hands back a fully mutated
+     clone that already went through the calculator's engine preview. It enters
+     the scenario list through the normal pipeline and is recomputed live. */
+  const createScenarioFromTool = (name, clone, memo) => {
+    const c = { ...clone, id: uid(), name };
+    logEvent({
+      label: "Scenario created from calculator",
+      kind: "structure",
+      scenarioId: c.id,
+      scenarioName: name,
+      from: active ? active.name : "",
+      to: memo || name
+    });
+    setScenarios(sc => [...sc, c]);
+    setActiveId(c.id);
+    setOpenCalc(null);
+    setTab("scenarios");
+  };
+  const addQuickNote = text => {
+    if (!text) return;
+    setNotes(n => [...n, {
+      id: uid(),
+      ts: Date.now(),
+      tsLabel: new Date().toLocaleString(),
+      scenarioName: active ? active.name : "Session",
+      text
+    }]);
+  };
   const askWorkspace = prefill => {
     setAiPrefill(prefill);
     setTab("ai");
@@ -726,276 +781,242 @@ function App() {
   const setScenariosLogged = fnOrArr => setScenarios(fnOrArr);
   const moduleTabs = ["se", "magi", "qbi", "health"];
   const [navOpen, setNavOpen] = useState(false);
+  const [toolsMobile, setToolsMobile] = useState(false);
   const pickTab = id => {
     setTab(id);
     setNavOpen(false);
   };
   const t = TABS.find(x => x.id === tab);
-  return /*#__PURE__*/React.createElement("div", {
-    className: "tp-root"
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "tp-navtoggle",
-    onClick: () => setNavOpen(v => !v),
-    "aria-label": "Toggle navigation",
-    title: "Menu"
-  }, "\u2630"), navOpen && /*#__PURE__*/React.createElement("div", {
-    className: "tp-navoverlay",
-    onClick: () => setNavOpen(false)
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "tp-shell"
-  }, /*#__PURE__*/React.createElement("aside", {
-    className: "tp-side" + (navOpen ? " open" : "")
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "tp-brand"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "tp-mark"
-  }, "§"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Tax Advisory Pro"), /*#__PURE__*/React.createElement("p", null, "Individual planning workbench"))), /*#__PURE__*/React.createElement("nav", {
-    className: "tp-nav"
-  }, TABS.map(x => /*#__PURE__*/React.createElement("button", {
-    key: x.id,
-    className: "tp-navitem " + (tab === x.id ? "on" : ""),
-    onClick: () => pickTab(x.id)
-  }, x.icon, " ", x.label))), /*#__PURE__*/React.createElement("div", {
-    className: "tp-side-controls"
-  }, /*#__PURE__*/React.createElement("label", {
-    className: "tp-sidefield"
-  }, /*#__PURE__*/React.createElement("span", null, "Tax year"), /*#__PURE__*/React.createElement(Seg, {
+  const validation = results[activeIdx].v;
+  const toolsVisible = toolsMode !== "hidden";
+  const shellCls = "tp-shell" + (navCollapsed ? " nav-collapsed" : "") + (toolsMode === "collapsed" ? " tools-collapsed" : "") + (!toolsVisible ? " tools-hidden" : "");
+  const yearStatusControls = compact => EL(React.Fragment, null, EL("label", {
+    className: compact ? "tp-sel compact" : "tp-sidefield"
+  }, EL("span", null, "Tax year"), EL(Seg, {
     small: true,
     value: year,
     onChange: setYearLogged,
-    options: [{
-      v: 2025,
-      l: "2025"
-    }, {
-      v: 2026,
-      l: "2026"
-    }]
-  })), /*#__PURE__*/React.createElement("label", {
-    className: "tp-sidefield"
-  }, /*#__PURE__*/React.createElement("span", null, "Filing status"), /*#__PURE__*/React.createElement("select", {
+    options: [{ v: 2025, l: "2025" }, { v: 2026, l: "2026" }]
+  })), EL("label", {
+    className: compact ? "tp-sel compact" : "tp-sidefield"
+  }, EL("span", null, "Filing status"), EL("select", {
     value: status,
     onChange: e => setStatusLogged(e.target.value)
-  }, STATUSES.map(s => /*#__PURE__*/React.createElement("option", {
-    key: s.v,
-    value: s.v
-  }, s.l))))), /*#__PURE__*/React.createElement("div", {
-    className: "tp-side-foot"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "tp-sidestat"
-  }, /*#__PURE__*/React.createElement("span", null, "Lowest modeled tax scenario"), /*#__PURE__*/React.createElement("strong", null, results.find(x => x.s.id === bestId).s.name)), /*#__PURE__*/React.createElement("div", {
-    className: "tp-sidestat"
-  }, /*#__PURE__*/React.createElement("span", null, "Total modeled federal tax"), /*#__PURE__*/React.createElement("strong", {
-    className: "green"
-  }, usd$(results.find(x => x.s.id === bestId).r.totalTax))))), /*#__PURE__*/React.createElement("main", {
-    className: "tp-main"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "tp-topbar"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", null, t.label), /*#__PURE__*/React.createElement("p", null, t.blurb)), moduleTabs.includes(tab) && /*#__PURE__*/React.createElement("label", {
-    className: "tp-sel compact"
-  }, /*#__PURE__*/React.createElement("span", null, "Scenario"), /*#__PURE__*/React.createElement("select", {
-    value: activeIdSafe,
-    onChange: e => setActiveId(e.target.value)
-  }, scenarios.map(s => /*#__PURE__*/React.createElement("option", {
-    key: s.id,
-    value: s.id
-  }, s.name)))), moduleTabs.includes(tab) && /*#__PURE__*/React.createElement("button", {
-    className: "tp-btn ghost sm tp-ai-ctx",
-    type: "button",
-    title: "Ask AI about this section",
-    onClick: () => askWorkspace({
-      scenarioId: activeIdSafe,
-      question: "Analysis context: " + active.name + " \u00b7 " + t.label + ". Explain this module's calculation for the scenario, check the binding limitation, identify optimization opportunities and missing facts, and note any inconsistencies.",
-      autoRun: true
-    })
-  }, I.chat, " Ask AI about this section")), results[activeIdx].v.all.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "tp-validbar"
-  }, /*#__PURE__*/React.createElement("strong", null, active.name, ": "), results[activeIdx].v.errors.map((v, i) => /*#__PURE__*/React.createElement("span", {
-    key: "e" + i,
-    className: "tp-vchip err"
-  }, "Blocking: ", v.msg)), results[activeIdx].v.warnings.map((v, i) => /*#__PURE__*/React.createElement("span", {
-    key: "w" + i,
-    className: "tp-vchip warn"
-  }, v.msg)), results[activeIdx].v.infos.map((v, i) => /*#__PURE__*/React.createElement("span", {
-    key: "i" + i,
-    className: "tp-vchip info"
-  }, v.msg))), tab === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, {
-    results: results,
-    bestId: bestId,
-    baseline: baseline,
-    status: status,
-    year: year,
-    focusId: focusSafe,
-    setFocusId: setFocusId,
-    goto: setTab
-  }), tab === "scenarios" && /*#__PURE__*/React.createElement(ScenariosPage, {
-    onAIOptimize: () => setShowOptimize(true),
-    onAIReport: () => setShowAIReport(true),
-    onAskAI: askWorkspace,
-    scenarios: scenarios,
-    results: results,
-    bestId: bestId,
-    baseline: baseline,
-    status: status,
-    year: year,
-    update: update,
-    addScenario: addScenario,
-    duplicate: duplicate,
-    remove: remove,
-    reset: reset
-  }), tab === "se" && /*#__PURE__*/React.createElement(SEModule, {
-    scenario: active,
-    result: activeResult,
-    status: status,
-    year: year,
-    update: updateActive
-  }), tab === "magi" && /*#__PURE__*/React.createElement(MAGIModule, {
-    scenario: active,
-    result: activeResult,
-    status: status,
-    year: year,
-    update: updateActive
-  }), tab === "qbi" && /*#__PURE__*/React.createElement(QBIModule, {
-    scenario: active,
-    result: activeResult,
-    status: status,
-    year: year,
-    update: updateActive
-  }), tab === "health" && /*#__PURE__*/React.createElement(HealthModule, {
-    scenario: active,
-    result: activeResult,
-    status: status,
-    year: year,
-    update: updateActive
-  }), tab === "guide" && /*#__PURE__*/React.createElement(PlanningGuide, {
-    year: year
-  }), tab === "reference" && /*#__PURE__*/React.createElement(ReferenceTables, {
-    year: year,
-    status: status
-  }), tab === "audit" && /*#__PURE__*/React.createElement(AuditPage, {
-    auditLog: auditLog,
-    setAuditLog: setAuditLog,
-    scenarios: scenarios,
-    results: results,
-    year: year,
-    status: status
-  }), tab === "data" && /*#__PURE__*/React.createElement(DataPage, {
-    scenarios: scenarios,
-    setScenarios: setScenariosLogged,
-    results: results,
-    status: status,
-    year: year,
-    auditLog: auditLog,
-    notes: notes,
-    logEvent: logEvent,
-    setYear: setYearLogged,
-    setStatus: setStatusLogged
-  }), tab === "report" && /*#__PURE__*/React.createElement(ReportPage, {
-    results: results,
-    bestId: bestId,
-    baseline: baseline,
-    status: status,
-    year: year,
-    notes: notes,
-    auditLog: auditLog
-  }), tab === "ai" && /*#__PURE__*/React.createElement(AIAnalysisPage, {
-    results: results,
-    status: status,
-    year: year,
-    activeIdx: activeIdx,
-    aiPrefill: aiPrefill,
-    clearPrefill: () => setAiPrefill(null),
-    onCreateTestScenario: c => createAIScenarios([c]),
-    onSaveToNotes: text => setNotes(n => [...n, {
-      id: uid(),
-      ts: Date.now(),
-      tsLabel: new Date().toLocaleString(),
-      scenarioName: "AI analysis",
-      text: text
-    }]),
-    onAddToReport: addToReportInbox,
-    logEvent: logEvent,
-    history: aiHistory,
-    setHistory: setAiHistory
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "tp-dock"
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "tp-dockbtn " + (showCalc ? "on" : ""),
-    onClick: () => {
-      setShowCalc(v => !v);
-      raise("calc");
-    },
-    title: "Calculator"
-  }, I.calc, /*#__PURE__*/React.createElement("span", null, "Calculator")), /*#__PURE__*/React.createElement("button", {
-    className: "tp-dockbtn " + (showNotes ? "on" : ""),
-    onClick: () => {
-      setShowNotes(v => !v);
-      raise("notes");
-    },
-    title: "Notes"
-  }, I.note, /*#__PURE__*/React.createElement("span", null, "Notes", notes.length ? " (" + notes.length + ")" : "")), /*#__PURE__*/React.createElement("button", {
-    className: "tp-dockbtn " + (showAI ? "on" : ""),
-    onClick: () => {
-      setShowAI(v => !v);
-      raise("ai");
-    },
-    title: "Ask AI"
-  }, I.chat, /*#__PURE__*/React.createElement("span", null, "Ask AI"))), showCalc && /*#__PURE__*/React.createElement(Calculator, {
-    onClose: () => setShowCalc(false),
-    result: activeResult,
-    scenarioName: active.name,
-    onFocus: () => raise("calc"),
-    z: zTop.calc,
-    onSendToNotes: text => {
-      setNoteDraft(d => (d ? d + "\n\n" : "") + text);
-      setShowNotes(true);
-      raise("notes");
-    }
-  }), showNotes && /*#__PURE__*/React.createElement(Notepad, {
-    onClose: () => setShowNotes(false),
-    notes: notes,
-    setNotes: setNotes,
-    scenarioName: active.name,
-    scenarioId: active.id,
-    onFocus: () => raise("notes"),
-    z: zTop.notes,
-    draft: noteDraft,
-    setDraft: setNoteDraft
-  }), showOptimize && /*#__PURE__*/React.createElement(AIOptimizePanel, {
-    onClose: () => setShowOptimize(false),
-    results: results,
-    status: status,
-    year: year,
-    onCreateScenarios: createAIScenarios,
-    logEvent: logEvent,
-    onOpenScenario: id => {
-      setActiveId(id);
-      setTab("scenarios");
-      setShowOptimize(false);
-    },
-    onAskWorkspace: askWorkspace,
-    onAddToReport: addToReportInbox,
-    onDecide: decideAIScenario
-  }), showAIReport && /*#__PURE__*/React.createElement(AIReportPanel, {
-    onClose: () => setShowAIReport(false),
-    results: results,
-    status: status,
-    year: year,
-    reportInbox: reportInbox,
-    logEvent: logEvent
-  }), showAI && /*#__PURE__*/React.createElement(AIReviewer, {
-    onClose: () => setShowAI(false),
-    result: activeResult,
-    scenario: active,
-    scenarioName: active.name,
-    status: status,
-    year: year,
-    validation: results[activeIdx].v,
-    onSendToNotes: text => {
-      setNoteDraft(d => (d ? d + "\n\n" : "") + text);
-      setShowNotes(true);
-      raise("notes");
-    },
-    onApplyChange: applyAIChange
-  }));
+  }, STATUSES.map(s => EL("option", { key: s.v, value: s.v }, s.l)))));
+
+  return EL("div", { className: "tp-root" },
+    EL("button", {
+      className: "tp-navtoggle",
+      onClick: () => setNavOpen(v => !v),
+      "aria-label": "Toggle navigation",
+      title: "Menu"
+    }, "☰"),
+    navOpen && EL("div", { className: "tp-navoverlay", onClick: () => setNavOpen(false) }),
+    EL("div", { className: shellCls },
+
+      /* ---------------- Left navigation ---------------- */
+      EL("aside", { className: "tp-side" + (navOpen ? " open" : "") },
+        EL("div", { className: "tp-side-top" },
+          EL("div", { className: "tp-brand" },
+            EL("div", { className: "tp-mark" }, "§"),
+            !navCollapsed && EL("div", null,
+              EL("h1", null, "Tax Advisory Pro"),
+              EL("p", null, "Individual planning workbench"))),
+          EL("button", {
+            className: "tp-navcollapse",
+            type: "button",
+            onClick: () => setNavCollapsed(!navCollapsed),
+            title: navCollapsed ? "Expand navigation" : "Collapse navigation",
+            "aria-label": navCollapsed ? "Expand navigation" : "Collapse navigation",
+            "aria-expanded": !navCollapsed
+          }, navCollapsed ? "»" : "«")),
+        EL("nav", { className: "tp-nav" }, NAV_GROUPS.map(g => {
+          const gOpen = navCollapsed || navGroupsOpen[g.key] !== false;
+          return EL("div", { className: "tp-navgroup", key: g.key },
+            !navCollapsed && EL("button", {
+              className: "tp-navgroup-label",
+              type: "button",
+              onClick: () => setNavGroupsOpen({ ...navGroupsOpen, [g.key]: !(navGroupsOpen[g.key] !== false) }),
+              "aria-expanded": gOpen
+            }, EL("span", { className: "tp-sec-chev" + (gOpen ? " open" : "") }, I.chevR), g.label),
+            gOpen && g.ids.map(id => {
+              const x = TABS.find(tb => tb.id === id);
+              return EL("button", {
+                key: x.id,
+                className: "tp-navitem " + (tab === x.id ? "on" : ""),
+                onClick: () => pickTab(x.id),
+                title: navCollapsed ? x.label : undefined,
+                "aria-current": tab === x.id ? "page" : undefined
+              }, x.icon, !navCollapsed && EL("span", null, x.label));
+            }));
+        })),
+        !navCollapsed && EL("div", { className: "tp-side-controls" }, yearStatusControls(false)),
+        !navCollapsed && EL("div", { className: "tp-side-foot" },
+          EL("div", { className: "tp-sidestat" },
+            EL("span", null, "Lowest modeled tax scenario"),
+            EL("strong", null, results.find(x => x.s.id === bestId).s.name)),
+          EL("div", { className: "tp-sidestat" },
+            EL("span", null, "Total modeled federal tax"),
+            EL("strong", { className: "green" }, usd$(results.find(x => x.s.id === bestId).r.totalTax))))),
+
+      /* ---------------- Main working area ---------------- */
+      EL("main", { className: "tp-main" },
+        EL("div", { className: "tp-topbar" },
+          EL("div", null, EL("h2", null, t.label), EL("p", null, t.blurb)),
+          EL("div", { className: "tp-topbar-controls" },
+            navCollapsed && yearStatusControls(true),
+            moduleTabs.includes(tab) && EL("label", { className: "tp-sel compact" },
+              EL("span", null, "Scenario"),
+              EL("select", {
+                value: activeIdSafe,
+                onChange: e => setActiveId(e.target.value)
+              }, scenarios.map(s => EL("option", { key: s.id, value: s.id }, s.name)))),
+            moduleTabs.includes(tab) && EL("button", {
+              className: "tp-btn ghost sm tp-ai-ctx",
+              type: "button",
+              title: "Ask AI about this section",
+              onClick: () => askWorkspace({
+                scenarioId: activeIdSafe,
+                question: "Analysis context: " + active.name + " · " + t.label + ". Explain this module's calculation for the scenario, check the binding limitation, identify optimization opportunities and missing facts, and note any inconsistencies.",
+                autoRun: true
+              })
+            }, I.chat, " Ask AI"),
+            !toolsVisible && EL("button", {
+              className: "tp-btn ghost sm",
+              type: "button",
+              onClick: () => setToolsMode("pinned"),
+              title: "Show the tools panel"
+            }, "Tools"))),
+        validation.all.length > 0 && EL("div", { className: "tp-validbar" },
+          EL("strong", null, active.name, ": "),
+          validation.errors.map((v, i) => EL("span", { key: "e" + i, className: "tp-vchip err" }, "Blocking: ", v.msg)),
+          validation.warnings.map((v, i) => EL("span", { key: "w" + i, className: "tp-vchip warn" }, v.msg)),
+          validation.infos.map((v, i) => EL("span", { key: "i" + i, className: "tp-vchip info" }, v.msg))),
+        tab === "dashboard" && EL(Dashboard, {
+          results, bestId, baseline, status, year,
+          focusId: focusSafe, setFocusId, goto: setTab,
+          setYear: setYearLogged, setStatus: setStatusLogged,
+          onAskAI: askWorkspace, onAIReport: () => setShowAIReport(true)
+        }),
+        tab === "scenarios" && EL(ScenariosPage, {
+          onAIOptimize: () => setShowOptimize(true),
+          onAIReport: () => setShowAIReport(true),
+          onAskAI: askWorkspace,
+          scenarios, results, bestId, baseline, status, year,
+          update, addScenario, duplicate, remove, reset
+        }),
+        tab === "se" && EL(SEModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
+        tab === "magi" && EL(MAGIModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
+        tab === "qbi" && EL(QBIModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
+        tab === "health" && EL(HealthModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
+        tab === "guide" && EL(PlanningGuide, { year, onAskAI: askWorkspace, onAddNote: addQuickNote }),
+        tab === "reference" && EL(ReferenceTables, { year, status }),
+        tab === "audit" && EL(AuditPage, { auditLog, setAuditLog, scenarios, results, year, status }),
+        tab === "data" && EL(DataPage, {
+          scenarios, setScenarios: setScenariosLogged, results, status, year,
+          auditLog, notes, logEvent, setYear: setYearLogged, setStatus: setStatusLogged
+        }),
+        tab === "report" && EL(ReportPage, { results, bestId, baseline, status, year, notes, auditLog }),
+        tab === "ai" && EL(AIAnalysisPage, {
+          results, status, year, activeIdx,
+          aiPrefill, clearPrefill: () => setAiPrefill(null),
+          onCreateTestScenario: c => createAIScenarios([c]),
+          onSaveToNotes: text => setNotes(n => [...n, {
+            id: uid(), ts: Date.now(), tsLabel: new Date().toLocaleString(),
+            scenarioName: "AI analysis", text
+          }]),
+          onAddToReport: addToReportInbox,
+          logEvent, history: aiHistory, setHistory: setAiHistory
+        })),
+
+      /* ---------------- Right tools panel ---------------- */
+      toolsVisible && EL("aside", { className: "tp-tools" + (toolsMobile ? " open" : "") },
+        EL("div", { className: "tp-tools-head" },
+          toolsMode !== "collapsed" && EL("strong", null, "Tools"),
+          EL("div", { className: "tp-tools-headbtns" },
+            toolsMode !== "collapsed" && EL("button", {
+              type: "button",
+              className: "tp-toolshead-btn",
+              title: "Hide the tools panel",
+              onClick: () => { setToolsMode("hidden"); setToolsMobile(false); }
+            }, I.x),
+            EL("button", {
+              type: "button",
+              className: "tp-toolshead-btn",
+              title: toolsMode === "collapsed" ? "Expand tools" : "Collapse to icons",
+              "aria-expanded": toolsMode !== "collapsed",
+              onClick: () => setToolsMode(toolsMode === "collapsed" ? "pinned" : "collapsed")
+            }, toolsMode === "collapsed" ? "«" : "»"))),
+        toolsMode === "collapsed" ? EL("div", { className: "tp-tools-rail" },
+          [["scorp", "S-Corp Salary", I.briefcase], ["qbi", "QBI", I.scale], ["brackets", "Tax Brackets", I.gauge], ["charitable", "Charitable", I.heart], ["auditrisk", "Audit Risk", I.alert], ["roth", "Roth Conversion", I.reset]].map(x => EL("button", {
+            key: x[0], type: "button", className: "tp-railbtn", title: x[1],
+            onClick: () => setOpenCalc(x[0])
+          }, x[2]))) :
+          EL(ToolsPanel, {
+            active, result: activeResult, validation, status, year,
+            onOpenCalc: id => { setOpenCalc(id); setUIPref("lastTool", id); },
+            onGotoScenarios: () => setTab("scenarios"),
+            onAddNote: addQuickNote
+          }))),
+
+    /* ---------------- Dock, floating tools, drawers ---------------- */
+    EL("div", { className: "tp-dock" },
+      EL("button", {
+        className: "tp-dockbtn tools-dockbtn" + (toolsMobile ? " on" : ""),
+        onClick: () => { if (toolsMode === "hidden") setToolsMode("pinned"); setToolsMobile(v => !v); },
+        title: "Tools"
+      }, I.calc, EL("span", null, "Tools")),
+      EL("button", {
+        className: "tp-dockbtn " + (showNotes ? "on" : ""),
+        onClick: () => { setShowNotes(v => !v); raise("notes"); },
+        title: "Notes"
+      }, I.note, EL("span", null, "Notes", notes.length ? " (" + notes.length + ")" : "")),
+      EL("button", {
+        className: "tp-dockbtn " + (showAI ? "on" : ""),
+        onClick: () => { setShowAI(v => !v); raise("ai"); },
+        title: "Ask AI"
+      }, I.chat, EL("span", null, "Ask AI"))),
+    toolsMobile && EL("div", { className: "tp-navoverlay tools-overlay", onClick: () => setToolsMobile(false) }),
+    showNotes && EL(Notepad, {
+      onClose: () => setShowNotes(false),
+      notes, setNotes,
+      scenarioName: active.name, scenarioId: active.id,
+      onFocus: () => raise("notes"), z: zTop.notes,
+      draft: noteDraft, setDraft: setNoteDraft
+    }),
+    showOptimize && EL(AIOptimizePanel, {
+      onClose: () => setShowOptimize(false),
+      results, status, year,
+      onCreateScenarios: createAIScenarios,
+      logEvent,
+      onOpenScenario: id => { setActiveId(id); setTab("scenarios"); setShowOptimize(false); },
+      onAskWorkspace: askWorkspace,
+      onAddToReport: addToReportInbox,
+      onDecide: decideAIScenario
+    }),
+    showAIReport && EL(AIReportPanel, {
+      onClose: () => setShowAIReport(false),
+      results, status, year, reportInbox, logEvent
+    }),
+    showAI && EL(AIReviewer, {
+      onClose: () => setShowAI(false),
+      result: activeResult, scenario: active, scenarioName: active.name,
+      status, year, validation: results[activeIdx].v,
+      onSendToNotes: text => { setNoteDraft(d => (d ? d + "\n\n" : "") + text); setShowNotes(true); raise("notes"); },
+      onApplyChange: applyAIChange
+    }),
+    openCalc && EL(CalculatorDrawer, {
+      type: openCalc,
+      scenario: active,
+      result: activeResult,
+      status, year,
+      onClose: () => setOpenCalc(null),
+      onCreateScenario: createScenarioFromTool,
+      onAskAI: q => {
+        setOpenCalc(null);
+        askWorkspace({ scenarioId: activeIdSafe, question: q, autoRun: true });
+      },
+      onAddNote: text => { addQuickNote(text); }
+    }));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));

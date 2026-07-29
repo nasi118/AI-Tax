@@ -1,39 +1,26 @@
 /* ==== 08-pages ==== */
 /* ============================================================================
-   DASHBOARD
+   DASHBOARD — decision-oriented: toolbar, KPI row, switchable scenario chart,
+   collapsible Form 1040 walk, analysis sections. Detailed schedules collapse
+   by default; the marginal-rate sweep only computes when its section opens.
    ========================================================================== */
-function Dashboard({
-  results,
-  bestId,
-  baseline,
-  status,
-  year,
-  focusId,
-  setFocusId,
-  goto
-}) {
-  const focus = results.find(x => x.s.id === focusId) || results[0];
-  const A = focus.r;
-  const {
-    findings
-  } = useMemo(() => analyzeScenario(focus.s, status, year), [focus.s, status, year]);
-  const breakdown = taxTypeBreakdown(A);
-  const inc = incomeAnalysis(A);
-  const br = bracketFill(A.ordinaryTaxable, status, A.C);
-  const quantified = findings.filter(f => f.savings > 0);
-  const flagged = findings.filter(f => !f.savings);
-  const totalOpportunity = quantified.reduce((a, f) => a + f.savings, 0);
-  const chartData = results.map(({
-    s,
-    r
-  }) => ({
-    name: s.name,
-    inc: Math.round(clamp0(r.fedIncomeTax - r.creditsApplied)),
-    emp: Math.round(r.seTax + r.sCorpFICA + r.addlMedicare),
-    niit: Math.round(r.niit)
-  }));
-
-  // Sweep the marginal rate across a band of additional ordinary income
+const CHART_METRICS = [{
+  v: "tax",
+  l: "Total modeled tax"
+}, {
+  v: "aftertax",
+  l: "After-tax income"
+}, {
+  v: "spendable",
+  l: "Spendable cash"
+}, {
+  v: "rate",
+  l: "Effective rate"
+}];
+function RateCurveCard({ focus, status, year, A }) {
+  // Sweep the marginal rate across a band of additional ordinary income.
+  // Lives in its own component so the 50 engine runs only happen when the
+  // section is actually open.
   const curve = useMemo(() => {
     const pts = [];
     const start = Math.max(0, A.grossIncome - 20000);
@@ -51,302 +38,444 @@ function Dashboard({
       });
     }
     return pts;
-  }, [focus.s, status, year]);
-  return /*#__PURE__*/React.createElement("div", {
-    className: "tp-stack"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "tp-selector"
-  }, /*#__PURE__*/React.createElement("label", {
-    className: "tp-sel"
-  }, /*#__PURE__*/React.createElement("span", null, "Scenario under analysis"), /*#__PURE__*/React.createElement("select", {
-    value: focus.s.id,
-    onChange: e => setFocusId(e.target.value)
-  }, results.map(({
-    s
-  }) => /*#__PURE__*/React.createElement("option", {
-    key: s.id,
-    value: s.id
-  }, s.name, s.id === bestId ? "  ★ lowest modeled tax" : "")))), /*#__PURE__*/React.createElement("button", {
-    className: "tp-btn ghost",
-    onClick: () => goto("scenarios")
-  }, "Edit inputs ", I.chevR)), /*#__PURE__*/React.createElement("div", {
-    className: "tp-kpis"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "tp-kpi"
-  }, /*#__PURE__*/React.createElement("span", null, "Total income"), /*#__PURE__*/React.createElement("strong", null, usd$(A.grossIncome)), /*#__PURE__*/React.createElement("em", null, A.C.label, " · ", STATUSES.find(x => x.v === status).l)), /*#__PURE__*/React.createElement("div", {
-    className: "tp-kpi"
-  }, /*#__PURE__*/React.createElement("span", null, "Total modeled federal tax"), /*#__PURE__*/React.createElement("strong", null, usd$(A.totalTax)), /*#__PURE__*/React.createElement("em", null, pct(A.effectiveRate), " effective · ", pct(A.marginal), " ordinary bracket")), /*#__PURE__*/React.createElement("div", {
-    className: "tp-kpi"
-  }, /*#__PURE__*/React.createElement("span", null, "Taxable income"), /*#__PURE__*/React.createElement("strong", null, usd$(A.taxableIncome)), /*#__PURE__*/React.createElement("em", null, A.deductionKind.toLowerCase(), " deduction ", usd$(A.deductionUsed))), /*#__PURE__*/React.createElement("div", {
-    className: "tp-kpi " + (totalOpportunity > 0 ? "warn" : "good")
-  }, /*#__PURE__*/React.createElement("span", null, "Quantified opportunity"), /*#__PURE__*/React.createElement("strong", null, usd$(totalOpportunity)), /*#__PURE__*/React.createElement("em", null, quantified.length, " sized · ", flagged.length, " to review"))), /*#__PURE__*/React.createElement(Card, {
-    title: "Total modeled federal tax by scenario",
-    right: /*#__PURE__*/React.createElement("div", {
-      className: "tp-legend"
-    }, /*#__PURE__*/React.createElement("i", null, /*#__PURE__*/React.createElement("span", {
-      className: "sw",
-      style: {
-        background: "#312e81"
-      }
-    }), " Income tax"), /*#__PURE__*/React.createElement("i", null, /*#__PURE__*/React.createElement("span", {
-      className: "sw",
-      style: {
-        background: "#6366f1"
-      }
-    }), " Employment tax"), /*#__PURE__*/React.createElement("i", null, /*#__PURE__*/React.createElement("span", {
-      className: "sw",
-      style: {
-        background: "#f59e0b"
-      }
-    }), " NIIT"))
-  }, /*#__PURE__*/React.createElement(StackedBars, {
-    data: chartData,
-    format: usd$,
-    series: [{
-      key: "inc",
-      label: "Income tax",
-      color: "#312e81"
-    }, {
-      key: "emp",
-      label: "Employment tax",
-      color: "#6366f1"
-    }, {
-      key: "niit",
-      label: "NIIT",
-      color: "#f59e0b"
-    }]
-  })), /*#__PURE__*/React.createElement(Card, {
-    title: "Form 1040 walk",
-    sub: focus.s.name
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "tp-tblwrap"
-  }, /*#__PURE__*/React.createElement("table", {
-    className: "tp-tbl"
-  }, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", {
-    className: "sec"
-  }, /*#__PURE__*/React.createElement("td", {
-    colSpan: 2
-  }, "Income")), inc.bySource.map(x => /*#__PURE__*/React.createElement("tr", {
-    key: x.label
-  }, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, x.label, /*#__PURE__*/React.createElement("em", {
-    className: "tp-rownote"
-  }, x.note)), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(x.amount)))), /*#__PURE__*/React.createElement("tr", {
-    className: "tot"
-  }, /*#__PURE__*/React.createElement("td", null, "Total income"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.grossIncome))), /*#__PURE__*/React.createElement("tr", {
-    className: "sec"
-  }, /*#__PURE__*/React.createElement("td", {
-    colSpan: 2
-  }, "Adjustments to income — Schedule 1 Part II")), A.seDeduction > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Deductible half of self-employment tax"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.seDeduction))), A.retirementDeduction > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Self-employed retirement plan", A.selectedPlan ? " — " + A.selectedPlan.name : ""), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.retirementDeduction))), A.sehiDeduction > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Self-employed health insurance"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.sehiDeduction))), A.hsa > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Health savings account"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.hsa))), A.iraDeduction > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "IRA deduction"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.iraDeduction))), A.s1AdjOther > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Other adjustments"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.s1AdjOther))), /*#__PURE__*/React.createElement("tr", {
-    className: "tot"
-  }, /*#__PURE__*/React.createElement("td", null, "Adjusted gross income"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.agi))), /*#__PURE__*/React.createElement("tr", {
-    className: "sec"
-  }, /*#__PURE__*/React.createElement("td", {
-    colSpan: 2
-  }, "Deductions")), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, A.deductionKind, " deduction", A.addlStd > 0 ? " incl. " + usd$(A.addlStd) + " age/blindness addition" : ""), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.deductionUsed))), A.sched1ATotal > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Schedule 1-A additional deductions", /*#__PURE__*/React.createElement("em", {
-    className: "tp-rownote"
-  }, "below the line — reduces taxable income but not AGI")), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.sched1ATotal))), A.S1A.detail.map(d => /*#__PURE__*/React.createElement("tr", {
-    key: d.label,
-    className: "muted"
-  }, /*#__PURE__*/React.createElement("td", {
-    className: "ind2"
-  }, d.label, d.reduction > 0 ? " (after " + usd$(d.reduction) + " phase-out)" : ""), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(d.allowed))))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Qualified business income deduction"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.qbi.deduction))), /*#__PURE__*/React.createElement("tr", {
-    className: "tot"
-  }, /*#__PURE__*/React.createElement("td", null, "Taxable income"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.taxableIncome))), /*#__PURE__*/React.createElement("tr", {
-    className: "sec"
-  }, /*#__PURE__*/React.createElement("td", {
-    colSpan: 2
-  }, "Tax")), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Tax on ordinary income"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.ordTax))), A.cgTax > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Tax on preferential income", A.ltcgMarginal ? " — " + pct(A.ltcgMarginal, 0) + " marginal" : ""), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.cgTax))), A.creditsApplied > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Less nonrefundable credits", A.ctc > 0 ? " (child tax credit " + usd$(A.ctc) + ")" : ""), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, "(", usd(A.creditsApplied), ")")), A.seTax > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Self-employment tax"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.seTax))), A.sCorpFICA > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "S corporation payroll — employee half", /*#__PURE__*/React.createElement("em", {
-    className: "tp-rownote"
-  }, "withheld from the owner's wages")), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.employeeFICA))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "S corporation payroll — employer half", /*#__PURE__*/React.createElement("em", {
-    className: "tp-rownote"
-  }, "the corporation's expense; already deducted in arriving at the K-1 above")), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.employerFICA)))), A.addlMedicare > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Additional Medicare Tax"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.addlMedicare))), A.niit > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    className: "ind"
-  }, "Net investment income tax"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.niit))), /*#__PURE__*/React.createElement("tr", {
-    className: "grand"
-  }, /*#__PURE__*/React.createElement("td", null, "Total federal economic tax"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.totalTax))), A.employerFICA > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Economic income", /*#__PURE__*/React.createElement("em", {
-    className: "tp-rownote"
-  }, "Form 1040 income plus employer payroll tax, restoring the pre-tax business economics")), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.economicIncome))), /*#__PURE__*/React.createElement("tr", {
-    className: "tot"
-  }, /*#__PURE__*/React.createElement("td", null, "After-tax cash"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.afterTaxCash))), A.payments > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Less withholding and estimates"), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, "(", usd(A.payments), ")")), /*#__PURE__*/React.createElement("tr", {
-    className: "tot"
-  }, /*#__PURE__*/React.createElement("td", null, A.balanceDue >= 0 ? "Balance due" : "Overpayment", /*#__PURE__*/React.createElement("em", {
-    className: "tp-rownote"
-  }, "Form 1040 only; excludes the S corporation's share of payroll tax")), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(Math.abs(A.balanceDue))))))))), /*#__PURE__*/React.createElement("div", {
-    className: "tp-2col"
-  }, /*#__PURE__*/React.createElement(Card, {
-    title: "Analysis by type of tax"
-  }, /*#__PURE__*/React.createElement("table", {
-    className: "tp-tbl"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Tax"), /*#__PURE__*/React.createElement("th", {
-    className: "num"
-  }, "Amount"), /*#__PURE__*/React.createElement("th", {
-    className: "num"
-  }, "Share"))), /*#__PURE__*/React.createElement("tbody", null, breakdown.map(b => /*#__PURE__*/React.createElement("tr", {
-    key: b.key,
-    className: b.amount === 0 ? "muted" : ""
-  }, /*#__PURE__*/React.createElement("td", null, b.label, /*#__PURE__*/React.createElement("em", {
-    className: "tp-rownote"
-  }, b.note)), /*#__PURE__*/React.createElement("td", {
-    className: "num strong"
-  }, usd$(b.amount)), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, pct(b.share))))))), /*#__PURE__*/React.createElement(Card, {
-    title: "Bracket fill"
-  }, /*#__PURE__*/React.createElement("table", {
-    className: "tp-tbl"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Rate"), /*#__PURE__*/React.createElement("th", {
-    className: "num"
-  }, "Bracket"), /*#__PURE__*/React.createElement("th", {
-    className: "num"
-  }, "Income"), /*#__PURE__*/React.createElement("th", {
-    className: "num"
-  }, "Tax"))), /*#__PURE__*/React.createElement("tbody", null, br.rows.map(row => {
-    const isMarginal = row.rate === br.marginalRate && row.income > 0;
-    return /*#__PURE__*/React.createElement("tr", {
-      key: row.rate,
-      className: row.income === 0 ? "muted" : isMarginal ? "best" : ""
-    }, /*#__PURE__*/React.createElement("td", null, pct(row.rate, 0), isMarginal && " ← current"), /*#__PURE__*/React.createElement("td", {
-      className: "num sm"
-    }, usd$(row.floor), row.ceil === Infinity ? "+" : " – " + usd$(row.ceil)), /*#__PURE__*/React.createElement("td", {
-      className: "num strong"
-    }, usd$(row.income)), /*#__PURE__*/React.createElement("td", {
-      className: "num"
-    }, usd$(row.tax)));
-  }), A.prefIncome > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, pct(A.ltcgMarginal, 0)), /*#__PURE__*/React.createElement("td", {
-    className: "num sm"
-  }, "preferential"), /*#__PURE__*/React.createElement("td", {
-    className: "num strong"
-  }, usd$(A.prefIncome)), /*#__PURE__*/React.createElement("td", {
-    className: "num"
-  }, usd$(A.cgTax))))), br.headroom !== Infinity && /*#__PURE__*/React.createElement(Note, null, /*#__PURE__*/React.createElement("strong", null, usd$(br.headroom)), " of room remains in the ", pct(br.marginalRate, 0), " bracket. That is the working space for Roth conversions or gain realization — but check the MAGI module first, since IRMAA and ACA thresholds usually bind before the bracket does."))), /*#__PURE__*/React.createElement(Card, {
-    title: "Effective marginal rate on the next dollar",
-    sub: "measured by re-running the full engine, not the nominal bracket"
-  }, /*#__PURE__*/React.createElement(RateCurve, {
+  }, [focus.s, status, year, A.grossIncome]);
+  return EL(React.Fragment, null, EL(RateCurve, {
     points: curve,
     markerX: A.grossIncome
-  }), /*#__PURE__*/React.createElement(Note, null, "The nominal bracket understates reality wherever a phase-out is active. Spikes in this curve are where credits, the QBI cap, or a deduction phase-out stack on top of the statutory rate. Flat regions are where planning is cheapest.")), /*#__PURE__*/React.createElement(Card, {
+  }), EL(Note, null, "The nominal bracket understates reality wherever a phase-out is active. Spikes in this curve are where credits, the QBI cap, or a deduction phase-out stack on top of the statutory rate. Flat regions are where planning is cheapest."));
+}
+function Dashboard({
+  results,
+  bestId,
+  baseline,
+  status,
+  year,
+  focusId,
+  setFocusId,
+  goto,
+  setYear,
+  setStatus,
+  onAskAI,
+  onAIReport
+}) {
+  const focus = results.find(x => x.s.id === focusId) || results[0];
+  const A = focus.r;
+  const {
+    findings
+  } = useMemo(() => analyzeScenario(focus.s, status, year), [focus.s, status, year]);
+  const breakdown = taxTypeBreakdown(A);
+  const inc = incomeAnalysis(A);
+  const br = bracketFill(A.ordinaryTaxable, status, A.C);
+  const quantified = findings.filter(f => f.savings > 0);
+  const flagged = findings.filter(f => !f.savings);
+  const totalOpportunity = quantified.reduce((a, f) => a + f.savings, 0);
+  const [metric, setMetric] = useUIPref("dash:metric", "tax");
+  const [walkDetail, setWalkDetail] = useUIPref("dash:walkDetail", false);
+  const chartData = results.map(({ s, r }) => metric === "tax" ? {
+    name: s.name,
+    inc: Math.round(clamp0(r.fedIncomeTax - r.creditsApplied)),
+    emp: Math.round(r.seTax + r.sCorpFICA + r.addlMedicare),
+    niit: Math.round(r.niit)
+  } : {
+    name: s.name,
+    v: metric === "aftertax" ? Math.round(r.afterTaxCash) : metric === "spendable" ? Math.round(r.spendableAfterTaxCash) : r.effectiveRate
+  });
+  const chartSeries = metric === "tax" ? [{
+    key: "inc",
+    label: "Income tax",
+    color: "#1e40af"
+  }, {
+    key: "emp",
+    label: "Employment tax",
+    color: "#60a5fa"
+  }, {
+    key: "niit",
+    label: "NIIT",
+    color: "#f59e0b"
+  }] : [{
+    key: "v",
+    label: CHART_METRICS.find(m => m.v === metric).l,
+    color: metric === "rate" ? "#475569" : "#047857"
+  }];
+  const warnKPI = A.qbi.manual || (focus.v && focus.v.warnings.length > 0);
+  const kpis = [{
+    label: "Economic income",
+    value: usd$(A.economicIncome),
+    sub: A.C.label + " · " + STATUSES.find(x => x.v === status).l
+  }, {
+    label: "Adjusted gross income",
+    value: usd$(A.agi),
+    sub: "total income " + usd$(A.grossIncome)
+  }, {
+    label: "Taxable income",
+    value: usd$(A.taxableIncome),
+    sub: A.deductionKind.toLowerCase() + " deduction " + usd$(A.deductionUsed)
+  }, {
+    label: "Total modeled federal tax",
+    value: usd$(A.totalTax),
+    sub: pct(A.effectiveRate) + " effective · " + pct(A.marginal) + " bracket",
+    warn: warnKPI
+  }, {
+    label: "After-tax economic income",
+    value: usd$(A.afterTaxCash),
+    sub: "spendable " + usd$(A.spendableAfterTaxCash),
+    cls: "good"
+  }, {
+    label: "Quantified opportunity",
+    value: usd$(totalOpportunity),
+    sub: quantified.length + " sized · " + flagged.length + " to review",
+    cls: totalOpportunity > 0 ? "warn" : "good"
+  }];
+  const walkKey = [
+    ["Total income", A.grossIncome],
+    ["Adjusted gross income", A.agi],
+    [A.deductionKind + " deduction", -A.deductionUsed],
+    ["QBI deduction", -A.qbi.deduction],
+    ["Taxable income", A.taxableIncome, "tot"],
+    ["Income tax net of credits", clamp0(A.fedIncomeTax - A.creditsApplied)],
+    ["Employment taxes", A.seTax + A.sCorpFICA],
+    ["Surtaxes (Add'l Medicare, NIIT)", A.addlMedicare + A.niit],
+    ["Total modeled federal tax", A.totalTax, "grand"],
+    ["Economic income", A.economicIncome],
+    ["After-tax economic income", A.afterTaxCash, "tot"],
+    ["Spendable after-tax cash", A.spendableAfterTaxCash, "tot"]
+  ];
+  return EL("div", {
+    className: "tp-stack"
+  }, EL("div", {
+    className: "tp-selector"
+  }, EL("label", {
+    className: "tp-sel"
+  }, EL("span", null, "Scenario under analysis"), EL("select", {
+    value: focus.s.id,
+    onChange: e => setFocusId(e.target.value)
+  }, results.map(({ s }) => EL("option", {
+    key: s.id,
+    value: s.id
+  }, s.name, s.id === bestId ? "  ★ lowest modeled tax" : "")))), setYear && EL("label", {
+    className: "tp-sel"
+  }, EL("span", null, "Tax year"), EL(Seg, {
+    small: true,
+    value: year,
+    onChange: setYear,
+    options: [{ v: 2025, l: "2025" }, { v: 2026, l: "2026" }]
+  })), setStatus && EL("label", {
+    className: "tp-sel"
+  }, EL("span", null, "Filing status"), EL("select", {
+    value: status,
+    onChange: e => setStatus(e.target.value)
+  }, STATUSES.map(s => EL("option", { key: s.v, value: s.v }, s.l)))), EL("button", {
+    className: "tp-btn ghost",
+    onClick: () => goto("scenarios")
+  }, "Edit inputs ", I.chevR), onAskAI && EL("button", {
+    className: "tp-btn ghost",
+    onClick: () => onAskAI({
+      scenarioId: focus.s.id,
+      question: "Analyze the scenario \"" + focus.s.name + "\" — explain what drives the result, check for inconsistencies, and identify planning opportunities and missing facts.",
+      autoRun: true
+    })
+  }, I.chat, " Analyze with AI"), onAIReport && EL("button", {
+    className: "tp-btn ghost",
+    onClick: onAIReport
+  }, I.file, " Build report"), EL("div", {
+    style: { marginLeft: "auto" }
+  }, EL(SectionControls, {
+    page: "dashboard"
+  }))), EL("div", {
+    className: "tp-kpis"
+  }, kpis.map(k => EL("div", {
+    key: k.label,
+    className: "tp-kpi " + (k.cls || "")
+  }, EL("span", null, k.label, k.warn && EL("span", {
+    title: "Includes a manual override or items flagged for review",
+    style: { marginLeft: 5, color: "var(--amber)" }
+  }, I.alert)), EL("strong", null, k.value), EL("em", null, k.sub)))), EL(Section, {
+    page: "dashboard",
+    id: "chart",
+    title: "Scenario comparison",
+    summary: results.length + " scenarios",
+    fullable: true,
+    right: EL("div", {
+      className: "tp-chart-tools"
+    }, EL(Seg, {
+      small: true,
+      value: metric,
+      onChange: setMetric,
+      options: CHART_METRICS
+    }), metric === "tax" && EL("div", {
+      className: "tp-legend"
+    }, chartSeries.map(s => EL("i", {
+      key: s.key
+    }, EL("span", {
+      className: "sw",
+      style: { background: s.color }
+    }), " ", s.label))))
+  }, EL(StackedBars, {
+    data: chartData,
+    height: 300,
+    format: metric === "rate" ? v => pct(v) : usd$,
+    axisFormat: metric === "rate" ? v => pct(v, 0) : undefined,
+    series: chartSeries
+  }), metric !== "tax" && EL(Note, null, "Each metric is drawn on its own scale. Tax and after-tax income are never mixed on one axis — a lower bar here means ", metric === "rate" ? "a lower effective economic rate" : "less cash", ", not necessarily a better outcome; check the economics rows on the Scenarios ledger.")), EL(Section, {
+    page: "dashboard",
+    id: "walk",
+    title: "Form 1040 walk",
+    summary: focus.s.name,
+    right: EL("button", {
+      className: "tp-mini",
+      type: "button",
+      onClick: () => setWalkDetail(!walkDetail),
+      "aria-expanded": walkDetail
+    }, walkDetail ? "Key totals only" : "Show detailed lines"),
+    flush: true,
+    fullable: true
+  }, !walkDetail ? EL("div", {
+    className: "tp-tblwrap"
+  }, EL("table", {
+    className: "tp-tbl"
+  }, EL("tbody", null, walkKey.map(row => EL("tr", {
+    key: row[0],
+    className: row[2] || ""
+  }, EL("td", null, row[0]), EL("td", {
+    className: "num" + (row[2] ? " strong" : "")
+  }, row[1] < 0 ? "(" + usd(Math.abs(row[1])) + ")" : usd$(row[1])))))))
+    : EL("div", {
+    className: "tp-tblwrap"
+  }, EL("table", {
+    className: "tp-tbl"
+  }, EL("tbody", null, EL("tr", {
+    className: "sec"
+  }, EL("td", { colSpan: 2 }, "Income")), inc.bySource.map(x => EL("tr", {
+    key: x.label
+  }, EL("td", {
+    className: "ind"
+  }, x.label, EL("em", {
+    className: "tp-rownote"
+  }, x.note)), EL("td", {
+    className: "num"
+  }, usd$(x.amount)))), EL("tr", {
+    className: "tot"
+  }, EL("td", null, "Total income"), EL("td", {
+    className: "num"
+  }, usd$(A.grossIncome))), EL("tr", {
+    className: "sec"
+  }, EL("td", { colSpan: 2 }, "Adjustments to income — Schedule 1 Part II")), A.seDeduction > 0 && EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Deductible half of self-employment tax"), EL("td", {
+    className: "num"
+  }, usd$(A.seDeduction))), A.retirementDeduction > 0 && EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Self-employed retirement plan", A.selectedPlan ? " — " + A.selectedPlan.name : ""), EL("td", {
+    className: "num"
+  }, usd$(A.retirementDeduction))), A.sehiDeduction > 0 && EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Self-employed health insurance"), EL("td", {
+    className: "num"
+  }, usd$(A.sehiDeduction))), A.hsa > 0 && EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Health savings account"), EL("td", {
+    className: "num"
+  }, usd$(A.hsa))), A.iraDeduction > 0 && EL("tr", null, EL("td", {
+    className: "ind"
+  }, "IRA deduction"), EL("td", {
+    className: "num"
+  }, usd$(A.iraDeduction))), A.s1AdjOther > 0 && EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Other adjustments"), EL("td", {
+    className: "num"
+  }, usd$(A.s1AdjOther))), EL("tr", {
+    className: "tot"
+  }, EL("td", null, "Adjusted gross income"), EL("td", {
+    className: "num"
+  }, usd$(A.agi))), EL("tr", {
+    className: "sec"
+  }, EL("td", { colSpan: 2 }, "Deductions")), EL("tr", null, EL("td", {
+    className: "ind"
+  }, A.deductionKind, " deduction", A.addlStd > 0 ? " incl. " + usd$(A.addlStd) + " age/blindness addition" : ""), EL("td", {
+    className: "num"
+  }, usd$(A.deductionUsed))), A.sched1ATotal > 0 && EL(React.Fragment, null, EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Schedule 1-A additional deductions", EL("em", {
+    className: "tp-rownote"
+  }, "below the line — reduces taxable income but not AGI")), EL("td", {
+    className: "num"
+  }, usd$(A.sched1ATotal))), A.S1A.detail.map(d => EL("tr", {
+    key: d.label,
+    className: "muted"
+  }, EL("td", {
+    className: "ind2"
+  }, d.label, d.reduction > 0 ? " (after " + usd$(d.reduction) + " phase-out)" : ""), EL("td", {
+    className: "num"
+  }, usd$(d.allowed))))), EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Qualified business income deduction"), EL("td", {
+    className: "num"
+  }, usd$(A.qbi.deduction))), EL("tr", {
+    className: "tot"
+  }, EL("td", null, "Taxable income"), EL("td", {
+    className: "num"
+  }, usd$(A.taxableIncome))), EL("tr", {
+    className: "sec"
+  }, EL("td", { colSpan: 2 }, "Tax")), EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Tax on ordinary income"), EL("td", {
+    className: "num"
+  }, usd$(A.ordTax))), A.cgTax > 0 && EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Tax on preferential income", A.ltcgMarginal ? " — " + pct(A.ltcgMarginal, 0) + " marginal" : ""), EL("td", {
+    className: "num"
+  }, usd$(A.cgTax))), A.creditsApplied > 0 && EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Less nonrefundable credits", A.ctc > 0 ? " (child tax credit " + usd$(A.ctc) + ")" : ""), EL("td", {
+    className: "num"
+  }, "(", usd(A.creditsApplied), ")")), A.seTax > 0 && EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Self-employment tax"), EL("td", {
+    className: "num"
+  }, usd$(A.seTax))), A.sCorpFICA > 0 && EL(React.Fragment, null, EL("tr", null, EL("td", {
+    className: "ind"
+  }, "S corporation payroll — employee half", EL("em", {
+    className: "tp-rownote"
+  }, "withheld from the owner's wages")), EL("td", {
+    className: "num"
+  }, usd$(A.employeeFICA))), EL("tr", null, EL("td", {
+    className: "ind"
+  }, "S corporation payroll — employer half", EL("em", {
+    className: "tp-rownote"
+  }, "the corporation's expense; already deducted in arriving at the K-1 above")), EL("td", {
+    className: "num"
+  }, usd$(A.employerFICA)))), A.addlMedicare > 0 && EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Additional Medicare Tax"), EL("td", {
+    className: "num"
+  }, usd$(A.addlMedicare))), A.niit > 0 && EL("tr", null, EL("td", {
+    className: "ind"
+  }, "Net investment income tax"), EL("td", {
+    className: "num"
+  }, usd$(A.niit))), EL("tr", {
+    className: "grand"
+  }, EL("td", null, "Total federal economic tax"), EL("td", {
+    className: "num"
+  }, usd$(A.totalTax))), A.employerFICA > 0 && EL("tr", null, EL("td", null, "Economic income", EL("em", {
+    className: "tp-rownote"
+  }, "Form 1040 income plus employer payroll tax, restoring the pre-tax business economics")), EL("td", {
+    className: "num"
+  }, usd$(A.economicIncome))), EL("tr", {
+    className: "tot"
+  }, EL("td", null, "After-tax cash"), EL("td", {
+    className: "num"
+  }, usd$(A.afterTaxCash))), A.payments > 0 && EL(React.Fragment, null, EL("tr", null, EL("td", null, "Less withholding and estimates"), EL("td", {
+    className: "num"
+  }, "(", usd(A.payments), ")")), EL("tr", {
+    className: "tot"
+  }, EL("td", null, A.balanceDue >= 0 ? "Balance due" : "Overpayment", EL("em", {
+    className: "tp-rownote"
+  }, "Form 1040 only; excludes the S corporation's share of payroll tax")), EL("td", {
+    className: "num"
+  }, usd$(Math.abs(A.balanceDue))))))))), EL("div", {
+    className: "tp-2col"
+  }, EL(Section, {
+    page: "dashboard",
+    id: "bytype",
+    title: "Analysis by type of tax",
+    flush: true
+  }, EL("table", {
+    className: "tp-tbl"
+  }, EL("thead", null, EL("tr", null, EL("th", null, "Tax"), EL("th", {
+    className: "num"
+  }, "Amount"), EL("th", {
+    className: "num"
+  }, "Share"))), EL("tbody", null, breakdown.map(b => EL("tr", {
+    key: b.key,
+    className: b.amount === 0 ? "muted" : ""
+  }, EL("td", null, b.label, EL("em", {
+    className: "tp-rownote"
+  }, b.note)), EL("td", {
+    className: "num strong"
+  }, usd$(b.amount)), EL("td", {
+    className: "num"
+  }, pct(b.share))))))), EL(Section, {
+    page: "dashboard",
+    id: "bracket",
+    title: "Bracket fill",
+    flush: true
+  }, EL("table", {
+    className: "tp-tbl"
+  }, EL("thead", null, EL("tr", null, EL("th", null, "Rate"), EL("th", {
+    className: "num"
+  }, "Bracket"), EL("th", {
+    className: "num"
+  }, "Income"), EL("th", {
+    className: "num"
+  }, "Tax"))), EL("tbody", null, br.rows.map(row => {
+    const isMarginal = row.rate === br.marginalRate && row.income > 0;
+    return EL("tr", {
+      key: row.rate,
+      className: row.income === 0 ? "muted" : isMarginal ? "best" : ""
+    }, EL("td", null, pct(row.rate, 0), isMarginal && " ← current"), EL("td", {
+      className: "num sm"
+    }, usd$(row.floor), row.ceil === Infinity ? "+" : " – " + usd$(row.ceil)), EL("td", {
+      className: "num strong"
+    }, usd$(row.income)), EL("td", {
+      className: "num"
+    }, usd$(row.tax)));
+  }), A.prefIncome > 0 && EL("tr", null, EL("td", null, pct(A.ltcgMarginal, 0)), EL("td", {
+    className: "num sm"
+  }, "preferential"), EL("td", {
+    className: "num strong"
+  }, usd$(A.prefIncome)), EL("td", {
+    className: "num"
+  }, usd$(A.cgTax))))), br.headroom !== Infinity && EL("div", {
+    style: { padding: "0 15px 13px" }
+  }, EL(Note, null, EL("strong", null, usd$(br.headroom)), " of room remains in the ", pct(br.marginalRate, 0), " bracket. That is the working space for Roth conversions or gain realization — but check the MAGI module first, since IRMAA and ACA thresholds usually bind before the bracket does.")))), EL(Section, {
+    page: "dashboard",
+    id: "curve",
+    title: "Effective marginal rate on the next dollar",
+    summary: "measured by re-running the full engine, not the nominal bracket",
+    defaultOpen: false
+  }, EL(RateCurveCard, {
+    focus: focus,
+    status: status,
+    year: year,
+    A: A
+  })), EL(Section, {
+    page: "dashboard",
+    id: "opps",
     title: "Opportunities identified",
-    sub: findings.length + " item" + (findings.length === 1 ? "" : "s")
-  }, !findings.length ? /*#__PURE__*/React.createElement("div", {
+    count: findings.length,
+    warnCount: flagged.length
+  }, !findings.length ? EL("div", {
     className: "tp-clean"
-  }, I.check, " No further material opportunities detected on these inputs.") : /*#__PURE__*/React.createElement("div", {
+  }, I.check, " No further material opportunities detected on these inputs.") : EL("div", {
     className: "tp-findings"
-  }, findings.map((f, i) => /*#__PURE__*/React.createElement("div", {
+  }, findings.map((f, i) => EL("div", {
     key: f.id,
     className: "tp-finding " + (f.savings > 0 ? "quant" : "flag")
-  }, /*#__PURE__*/React.createElement("div", {
+  }, EL("div", {
     className: "tp-finding-rank"
-  }, f.savings > 0 ? i + 1 : I.alert), /*#__PURE__*/React.createElement("div", {
+  }, f.savings > 0 ? i + 1 : I.alert), EL("div", {
     className: "tp-finding-body"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, EL("div", {
     className: "tp-finding-top"
-  }, /*#__PURE__*/React.createElement("span", {
+  }, EL("span", {
     className: "tp-finding-title"
-  }, f.title), /*#__PURE__*/React.createElement("span", {
+  }, f.title), EL("span", {
     className: "tp-finding-tags"
-  }, /*#__PURE__*/React.createElement("span", {
+  }, EL("span", {
     className: "tp-tag"
-  }, f.cat), /*#__PURE__*/React.createElement("span", {
+  }, f.cat), EL("span", {
     className: "tp-pill " + RISK[f.risk].c
-  }, RISK[f.risk].label), f.savings > 0 ? /*#__PURE__*/React.createElement("span", {
+  }, RISK[f.risk].label), f.savings > 0 ? EL("span", {
     className: "tp-save"
-  }, usd$(f.savings), "/yr") : /*#__PURE__*/React.createElement("span", {
+  }, usd$(f.savings), "/yr") : EL("span", {
     className: "tp-save neutral"
-  }, "review"))), /*#__PURE__*/React.createElement("div", {
+  }, "review"))), EL("div", {
     className: "tp-finding-why"
-  }, f.why), /*#__PURE__*/React.createElement("div", {
+  }, f.why), EL("div", {
     className: "tp-finding-act"
-  }, I.bulb, " ", f.action), /*#__PURE__*/React.createElement("div", {
+  }, I.bulb, " ", f.action), EL("div", {
     className: "tp-finding-ref"
-  }, f.ref))))), /*#__PURE__*/React.createElement(Note, null, "Savings are computed by cloning the scenario, applying exactly one change, and re-running the whole engine. They exclude state tax, implementation cost, and non-tax considerations, and they do not add cleanly — each deduction lowers taxable income and therefore the QBI cap, so implementing several together delivers less than the sum.")));
+  }, f.ref))))), EL(Note, null, "Savings are computed by cloning the scenario, applying exactly one change, and re-running the whole engine. They exclude state tax, implementation cost, and non-tax considerations, and they do not add cleanly — each deduction lowers taxable income and therefore the QBI cap, so implementing several together delivers less than the sum.")));
 }
 
 /* ============================================================================
@@ -368,21 +497,25 @@ function ScenariosPage({
   onAIReport,
   onAskAI
 }) {
-  const [open, setOpen] = useState({
+  /* Ledger group collapse state persists per user; density is a preference. */
+  const [open, setOpen] = useUIPref("ledger:groups", {
     income: true,
     sched: true,
     ded: false,
-    other: false
+    other: false,
+    econ: true
   });
-  const toggle = k => setOpen(o => ({
-    ...o,
-    [k]: !o[k]
-  }));
+  const toggle = k => setOpen({ ...open, [k]: !open[k] });
+  const setAllGroups = v => setOpen({ income: v, sched: v, ded: v, other: v, econ: v });
+  const [density, setDensity] = useUIPref("ledger:density", "standard");
   const [drill, setDrill] = useState(null);
+  const [aiPanel, setAiPanel] = useState(null); // scenario id with the AI panel expanded
   const n = scenarios.length;
   const cols = {
-    gridTemplateColumns: `minmax(240px,1.4fr) repeat(${n}, minmax(150px,1fr))`
+    gridTemplateColumns: `minmax(210px,240px) repeat(${n}, minmax(148px,190px))`
   };
+  const richestId = results.length > 1 ? results.reduce((a, b) => b.r.spendableAfterTaxCash > a.r.spendableAfterTaxCash ? b : a).s.id : null;
+  const bestAfterTaxId = results.length > 1 ? results.reduce((a, b) => b.r.afterTaxCash > a.r.afterTaxCash ? b : a).s.id : null;
 
   /* The ledger rows are module-level components (defined below). They must not
      be wrapped or redefined here: a component created inside this function is a
@@ -419,40 +552,100 @@ function ScenariosPage({
     v
   }, i) => {
     const isBest = s.id === bestId;
-    const isRichest = results.length > 1 && results.reduce((a, b) => b.r.spendableAfterTaxCash > a.r.spendableAfterTaxCash ? b : a).s.id === s.id;
     const comparable = !baseline || Math.abs(r.economicIncome - baseline.r.economicIncome) <= 1;
     const delta = baseline ? r.totalTax - baseline.r.totalTax : 0;
-    return /*#__PURE__*/React.createElement("div", {
+    return EL("div", {
       key: s.id,
       className: "tp-vcard " + (isBest ? "best" : "")
-    }, isBest && /*#__PURE__*/React.createElement("div", {
+    }, isBest && EL("div", {
       className: "tp-badge"
-    }, I.award, " Lowest modeled tax"), isRichest && /*#__PURE__*/React.createElement("div", {
+    }, I.award, " Lowest modeled tax"), !isBest && s.id === richestId && EL("div", {
       className: "tp-badge alt"
-    }, "Highest modeled spendable cash"), /*#__PURE__*/React.createElement("div", {
-      className: "tp-vname"
-    }, s.name), /*#__PURE__*/React.createElement("div", {
+    }, "Highest spendable cash"), EL("div", {
+      className: "tp-vname",
+      title: s.name
+    }, s.name), EL("div", {
+      className: "tp-vtags"
+    }, i === 0 && EL("span", {
+      className: "tp-tag"
+    }, "Base"), s.aiGenerated && EL("span", {
+      className: "tp-tag amber"
+    }, "AI proposed"), s.id === bestAfterTaxId && EL("span", {
+      className: "tp-tag green"
+    }, "Highest after-tax income")), EL("div", {
       className: "tp-vtotal"
-    }, usd$(r.totalTax)), /*#__PURE__*/React.createElement("div", {
+    }, usd$(r.totalTax)), EL("div", {
       className: "tp-vsub"
-    }, pct(r.effectiveRate), " effective · AGI ", usd$(r.agi)), /*#__PURE__*/React.createElement("div", {
+    }, pct(r.effectiveRate), " effective economic rate"), EL("div", {
+      className: "tp-vrows"
+    }, EL("div", {
+      className: "tp-vrow"
+    }, EL("span", null, "After-tax economic income"), EL("strong", null, usd$(r.afterTaxCash))), EL("div", {
+      className: "tp-vrow"
+    }, EL("span", null, "Spendable after-tax cash"), EL("strong", null, usd$(r.spendableAfterTaxCash)))), EL("div", {
       className: "tp-vdelta " + (delta < 0 ? "save" : delta > 0 ? "cost" : "base")
-    }, i === 0 ? "baseline" : delta === 0 ? "same as baseline" : (delta < 0 ? "saves " : "costs ") + usd$(Math.abs(delta)) + " vs. " + baseline.s.name), i > 0 && !comparable && /*#__PURE__*/React.createElement("div", {
+    }, i === 0 ? "baseline" : delta === 0 ? "same as baseline" : (delta < 0 ? "saves " : "costs ") + usd$(Math.abs(delta)) + " vs. " + baseline.s.name), i > 0 && !comparable && EL("div", {
       className: "tp-vcompat"
-    }, "Not directly comparable \u2014 economic inputs differ."), v && v.blocking && /*#__PURE__*/React.createElement("div", {
+    }, "Not directly comparable \u2014 economic inputs differ."), v && v.blocking && EL("div", {
       className: "tp-vcompat err"
-    }, "Blocking validation error \u2014 resolve before relying on this scenario."), v && !v.blocking && v.warnings.length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, "Blocking validation error \u2014 resolve before relying on this scenario."), v && !v.blocking && v.warnings.length > 0 && EL("div", {
       className: "tp-vcompat"
-    }, "Requires human review"), onAskAI && /*#__PURE__*/React.createElement(AICardMenu, {
+    }, "Needs review"), EL("div", {
+      className: "tp-vactions"
+    }, onAskAI && EL("button", {
+      className: "tp-mini ai",
+      type: "button",
+      "aria-expanded": aiPanel === s.id,
+      onClick: () => setAiPanel(aiPanel === s.id ? null : s.id)
+    }, I.chat, " Analyze with AI"), onAskAI && EL(AICardMenu, {
       scenario: s,
       status: status,
       year: year,
       onAskAI: onAskAI,
       onAIOptimize: onAIOptimize
-    }));
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "tp-ledger-wrap"
-  }, /*#__PURE__*/React.createElement("div", {
+    })));
+  })), aiPanel && (() => {
+    const entry = results.find(x => x.s.id === aiPanel);
+    return entry ? EL(ScenarioAIPanel, {
+      key: entry.s.id,
+      entry: entry,
+      baseline: baseline,
+      status: status,
+      year: year,
+      onClose: () => setAiPanel(null),
+      onOpenWorkspace: q => onAskAI({
+        scenarioId: entry.s.id,
+        question: q || "",
+        autoRun: !!q
+      })
+    }) : null;
+  })(), /*#__PURE__*/React.createElement("div", {
+    className: "tp-ledger-wrap density-" + density
+  }, EL("div", {
+    className: "tp-ledger-toolbar"
+  }, EL("button", {
+    className: "tp-mini",
+    type: "button",
+    onClick: () => setAllGroups(true)
+  }, "Expand all groups"), EL("button", {
+    className: "tp-mini",
+    type: "button",
+    onClick: () => setAllGroups(false)
+  }, "Collapse all groups"), EL(Seg, {
+    small: true,
+    value: density,
+    onChange: setDensity,
+    options: [{
+      v: "comfortable",
+      l: "Comfortable"
+    }, {
+      v: "standard",
+      l: "Standard"
+    }, {
+      v: "compact",
+      l: "Compact"
+    }]
+  }), EL("em", null, "Line-item column and scenario headers stay pinned while you scroll")), /*#__PURE__*/React.createElement("div", {
     className: "tp-ledger",
     style: cols
   }, /*#__PURE__*/React.createElement("div", {
@@ -729,7 +922,13 @@ function ScenariosPage({
     get: r => r.marginal,
     isPct: true,
     results: results
-  }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
+  }), EL(LedgerGroup, {
+    label: "Economic and cash-flow reconciliation",
+    k: "econ",
+    n: n,
+    open: open,
+    toggle: toggle
+  }), open.econ && EL(React.Fragment, null, /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Economic income",
     get: r => r.economicIncome,
     results: results
@@ -767,7 +966,7 @@ function ScenariosPage({
     get: r => r.spendableAfterTaxCash,
     favorable: "up",
     results: results
-  })), /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "tp-add-row"
   }, /*#__PURE__*/React.createElement("button", {
     className: "tp-addbtn",
@@ -1579,4 +1778,135 @@ function Sched1AEditor({
   }), /*#__PURE__*/React.createElement("td", {
     className: "num"
   }, usd$(S.total))))), /*#__PURE__*/React.createElement(Note, null, "Tips must be earned in an occupation on the IRS published list and the taxpayer must have an SSN valid for employment. Overtime means only the premium portion above the regular rate, required by the Fair Labor Standards Act. Car loan interest requires a loan originated after December 31, 2024, secured by a first lien on a new personal-use vehicle under 14,000 pounds with final assembly in the United States. Married taxpayers must file jointly for all four."));
+}
+
+/* ============================================================================
+   SCENARIO AI PANEL — expands beneath the scenario cards. Inline mode for
+   quick questions; drawer mode for longer analysis. Read-only: it can never
+   change inputs; proposals route through the AI Analysis workspace.
+   ========================================================================== */
+const SCENARIO_AI_PROMPTS = [
+  ["Explain this scenario", "Explain this scenario: walk through what drives total income, the deduction path, the QBI result, employment taxes and surtaxes, and the after-tax economics."],
+  ["Compare to base", "Compare this scenario to the base scenario. What drives the differences in total modeled tax, after-tax economic income and spendable cash? Are the two economically comparable?"],
+  ["Identify opportunities", "Identify planning opportunities relevant to this scenario's facts. Classify each as permanent reduction, deferral, timing, or character conversion, and list the facts to confirm."],
+  ["Review calculation logic", "Review the calculation results for internal consistency: deduction election, QBI limitation, NIIT base, payroll reconciliation, and the economic-income tie-out. Flag anything that looks inconsistent."],
+  ["Identify missing facts", "What facts are missing from this model that would materially change the analysis? List them as specific questions for the client."],
+  ["Reconcile after-tax cash", "Reconcile economic income down to spendable after-tax cash for this scenario, explaining each outflow."]
+];
+function ScenarioAIPanel({ entry, baseline, status, year, onClose, onOpenWorkspace }) {
+  const [mode, setMode] = useState("inline"); // inline | drawer
+  const [q, setQ] = useState("");
+  const [resp, setResp] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const abortRef = useRef(null);
+  useEffect(() => () => {
+    if (abortRef.current) abortRef.current.abort();
+  }, []);
+  const run = async question => {
+    if (!question || busy) return;
+    setBusy(true);
+    setErr("");
+    setResp("");
+    const wantsBase = /base|compare/i.test(question);
+    const entries = wantsBase && baseline && baseline.s.id !== entry.s.id ? [baseline, entry] : [entry];
+    const pack = buildAIDataPackage({
+      requestType: "scenario-panel",
+      entries,
+      status,
+      year,
+      includeCalcs: true,
+      includeWarnings: true
+    });
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    try {
+      const text = await callAI("analyze", {
+        system: AI_SYSTEM_CORE + "\nDATA PACKAGE (authoritative figures):\n" + JSON.stringify(pack) + "\nAnswer concisely for an advisor reviewing the scenario card \"" + entry.s.name + "\". Do not propose input changes here; direct structural proposals to the AI Analysis workspace.",
+        messages: [{
+          role: "user",
+          content: question
+        }],
+        signal: ctrl.signal
+      });
+      setResp(text || "(empty response)");
+    } catch (e) {
+      if (e.name !== "AbortError") setErr(String(e.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const body = EL("div", {
+    className: "tp-scai-body" + (mode === "drawer" ? " tall" : "")
+  }, EL("div", {
+    className: "tp-scai-quick"
+  }, SCENARIO_AI_PROMPTS.map(p => EL("button", {
+    key: p[0],
+    type: "button",
+    className: "tp-mini",
+    disabled: busy,
+    onClick: () => {
+      setQ(p[1]);
+      run(p[1]);
+    }
+  }, p[0])), EL("button", {
+    type: "button",
+    className: "tp-mini",
+    onClick: () => onOpenWorkspace("Optimize this scenario: propose input changes for deterministic recalculation.")
+  }, "Optimize this scenario")), err && EL("div", {
+    className: "tp-chat-error"
+  }, err), (busy || resp) && EL("div", {
+    className: "tp-scai-resp",
+    "aria-live": "polite"
+  }, busy && !resp ? "Analyzing " + entry.s.name + "…" : resp), EL("div", {
+    className: "tp-scai-inputrow"
+  }, EL("textarea", {
+    value: q,
+    rows: 2,
+    placeholder: "Ask about this scenario… (Enter to send, Shift+Enter for a new line)",
+    onChange: e => setQ(e.target.value),
+    onKeyDown: e => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        run(q);
+      }
+    }
+  }), EL("button", {
+    className: "tp-btn solid sm",
+    type: "button",
+    disabled: busy || !q.trim(),
+    onClick: () => run(q)
+  }, busy ? "Working…" : "Send")), EL("div", {
+    className: "tp-ai-governance-inline"
+  }, "AI explains and proposes; the engine computes every stored figure. Nothing here modifies inputs."));
+  const head = EL("div", {
+    className: "tp-scai-head"
+  }, EL("strong", null, "AI analysis — ", entry.s.name), EL("em", {
+    className: "tp-scai-ctx"
+  }, "Context: ", TY[year].label, " · ", STATUSES.find(s => s.v === status).l, entry.s.aiGenerated ? " · AI-proposed scenario" : ""), EL("button", {
+    className: "tp-mini",
+    type: "button",
+    onClick: () => setMode(mode === "drawer" ? "inline" : "drawer")
+  }, mode === "drawer" ? "Inline view" : "Open as drawer"), EL("button", {
+    className: "tp-mini",
+    type: "button",
+    onClick: () => {
+      onClose();
+      onOpenWorkspace(null);
+    }
+  }, "Full AI workspace"), EL("button", {
+    className: "tp-mini",
+    type: "button",
+    onClick: onClose,
+    "aria-label": "Close AI panel"
+  }, "Close"));
+  if (mode === "drawer") return EL(Drawer, {
+    title: "AI analysis — " + entry.s.name,
+    sub: TY[year].label + " · " + STATUSES.find(s => s.v === status).l + " · the engine stays authoritative",
+    width: "min(480px, 100vw)",
+    onClose: () => setMode("inline")
+  }, body);
+  return EL("div", {
+    className: "tp-scai"
+  }, head, body);
 }
