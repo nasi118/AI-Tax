@@ -1,0 +1,222 @@
+{
+  "approval_status": "approved_as_provisional",
+  "effective_from": "2030-01-01",
+  "effective_to": "2030-12-31",
+  "jurisdiction": "US-FEDERAL",
+  "parameters": {
+    "additional_std_deduction_65": {
+      "head_of_household": 2250,
+      "married_filing_jointly": 1800,
+      "married_filing_separately": 1800,
+      "single": 2250
+    },
+    "capital_loss_limit": {
+      "head_of_household": 3000,
+      "married_filing_jointly": 3000,
+      "married_filing_separately": 1500,
+      "single": 3000
+    },
+    "catchup_401k_50": 8500,
+    "ctc_per_child": 2500,
+    "ctc_phaseout_rate_per_1000": 50,
+    "ctc_phaseout_threshold": {
+      "head_of_household": 200000,
+      "married_filing_jointly": 400000,
+      "married_filing_separately": 200000,
+      "single": 200000
+    },
+    "ira_catchup_50": 1100,
+    "ira_contribution_limit": 8000,
+    "limit_401k": 26500,
+    "ltcg_0_top": {
+      "head_of_household": 73250,
+      "married_filing_jointly": 109400,
+      "married_filing_separately": 54700,
+      "single": 54700
+    },
+    "ltcg_15_top": {
+      "head_of_household": 641150,
+      "married_filing_jointly": 678900,
+      "married_filing_separately": 339400,
+      "single": 603500
+    },
+    "ltcg_rates": {
+      "mid": "0.15",
+      "top": "0.20",
+      "zero": "0.00"
+    },
+    "medical_agi_floor_rate": "0.075",
+    "niit_magi_threshold": {
+      "head_of_household": 200000,
+      "married_filing_jointly": 250000,
+      "married_filing_separately": 125000,
+      "single": 200000
+    },
+    "niit_rate": "0.038",
+    "odc_per_dependent": 500,
+    "ordinary_brackets": {
+      "head_of_household": [
+        [
+          19225,
+          "0.10"
+        ],
+        [
+          73375,
+          "0.12"
+        ],
+        [
+          116925,
+          "0.22"
+        ],
+        [
+          223225,
+          "0.24"
+        ],
+        [
+          283425,
+          "0.32"
+        ],
+        [
+          708650,
+          "0.35"
+        ],
+        [
+          null,
+          "0.37"
+        ]
+      ],
+      "married_filing_jointly": [
+        [
+          26975,
+          "0.10"
+        ],
+        [
+          109700,
+          "0.12"
+        ],
+        [
+          233850,
+          "0.22"
+        ],
+        [
+          446450,
+          "0.24"
+        ],
+        [
+          566900,
+          "0.32"
+        ],
+        [
+          850375,
+          "0.35"
+        ],
+        [
+          null,
+          "0.37"
+        ]
+      ],
+      "married_filing_separately": [
+        [
+          13500,
+          "0.10"
+        ],
+        [
+          54850,
+          "0.12"
+        ],
+        [
+          116925,
+          "0.22"
+        ],
+        [
+          223225,
+          "0.24"
+        ],
+        [
+          283450,
+          "0.32"
+        ],
+        [
+          425175,
+          "0.35"
+        ],
+        [
+          null,
+          "0.37"
+        ]
+      ],
+      "single": [
+        [
+          13500,
+          "0.10"
+        ],
+        [
+          54850,
+          "0.12"
+        ],
+        [
+          116925,
+          "0.22"
+        ],
+        [
+          223225,
+          "0.24"
+        ],
+        [
+          283450,
+          "0.32"
+        ],
+        [
+          708650,
+          "0.35"
+        ],
+        [
+          null,
+          "0.37"
+        ]
+      ]
+    },
+    "salt_cap": {
+      "head_of_household": 10000,
+      "married_filing_jointly": 10000,
+      "married_filing_separately": 5000,
+      "single": 10000
+    },
+    "salt_cap_floor": {
+      "head_of_household": 10000,
+      "married_filing_jointly": 10000,
+      "married_filing_separately": 5000,
+      "single": 10000
+    },
+    "salt_phasedown_magi_threshold": {
+      "head_of_household": 500000,
+      "married_filing_jointly": 500000,
+      "married_filing_separately": 250000,
+      "single": 500000
+    },
+    "salt_phasedown_rate": "0.30",
+    "standard_deduction": {
+      "head_of_household": 26700,
+      "married_filing_jointly": 35600,
+      "married_filing_separately": 17800,
+      "single": 17800
+    }
+  },
+  "provisional_policy": {
+    "assumed_inflation": "0.025",
+    "projection_method": "inflation_linked",
+    "source_year": 2025,
+    "sunset_handling": "Post-sunset statutory SALT cap of 10,000 (5,000 MFS) applied.",
+    "uncertainty_warning": "Tax year 2030 parameters are PROVISIONAL projections from enacted 2025 law using an assumed 2.5% annual chained-CPI adjustment. They are NOT enacted law and official IRS figures will differ."
+  },
+  "source_references": [
+    "Rev. Proc. 2024-40 (inflation adjustments for 2025)",
+    "P.L. 119-21 One Big Beautiful Bill Act (2025 standard deduction, CTC, SALT cap)",
+    "IRC \u00a71 (rates), \u00a763 (standard deduction), \u00a724 (CTC), \u00a7164(b)(6) (SALT)",
+    "IRC \u00a71411 (net investment income tax)",
+    "IRS Notice 2024-80 (2025 retirement plan limits)"
+  ],
+  "status": "provisional",
+  "tax_year": 2030,
+  "version": "us-federal-2030-v1"
+}
