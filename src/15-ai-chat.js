@@ -675,17 +675,72 @@ function buildAIDataPackage(opts) {
     includeWarnings,
     multiYear
   } = opts;
+  const cl = typeof TP_ACTIVE_CLIENT !== "undefined" ? TP_ACTIVE_CLIENT : null;
   const pack = {
     requestType,
     engineVersion: ENGINE_VERSION,
     rulesVersion: RULES_VERSION,
     generatedAt: new Date().toISOString(),
     clientContext: {
-      clientIdentifier: "client-1",
-      planningPeriod: multiYear ? "TY2025–TY2026" : TY[year].label,
+      clientIdentifier: cl ? cl.clientId : "client-1",
+      planningPeriod: multiYear ? "TY2025\u2013TY2026" : TY[year].label,
       filingStatus: status,
-      stateModelingStatus: "not modeled (federal only)"
+      stateModelingStatus: cl && cl.profile.state ? cl.profile.state + " state tax NOT MODELED (federal only)" : "not modeled (federal only)"
     },
+    /* Known client facts, goals and constraints — from the client profile.
+       Facts here are KNOWN; anything in unresolvedClientFacts is UNKNOWN and
+       must be asked about, never assumed. */
+    clientProfile: cl ? {
+      householdSummary: {
+        taxpayerAge: cl.profile.household.taxpayerAge,
+        spouseAge: cl.profile.household.spouseAge,
+        dependents: cl.profile.household.dependents,
+        dependentAges: cl.profile.household.dependentAges,
+        retired: !!cl.profile.household.retired,
+        medicare: !!cl.profile.household.medicare,
+        healthCoverage: cl.profile.household.healthCoverage || null
+      },
+      riskTolerance: cl.profile.riskTolerance,
+      auditRiskTolerance: cl.profile.auditRiskTolerance,
+      goalsRanked: (cl.goals || []).slice().sort((a, b) => a.priority - b.priority).map(g => ({
+        priority: g.priority,
+        goal: g.label,
+        classification: g.classification,
+        targetAmount: g.targetAmount ? num(g.targetAmount) : null,
+        targetYear: g.targetYear || null,
+        reason: g.reason || null
+      })),
+      constraints: {
+        minSpendableCash: num(cl.constraints.minSpendableCash) || null,
+        maxCurrentTaxPayment: num(cl.constraints.maxCurrentTaxPayment) || null,
+        maxImplementationCost: num(cl.constraints.maxImplementationCost) || null,
+        minCashReserve: num(cl.constraints.minCashReserve) || null,
+        other: cl.constraints.other || null
+      },
+      assetSummary: (() => {
+        const t = clientAssetTotals(cl);
+        return {
+          netWorthModeled: Math.round(t.total),
+          liquidAssets: Math.round(t.liquid),
+          retirementAssets: Math.round(t.retirement),
+          debt: Math.round(t.debt)
+        };
+      })(),
+      businesses: (cl.profile.businesses || []).map(b => ({
+        name: b.name,
+        entityType: b.entityType,
+        sstb: !!b.sstb,
+        grossReceipts: num(b.grossReceipts),
+        ownerCompensation: num(b.ownerComp),
+        otherW2Wages: num(b.otherW2),
+        ubia: num(b.ubia),
+        businessInterestExpense: num(b.interestExpense),
+        sec163jCarryforward: num(b.interestCarryforward),
+        complianceCost: num(b.complianceCost),
+        notes: b.notes || null
+      })),
+      unresolvedClientFacts: cl.missingFacts || []
+    } : null,
     objective: objective || null,
     scenarios: entries.map((x, i) => {
       const snap = buildScenarioSnapshot(x.s, x.r, x.s.name, status, year, x.v);
@@ -751,7 +806,7 @@ function buildAIDataPackage(opts) {
 }
 
 /* ---- Core system behavior (applies to every AI capability) ---- */
-const AI_SYSTEM_CORE = "You are the AI advisory and review layer for a professional tax-planning application (Tax Advisory Pro; deterministic federal engine for TY2025/TY2026).\n" + "The deterministic tax engine is the authoritative source for all stored tax calculations. You must not replace engine calculations with your own unsupported figures.\n" + "Your responsibilities: analyze supplied scenario data and calculation results; explain material tax drivers; identify planning opportunities relevant to the supplied facts; identify arithmetic inconsistencies, tax-law concerns, missing facts, unsupported assumptions, and model limitations; propose structured scenario input changes for deterministic recalculation; compare scenarios using tax, economic income, spendable cash, timing, implementation burden, and risk; distinguish permanent tax reduction from tax deferral and cash-flow timing; produce professional narratives grounded in supplied numbers; clearly separate known facts, assumptions, estimates, and unresolved questions.\n" + "Never: invent client facts, eligibility, tax elections, basis, documentation, or legal conclusions; silently modify a scenario; describe a strategy as approved unless a human reviewer approved it; treat the lowest-tax scenario as automatically optimal; produce a final tax amount for a proposed strategy — request that the deterministic engine calculate it.\n" + "State plainly when the supplied data is insufficient: \"The current model does not contain enough information to reach a reliable conclusion.\" and list the exact missing fields.\n" + "All figures are planning estimates unless specifically validated for return preparation. Classify each modeled benefit as: permanent tax reduction, tax deferral, income shifting, cash-flow timing, conversion of income character, or uncertain/fact-dependent.\n" + "When proposing an input change use EXACTLY this plain-text block format:\nPROPOSED CHANGE\nfield: <field path>\ncurrent: <current numeric value>\nproposed: <proposed numeric value>\nreason: <one sentence>\n";
+const AI_SYSTEM_CORE = "You are the AI advisory and review layer for a professional tax-planning application (Tax Advisory Pro; deterministic federal engine for TY2025/TY2026).\n" + "The deterministic tax engine is the authoritative source for all stored tax calculations. You must not replace engine calculations with your own unsupported figures.\n" + "Your responsibilities: analyze supplied scenario data and calculation results; explain material tax drivers; identify planning opportunities relevant to the supplied facts; identify arithmetic inconsistencies, tax-law concerns, missing facts, unsupported assumptions, and model limitations; propose structured scenario input changes for deterministic recalculation; compare scenarios using tax, economic income, spendable cash, timing, implementation burden, and risk; distinguish permanent tax reduction from tax deferral and cash-flow timing; produce professional narratives grounded in supplied numbers; clearly separate known facts, assumptions, estimates, and unresolved questions.\n" + "Never: invent client facts, eligibility, tax elections, basis, documentation, or legal conclusions; silently modify a scenario; describe a strategy as approved unless a human reviewer approved it; treat the lowest-tax scenario as automatically optimal; produce a final tax amount for a proposed strategy — request that the deterministic engine calculate it.\n" + "State plainly when the supplied data is insufficient: \"The current model does not contain enough information to reach a reliable conclusion.\" and list the exact missing fields.\n" + "DEFAULT OBJECTIVE: maximize after-tax economic value while respecting the client's liquidity needs, stated tax goals, risk preferences and implementation constraints (see clientProfile in the data package). Never optimize for tax minimization alone. When analyzing a client, state: the primary objective, secondary objectives, constraints, current position, most relevant strategies, strategies REJECTED because of the client's constraints, and the facts that must be confirmed.\nAll figures are planning estimates unless specifically validated for return preparation. Classify each modeled benefit as: permanent tax reduction, tax deferral, income shifting, cash-flow timing, conversion of income character, or uncertain/fact-dependent.\n" + "When proposing an input change use EXACTLY this plain-text block format:\nPROPOSED CHANGE\nfield: <field path>\ncurrent: <current numeric value>\nproposed: <proposed numeric value>\nreason: <one sentence>\n";
 
 const AI_ANALYZE_STRUCTURE = "Structure long-form analyses under these plain-text headings (omit headings that do not apply, keep the order):\nExecutive conclusion\nCurrent position\nKey tax drivers\nOptimization opportunities\nScenario comparison\nPotential tax impact\nCash-flow impact\nRisks and limitations\nMissing facts\nRecommended next steps\n";
 

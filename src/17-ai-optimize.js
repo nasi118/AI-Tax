@@ -45,9 +45,12 @@ function AIOptimizePanel({
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     try {
+      const cl = typeof TP_ACTIVE_CLIENT !== "undefined" ? TP_ACTIVE_CLIENT : null;
       const objective = {
         primaryObjective: objectives[0] || "Maximize after-tax economic income while maintaining reasonable implementation risk.",
         secondaryObjectives: objectives.slice(1).concat(customObjective ? [customObjective] : []),
+        clientPriorities: cl ? (cl.goals || []).slice().sort((a, b) => a.priority - b.priority).filter(g => g.classification === "Primary" || g.classification === "Secondary").map(g => g.priority + ". " + g.label + (g.reason ? " — " + g.reason : "")) : [],
+        clientConstraints: cl ? [num(cl.constraints.minSpendableCash) > 0 ? "Preserve at least " + usd$(num(cl.constraints.minSpendableCash)) + " of spendable after-tax cash" : null, num(cl.constraints.maxCurrentTaxPayment) > 0 ? "Maximum voluntary tax payment " + usd$(num(cl.constraints.maxCurrentTaxPayment)) : null, num(cl.constraints.maxImplementationCost) > 0 ? "Maximum implementation cost " + usd$(num(cl.constraints.maxImplementationCost)) : null, cl.profile.auditRiskTolerance ? "Audit-risk tolerance: " + cl.profile.auditRiskTolerance : null, cl.constraints.other || null].filter(Boolean) : [],
         riskTolerance: "reasonable implementation risk",
         cashConstraints: null
       };

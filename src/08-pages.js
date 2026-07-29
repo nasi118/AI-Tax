@@ -45,6 +45,8 @@ function RateCurveCard({ focus, status, year, A }) {
   }), EL(Note, null, "The nominal bracket understates reality wherever a phase-out is active. Spikes in this curve are where credits, the QBI cap, or a deduction phase-out stack on top of the statutory rate. Flat regions are where planning is cheapest."));
 }
 function Dashboard({
+  client,
+  alignments,
   results,
   bestId,
   baseline,
@@ -482,6 +484,8 @@ function Dashboard({
    SCENARIOS — the input ledger
    ========================================================================== */
 function ScenariosPage({
+  client,
+  alignments,
   scenarios,
   results,
   bestId,
@@ -520,6 +524,7 @@ function ScenariosPage({
     gridTemplateColumns: `minmax(${Math.min(210, labW)}px,${labW}px) repeat(${n}, minmax(${Math.max(130, colW - 35)}px,${colW}px))`
   };
   const richestId = results.length > 1 ? results.reduce((a, b) => b.r.spendableAfterTaxCash > a.r.spendableAfterTaxCash ? b : a).s.id : null;
+  const bestAlignedId = alignments && results.length > 1 && alignments.some(a => a && a.pct != null) ? results[alignments.reduce((bi, a, i) => a && a.pct != null && (alignments[bi] == null || alignments[bi].pct == null || a.pct > alignments[bi].pct) ? i : bi, 0)].s.id : null;
   const bestAfterTaxId = results.length > 1 ? results.reduce((a, b) => b.r.afterTaxCash > a.r.afterTaxCash ? b : a).s.id : null;
 
   /* The ledger rows are module-level components (defined below). They must not
@@ -557,6 +562,7 @@ function ScenariosPage({
     v
   }, i) => {
     const isBest = s.id === bestId;
+    const al = alignments ? alignments[i] : null;
     const comparable = !baseline || Math.abs(r.economicIncome - baseline.r.economicIncome) <= 1;
     const delta = baseline ? r.totalTax - baseline.r.totalTax : 0;
     return EL("div", {
@@ -577,7 +583,9 @@ function ScenariosPage({
       className: "tp-tag amber"
     }, "AI proposed"), s.id === bestAfterTaxId && EL("span", {
       className: "tp-tag green"
-    }, "Highest after-tax income")), EL("div", {
+    }, "Highest after-tax income"), s.id === bestAlignedId && EL("span", {
+      className: "tp-tag green"
+    }, "Best aligned with goals")), EL("div", {
       className: "tp-vtotal"
     }, usd$(r.totalTax)), EL("div", {
       className: "tp-vsub"
@@ -587,7 +595,9 @@ function ScenariosPage({
       className: "tp-vrow"
     }, EL("span", null, "After-tax economic income"), EL("strong", null, usd$(r.afterTaxCash))), EL("div", {
       className: "tp-vrow"
-    }, EL("span", null, "Spendable after-tax cash"), EL("strong", null, usd$(r.spendableAfterTaxCash)))), EL("div", {
+    }, EL("span", null, "Spendable after-tax cash"), EL("strong", null, usd$(r.spendableAfterTaxCash)))), al && al.pct != null && EL(GoalAlignmentBlock, {
+      al: al
+    }), EL("div", {
       className: "tp-vdelta " + (delta < 0 ? "save" : delta > 0 ? "cost" : "base")
     }, i === 0 ? "baseline" : delta === 0 ? "same as baseline" : (delta < 0 ? "saves " : "costs ") + usd$(Math.abs(delta)) + " vs. " + baseline.s.name), i > 0 && !comparable && EL("div", {
       className: "tp-vcompat"
@@ -614,6 +624,7 @@ function ScenariosPage({
     return entry ? EL(ScenarioAIPanel, {
       key: entry.s.id,
       entry: entry,
+      client: client,
       baseline: baseline,
       status: status,
       year: year,
@@ -1813,12 +1824,14 @@ function Sched1AEditor({
 const SCENARIO_AI_PROMPTS = [
   ["Explain this scenario", "Explain this scenario: walk through what drives total income, the deduction path, the QBI result, employment taxes and surtaxes, and the after-tax economics."],
   ["Compare to base", "Compare this scenario to the base scenario. What drives the differences in total modeled tax, after-tax economic income and spendable cash? Are the two economically comparable?"],
+  ["Compare to client goals", "Compare this scenario against the client's stated goals and constraints in the data package. Which goals does it advance, which does it set back, and which constraints bind? Do not treat the lowest-tax outcome as automatically best."],
   ["Identify opportunities", "Identify planning opportunities relevant to this scenario's facts. Classify each as permanent reduction, deferral, timing, or character conversion, and list the facts to confirm."],
   ["Review calculation logic", "Review the calculation results for internal consistency: deduction election, QBI limitation, NIIT base, payroll reconciliation, and the economic-income tie-out. Flag anything that looks inconsistent."],
   ["Identify missing facts", "What facts are missing from this model that would materially change the analysis? List them as specific questions for the client."],
   ["Reconcile after-tax cash", "Reconcile economic income down to spendable after-tax cash for this scenario, explaining each outflow."]
 ];
-function ScenarioAIPanel({ entry, baseline, status, year, onClose, onOpenWorkspace }) {
+function ScenarioAIPanel({ entry, client, baseline, status, year, onClose, onOpenWorkspace }) {
+  const topGoal = client && (client.goals || []).slice().sort((a, b) => a.priority - b.priority)[0];
   const [mode, setMode] = useState("inline"); // inline | drawer
   const [q, setQ] = useState("");
   const [resp, setResp] = useState("");
@@ -1908,7 +1921,7 @@ function ScenarioAIPanel({ entry, baseline, status, year, onClose, onOpenWorkspa
     className: "tp-scai-head"
   }, EL("strong", null, "AI analysis — ", entry.s.name), EL("em", {
     className: "tp-scai-ctx"
-  }, "Context: ", TY[year].label, " · ", STATUSES.find(s => s.v === status).l, entry.s.aiGenerated ? " · AI-proposed scenario" : ""), EL("button", {
+  }, "Context: ", client ? client.name + " · " : "", TY[year].label, " · ", STATUSES.find(s => s.v === status).l, entry.s.aiGenerated ? " · AI-proposed scenario" : "", topGoal ? " · Primary objective: " + topGoal.label : ""), EL("button", {
     className: "tp-mini",
     type: "button",
     onClick: () => setMode(mode === "drawer" ? "inline" : "drawer")
@@ -1934,4 +1947,29 @@ function ScenarioAIPanel({ entry, baseline, status, year, onClose, onOpenWorkspa
   return EL("div", {
     className: "tp-scai"
   }, head, body);
+}
+
+/* Transparent per-card goal alignment: percentage plus the scored rows */
+function GoalAlignmentBlock({ al }) {
+  const [open, setOpen] = useState(false);
+  return EL("div", {
+    className: "tp-goalalign"
+  }, EL("button", {
+    type: "button",
+    className: "tp-goalalign-head",
+    onClick: () => setOpen(o => !o),
+    "aria-expanded": open
+  }, EL("span", {
+    className: "tp-sec-chev" + (open ? " open" : "")
+  }, I.chevR), "Goal alignment: ", EL("strong", {
+    className: al.pct >= 80 ? "up" : al.pct >= 50 ? "" : "down"
+  }, al.pct + "%")), open && EL("div", {
+    className: "tp-goalalign-rows"
+  }, al.rows.map((row, i) => EL("div", {
+    key: i,
+    className: "tp-vrow",
+    title: row.detail
+  }, EL("span", null, row.label), EL("strong", {
+    className: row.status === "strong" || row.status === "met" ? "up" : row.status === "at-risk" ? "down" : ""
+  }, row.status === "strong" ? "Strong" : row.status === "met" ? "Met" : row.status === "moderate" ? "Moderate" : row.status === "at-risk" ? "At risk" : "Review")))));
 }
