@@ -457,6 +457,8 @@ function App() {
   const [navGroupsOpen, setNavGroupsOpen] = useUIPref("navGroups", {});
   const [toolsMode, setToolsMode] = useUIPref("toolsMode", "pinned"); // pinned | collapsed | hidden
   const [openCalc, setOpenCalc] = useState(null);
+  const [appearance, setAppearance] = useUIPref("appearance", {});
+  const [showAppearance, setShowAppearance] = useState(false);
 
   /* ---- Tools and records ---- */
   const [auditLog, setAuditLog] = useState([]);
@@ -804,7 +806,11 @@ function App() {
     onChange: e => setStatusLogged(e.target.value)
   }, STATUSES.map(s => EL("option", { key: s.v, value: s.v }, s.l)))));
 
-  return EL("div", { className: "tp-root" },
+  const apEff = effectiveAppearance(appearance, tab);
+  return EL("div", {
+    className: "tp-root " + appearanceClasses(apEff),
+    style: appearanceStyle(apEff)
+  },
     EL("button", {
       className: "tp-navtoggle",
       onClick: () => setNavOpen(v => !v),
@@ -886,7 +892,13 @@ function App() {
               type: "button",
               onClick: () => setToolsMode("pinned"),
               title: "Show the tools panel"
-            }, "Tools"))),
+            }, "Tools"),
+            EL("button", {
+              className: "tp-btn ghost sm",
+              type: "button",
+              onClick: () => setShowAppearance(true),
+              title: "Adjust theme, colors, fonts, borders and sizing — for this tab or the whole application"
+            }, "✎ Customize"))),
         validation.all.length > 0 && EL("div", { className: "tp-validbar" },
           EL("strong", null, active.name, ": "),
           validation.errors.map((v, i) => EL("span", { key: "e" + i, className: "tp-vchip err" }, "Blocking: ", v.msg)),
@@ -1004,6 +1016,13 @@ function App() {
       status, year, validation: results[activeIdx].v,
       onSendToNotes: text => { setNoteDraft(d => (d ? d + "\n\n" : "") + text); setShowNotes(true); raise("notes"); },
       onApplyChange: applyAIChange
+    }),
+    showAppearance && EL(AppearancePanel, {
+      appearance: appearance,
+      setAppearance: setAppearance,
+      tab: tab,
+      tabLabel: t.label,
+      onClose: () => setShowAppearance(false)
     }),
     openCalc && EL(CalculatorDrawer, {
       type: openCalc,

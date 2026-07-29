@@ -508,11 +508,16 @@ function ScenariosPage({
   const toggle = k => setOpen({ ...open, [k]: !open[k] });
   const setAllGroups = v => setOpen({ income: v, sched: v, ded: v, other: v, econ: v });
   const [density, setDensity] = useUIPref("ledger:density", "standard");
+  /* Column sizing within bounded limits, persisted like every UI preference */
+  const [labWidth, setLabWidth] = useUIPref("ledger:labw", 235);
+  const [colWidth, setColWidth] = useUIPref("ledger:colw", 185);
+  const labW = Math.min(320, Math.max(200, num(labWidth) || 235));
+  const colW = Math.min(260, Math.max(145, num(colWidth) || 185));
   const [drill, setDrill] = useState(null);
   const [aiPanel, setAiPanel] = useState(null); // scenario id with the AI panel expanded
   const n = scenarios.length;
   const cols = {
-    gridTemplateColumns: `minmax(210px,240px) repeat(${n}, minmax(148px,190px))`
+    gridTemplateColumns: `minmax(${Math.min(210, labW)}px,${labW}px) repeat(${n}, minmax(${Math.max(130, colW - 35)}px,${colW}px))`
   };
   const richestId = results.length > 1 ? results.reduce((a, b) => b.r.spendableAfterTaxCash > a.r.spendableAfterTaxCash ? b : a).s.id : null;
   const bestAfterTaxId = results.length > 1 ? results.reduce((a, b) => b.r.afterTaxCash > a.r.afterTaxCash ? b : a).s.id : null;
@@ -645,10 +650,30 @@ function ScenariosPage({
       v: "compact",
       l: "Compact"
     }]
-  }), EL("em", null, "Line-item column and scenario headers stay pinned while you scroll")), /*#__PURE__*/React.createElement("div", {
+  }), EL("label", {
+    className: "tp-colsize",
+    title: "Width of the line-item column"
+  }, "Labels", EL("input", {
+    type: "range",
+    min: 200,
+    max: 320,
+    value: labW,
+    onChange: e => setLabWidth(num(e.target.value)),
+    "aria-label": "Line-item column width"
+  })), EL("label", {
+    className: "tp-colsize",
+    title: "Width of each scenario column"
+  }, "Columns", EL("input", {
+    type: "range",
+    min: 145,
+    max: 260,
+    value: colW,
+    onChange: e => setColWidth(num(e.target.value)),
+    "aria-label": "Scenario column width"
+  })), EL("em", null, "Line-item column and scenario headers stay pinned while you scroll")), /*#__PURE__*/React.createElement("div", {
     className: "tp-ledger",
     style: cols
-  }, /*#__PURE__*/React.createElement("div", {
+  },/*#__PURE__*/React.createElement("div", {
     className: "tp-cell tp-corner"
   }, "Line item"), scenarios.map(s => /*#__PURE__*/React.createElement("div", {
     key: s.id,

@@ -177,6 +177,68 @@ await page.click(".tools-dockbtn");
 await page.waitForTimeout(300);
 ok(await page.$(".tp-tools.open"), "tools open as a mobile drawer");
 
+/* ---- appearance customization ---- */
+await page.setViewportSize({ width: 1600, height: 1000 });
+await page.click(".tools-overlay").catch(() => {});
+await page.waitForTimeout(300);
+await page.click('button.tp-navitem:has-text("Dashboard")');
+await page.waitForTimeout(300);
+await page.click('button:has-text("Customize")');
+await page.waitForTimeout(300);
+ok(await page.$(".tp-drawer"), "Customize panel opens");
+await page.click('.tp-ap-theme:has-text("Emerald")');
+await page.waitForTimeout(200);
+const accent = await page.$eval(".tp-root", el => getComputedStyle(el).getPropertyValue("--indigo").trim());
+ok(accent === "#059669", "color theme changes the accent variables");
+await page.click('.tp-ap-swatch[title="Linen"]');
+await page.waitForTimeout(200);
+ok((await page.$eval(".tp-root", el => getComputedStyle(el).backgroundColor)) === "rgb(244, 239, 230)", "background swatch repaints the page");
+await page.click('button:has-text("Extra large")');
+await page.waitForTimeout(150);
+ok(await page.$(".tp-root.ap-fs-xl"), "text size scales the application");
+await page.click('.tp-drawer button:has-text("Bold")');
+await page.click('.tp-drawer button:has-text("Square")');
+await page.waitForTimeout(150);
+ok(await page.$(".tp-root.ap-bw-2.ap-rad-square"), "border width and corner style apply");
+await page.click('.tp-drawer input[type="checkbox"]');
+await page.waitForTimeout(150);
+ok(await page.$(".tp-root.ap-gridv"), "table gridlines toggle applies");
+await page.click('button:has-text("Reset application defaults")');
+await page.waitForTimeout(200);
+ok(!(await page.$(".tp-root.ap-fs-xl")) && (accentReset => true)(), "reset restores the defaults");
+// per-tab scope: dark on Dashboard only
+await page.click('.tp-drawer button:has-text("This tab")');
+await page.click('.tp-ap-theme:has-text("Dark")');
+await page.waitForTimeout(200);
+ok(await page.$(".tp-root.ap-dark"), "per-tab override applies on this tab");
+await page.keyboard.press("Escape");
+await page.click('button.tp-navitem:has-text("Scenarios")');
+await page.waitForTimeout(300);
+ok(!(await page.$(".tp-root.ap-dark")), "other tabs keep the application theme");
+await page.click('button.tp-navitem:has-text("Dashboard")');
+await page.waitForTimeout(300);
+ok(await page.$(".tp-root.ap-dark"), "the tab override persists when returning");
+await page.click('button:has-text("Customize")');
+await page.waitForTimeout(250);
+await page.click('.tp-drawer button:has-text("This tab")');
+await page.click('button:has-text("Clear this tab")');
+await page.keyboard.press("Escape");
+await page.waitForTimeout(200);
+ok(!(await page.$(".tp-root.ap-dark")), "clearing the tab override restores the global theme");
+// ledger column resize
+await page.click('button.tp-navitem:has-text("Scenarios")');
+await page.waitForTimeout(300);
+const grid0 = await page.$eval(".tp-ledger", el => el.style.gridTemplateColumns);
+await page.$eval('.tp-colsize input[aria-label="Scenario column width"]', el => {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+  setter.call(el, "250");
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+});
+await page.waitForTimeout(250);
+const grid1 = await page.$eval(".tp-ledger", el => el.style.gridTemplateColumns);
+ok(grid0 !== grid1 && grid1.includes("250px"), "scenario columns resize within limits and rerender");
+
 ok(errors.length === 0, "no page errors during the run" + (errors.length ? " — " + errors[0] : ""));
 console.log(`\n${passed} passed, ${failed} failed`);
 await browser.close();
