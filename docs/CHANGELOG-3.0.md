@@ -130,3 +130,41 @@ new `src/19-ui-shell.js`, `src/20-tools-panel.js`,
   limited to the existing drill rows and calculator breakdowns.
 - The old floating calculator window was superseded by the tools-rail
   quick calculator; the Notes and Ask AI floating tools remain.
+
+---
+
+# 3.1 — Appearance customization
+
+Adds a **Customize** panel (topbar, every tab) for adjusting formatting and
+theming per tab or application-wide. Presentation only — settings live in
+the same device-local UI-preference store, never with tax data, and every
+value is bounded to presets so a saved preference cannot make the app
+unreadable.
+
+- **Scope switch** — "Entire application" or "This tab": each tab can carry
+  its own overrides on top of the global settings, with a one-click clear.
+- **Color themes** — Classic Blue, Indigo, Emerald, Graphite, Burgundy, and
+  Dark (full dark surface set including charts, inputs and grand-total rows).
+- **Background** — theme default, six curated tints, or a custom color picker.
+- **Fonts** — System Sans, Humanist, Georgia Serif, Monospace; text size
+  Compact / Default / Large / Extra large (scales tables, cells, KPIs and
+  inputs coherently).
+- **Borders** — strength (light/medium/strong border color), width
+  (hairline/bold), corner style (rounded/soft/square), and optional vertical
+  table gridlines.
+- **Column resizing** — Labels and Columns sliders in the Scenarios ledger
+  toolbar resize the line-item column (200–320px) and every scenario column
+  (145–260px) within bounded limits, persisted.
+
+Implementation: new `src/22-appearance.js` (presets + effective-settings
+resolution + panel); `css/styles.css` refactored so surfaces use
+`var(--card)`/`var(--grand-bg)` and the app root re-resolves theme variables,
+plus modifier classes (`ap-fs-*`, `ap-bw-2`, `ap-rad-*`, `ap-gridv`,
+`ap-dark`); `src/10-app.js` applies the effective settings per tab;
+`src/08-pages.js` adds the ledger column sliders.
+
+Verification: golden engine suite still **41/41**; UI acceptance suite
+extended to **62/62** (theme variables apply, background repaints, text
+size/border/corner/gridline classes, per-tab override isolation and
+clearing, column resize rerender, reset to defaults). Screenshots:
+`docs/screenshots-3.0/appearance-*.png`.

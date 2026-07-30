@@ -783,13 +783,16 @@ function AuditRiskCalc({ scenario, result, onAskAI, onAddNote }) {
    7. §163(j) BUSINESS INTEREST LIMITATION — standalone planning estimate
    ------------------------------------------------------------------------- */
 function S163jCalc({ onAskAI, onAddNote }) {
-  const [rev, setRev] = useState(2000000);
-  const [opex, setOpex] = useState(1400000);
-  const [dep, setDep] = useState(150000);
-  const [amort, setAmort] = useState(0);
-  const [intExp, setIntExp] = useState(120000);
+  /* Prefill from the active client's first business with interest expense */
+  const cl = typeof TP_ACTIVE_CLIENT !== "undefined" ? TP_ACTIVE_CLIENT : null;
+  const biz = cl && (cl.profile.businesses || []).find(b => num(b.interestExpense) > 0 || num(b.grossReceipts) > 0);
+  const [rev, setRev] = useState(biz ? num(biz.grossReceipts) : 2000000);
+  const [opex, setOpex] = useState(biz ? num(biz.operatingExpenses) + num(biz.ownerComp) : 1400000);
+  const [dep, setDep] = useState(biz ? num(biz.depreciation) : 150000);
+  const [amort, setAmort] = useState(biz ? num(biz.amortization) : 0);
+  const [intExp, setIntExp] = useState(biz ? num(biz.interestExpense) : 120000);
   const [intInc, setIntInc] = useState(0);
-  const [carry, setCarry] = useState(0);
+  const [carry, setCarry] = useState(biz ? num(biz.interestCarryforward) : 0);
   const ebit = num(rev) - num(opex) - num(dep) - num(amort) - num(intExp) + num(intInc);
   const ati = ebit + num(intExp) - num(intInc) + num(dep) + num(amort); // OBBBA restores the EBITDA add-back from 2025
   const limit = clamp0(0.30 * ati) + num(intInc);

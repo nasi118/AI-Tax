@@ -3,6 +3,8 @@
    REPORT GENERATOR
    ========================================================================== */
 function ReportPage({
+  client: clientRecord,
+  alignments,
   results,
   bestId,
   baseline,
@@ -11,7 +13,7 @@ function ReportPage({
   notes,
   auditLog
 }) {
-  const [client, setClient] = useState("");
+  const [client, setClient] = useState(clientRecord ? clientRecord.name : "");
   const [preparer, setPreparer] = useState("");
   const [firm, setFirm] = useState("");
   const [focusId, setFocusId] = useState(bestId);
@@ -277,7 +279,57 @@ function ReportPage({
     }, pct(r.effectiveRate)), /*#__PURE__*/React.createElement("td", {
       className: "num"
     }, i === 0 ? "—" : (d < 0 ? "−" : "+") + usd$(Math.abs(d))));
-  })))), /*#__PURE__*/React.createElement("section", {
+  })))), clientRecord && (clientRecord.goals || []).length > 0 && EL("section", {
+    className: "rp-sec"
+  }, EL("h2", null, "Client objectives and planning constraints"), EL("table", {
+    className: "rp-tbl"
+  }, EL("thead", null, EL("tr", null, EL("th", null, "Goal"), EL("th", null, "Class"), EL("th", {
+    className: "num"
+  }, "Target"), EL("th", null, "Status"))), EL("tbody", null, clientRecord.goals.slice().sort((a, b) => a.priority - b.priority).map(g => EL("tr", {
+    key: g.id
+  }, EL("td", null, g.priority + ". " + g.label, g.reason && EL("em", {
+    className: "tp-rownote"
+  }, g.reason)), EL("td", {
+    className: "sm"
+  }, g.classification), EL("td", {
+    className: "num"
+  }, g.targetAmount ? usd$(num(g.targetAmount)) : "\u2014"), EL("td", {
+    className: "sm"
+  }, g.status || "Open"))))), (num(clientRecord.constraints.minSpendableCash) > 0 || num(clientRecord.constraints.minCashReserve) > 0 || num(clientRecord.constraints.maxCurrentTaxPayment) > 0 || clientRecord.constraints.other) && EL("p", {
+    className: "rp-note"
+  }, "Constraints: ", [num(clientRecord.constraints.minSpendableCash) > 0 ? "minimum spendable cash " + usd$(num(clientRecord.constraints.minSpendableCash)) : null, num(clientRecord.constraints.minCashReserve) > 0 ? "minimum cash reserve " + usd$(num(clientRecord.constraints.minCashReserve)) : null, num(clientRecord.constraints.maxCurrentTaxPayment) > 0 ? "maximum voluntary tax payment " + usd$(num(clientRecord.constraints.maxCurrentTaxPayment)) : null, num(clientRecord.constraints.maxImplementationCost) > 0 ? "maximum implementation cost " + usd$(num(clientRecord.constraints.maxImplementationCost)) : null].filter(Boolean).join("; "), clientRecord.constraints.other ? " \u2014 " + clientRecord.constraints.other : ""), (clientRecord.missingFacts || []).length > 0 && EL("p", {
+    className: "rp-note"
+  }, "Unresolved facts requiring confirmation: ", clientRecord.missingFacts.join("; "), "."), alignments && results.length > 1 && EL("table", {
+    className: "rp-tbl"
+  }, EL("thead", null, EL("tr", null, EL("th", null, "Scenario"), EL("th", {
+    className: "num"
+  }, "Total tax"), EL("th", {
+    className: "num"
+  }, "After-tax income"), EL("th", {
+    className: "num"
+  }, "Spendable cash"), EL("th", {
+    className: "num"
+  }, "Goal alignment"), EL("th", null, "Constraints"))), EL("tbody", null, results.map((x, i) => {
+    const al = alignments[i];
+    const conRows = al ? al.rows.filter(rw => /Minimum spendable|Maximum voluntary/.test(rw.label)) : [];
+    const conMet = conRows.length ? conRows.every(rw => rw.status === "met") ? "Met" : "Not met" : "\u2014";
+    return EL("tr", {
+      key: x.s.id,
+      className: x.s.id === focus.s.id ? "hl" : ""
+    }, EL("td", null, x.s.name), EL("td", {
+      className: "num"
+    }, usd$(x.r.totalTax)), EL("td", {
+      className: "num"
+    }, usd$(x.r.afterTaxCash)), EL("td", {
+      className: "num"
+    }, usd$(x.r.spendableAfterTaxCash)), EL("td", {
+      className: "num"
+    }, al && al.pct != null ? al.pct + "%" : "\u2014"), EL("td", {
+      className: "sm"
+    }, conMet));
+  }))), EL("p", {
+    className: "rp-note"
+  }, "Goal alignment is a transparent rule-based comparison of each scenario's engine results against the stated goals and constraints above \u2014 it is not an AI judgment, and the lowest-tax scenario is not automatically treated as best.")), /*#__PURE__*/React.createElement("section", {
     className: "rp-sec"
   }, /*#__PURE__*/React.createElement("h2", null, "Opportunities identified"), !findings.length ? /*#__PURE__*/React.createElement("p", {
     className: "rp-note"
@@ -368,6 +420,11 @@ const TABS = [{
   icon: I.grid,
   blurb: "Form 1040 walk, tax composition, marginal rate curve, and sized opportunities."
 }, {
+  id: "clients",
+  label: "Client Profiles",
+  icon: I.userIcon,
+  blurb: "Household facts, income, assets, businesses, planning goals and constraints — the profile drives every calculation, scenario and report."
+}, {
   id: "scenarios",
   label: "Scenarios",
   icon: I.layers,
@@ -429,7 +486,7 @@ const TABS = [{
 const NAV_GROUPS = [{
   key: "planning",
   label: "Planning",
-  ids: ["dashboard", "scenarios", "ai", "guide", "report"]
+  ids: ["dashboard", "clients", "scenarios", "ai", "guide", "report"]
 }, {
   key: "calc",
   label: "Calculations",
@@ -440,9 +497,40 @@ const NAV_GROUPS = [{
   ids: ["audit", "data", "reference"]
 }];
 function App() {
-  const [status, setStatus] = useState("mfj");
-  const [year, setYear] = useState(2025);
-  const [scenarios, setScenarios] = useState(seed);
+  /* ---- Clients own their scenarios, tax year and filing status. Client
+     data persists separately from UI preferences and never mixes across
+     clients. ---- */
+  const [clients, setClients] = useState(loadClients);
+  const [activeClientId, setActiveClientIdRaw] = useState(() => getUIPref("activeClient", null));
+  const clientSafe = clients.find(c => c.id === activeClientId && !c.archived) || clients.find(c => !c.archived) || clients[0];
+  const clientId = clientSafe.id;
+  TP_ACTIVE_CLIENT = clientSafe;
+  useEffect(() => {
+    saveClients(clients);
+  }, [clients]);
+  const setActiveClient = id => {
+    setActiveClientIdRaw(id);
+    setUIPref("activeClient", id);
+  };
+  const updateClient = (id, fn) => setClients(cs => cs.map(c => c.id === id ? {
+    ...fn(c),
+    updatedAt: Date.now()
+  } : c));
+  const scenarios = clientSafe.scenarios;
+  const setScenarios = fnOrArr => updateClient(clientId, c => ({
+    ...c,
+    scenarios: typeof fnOrArr === "function" ? fnOrArr(c.scenarios) : fnOrArr
+  }));
+  const status = clientSafe.profile.filingStatus;
+  const year = TY[clientSafe.profile.taxYear] ? clientSafe.profile.taxYear : 2025;
+  const setStatus = v => updateClient(clientId, c => ({
+    ...c,
+    profile: { ...c.profile, filingStatus: v }
+  }));
+  const setYear = y => updateClient(clientId, c => ({
+    ...c,
+    profile: { ...c.profile, taxYear: y }
+  }));
   const [tab, setTabRaw] = useState(() => getUIPref("tab", "dashboard"));
   const setTab = t => {
     setTabRaw(t);
@@ -457,6 +545,8 @@ function App() {
   const [navGroupsOpen, setNavGroupsOpen] = useUIPref("navGroups", {});
   const [toolsMode, setToolsMode] = useUIPref("toolsMode", "pinned"); // pinned | collapsed | hidden
   const [openCalc, setOpenCalc] = useState(null);
+  const [appearance, setAppearance] = useUIPref("appearance", {});
+  const [showAppearance, setShowAppearance] = useState(false);
 
   /* ---- Tools and records ---- */
   const [auditLog, setAuditLog] = useState([]);
@@ -489,6 +579,16 @@ function App() {
     if (!results.length) return null;
     return results.reduce((a, b) => b.r.totalTax < a.r.totalTax ? b : a).s.id;
   }, [results]);
+  /* Transparent goal-alignment scoring for every scenario of the active client */
+  const alignments = useMemo(() => results.map(e => goalAlignment(clientSafe, e, results)), [results, clientSafe]);
+  /* The audit trail is session-wide but every entry is tagged; each client
+     sees only its own history. */
+  const clientAudit = useMemo(() => auditLog.filter(e => !e.clientId || e.clientId === clientId), [auditLog, clientId]);
+  const setClientAudit = fnOrArr => setAuditLog(l => {
+    const others = l.filter(e => e.clientId && e.clientId !== clientId);
+    const mine = l.filter(e => !e.clientId || e.clientId === clientId);
+    return [...others, ...(typeof fnOrArr === "function" ? fnOrArr(mine) : fnOrArr)];
+  });
   const baseline = results[0];
   const activeIdSafe = scenarios.find(s => s.id === activeId) ? activeId : scenarios[0].id;
   const activeIdx = scenarios.findIndex(s => s.id === activeIdSafe);
@@ -508,6 +608,7 @@ function App() {
     const d = new Date();
     setAuditLog(l => [...l, {
       id: uid(),
+      clientId: e.clientId || clientId,
       ts: d.getTime(),
       tsLabel: d.toLocaleString(),
       scenarioId: e.scenarioId || null,
@@ -750,11 +851,11 @@ function App() {
   };
   const reset = () => {
     logEvent({
-      label: "Reset to example scenarios",
+      label: "Base scenario rebuilt from the client profile",
       kind: "structure",
-      scenarioName: "Session"
+      scenarioName: clientSafe.name
     });
-    setScenarios(seed());
+    setScenarios([profileToScenario(clientSafe)]);
   };
   const setYearLogged = y => {
     if (y === year) return;
@@ -804,7 +905,11 @@ function App() {
     onChange: e => setStatusLogged(e.target.value)
   }, STATUSES.map(s => EL("option", { key: s.v, value: s.v }, s.l)))));
 
-  return EL("div", { className: "tp-root" },
+  const apEff = effectiveAppearance(appearance, tab);
+  return EL("div", {
+    className: "tp-root " + appearanceClasses(apEff),
+    style: appearanceStyle(apEff)
+  },
     EL("button", {
       className: "tp-navtoggle",
       onClick: () => setNavOpen(v => !v),
@@ -830,6 +935,18 @@ function App() {
             "aria-label": navCollapsed ? "Expand navigation" : "Collapse navigation",
             "aria-expanded": !navCollapsed
           }, navCollapsed ? "»" : "«")),
+        !navCollapsed && EL("div", { className: "tp-side-client" },
+          EL("span", null, "Active client"),
+          EL("select", {
+            value: clientId,
+            onChange: e => setActiveClient(e.target.value),
+            "aria-label": "Active client"
+          }, clients.filter(c => !c.archived).map(c => EL("option", { key: c.id, value: c.id }, c.name))),
+          EL("button", {
+            type: "button",
+            className: "tp-side-clientbtn",
+            onClick: () => pickTab("clients")
+          }, "Manage clients")),
         EL("nav", { className: "tp-nav" }, NAV_GROUPS.map(g => {
           const gOpen = navCollapsed || navGroupsOpen[g.key] !== false;
           return EL("div", { className: "tp-navgroup", key: g.key },
@@ -864,6 +981,12 @@ function App() {
         EL("div", { className: "tp-topbar" },
           EL("div", null, EL("h2", null, t.label), EL("p", null, t.blurb)),
           EL("div", { className: "tp-topbar-controls" },
+            navCollapsed && EL("label", { className: "tp-sel compact" },
+              EL("span", null, "Client"),
+              EL("select", {
+                value: clientId,
+                onChange: e => setActiveClient(e.target.value)
+              }, clients.filter(c => !c.archived).map(c => EL("option", { key: c.id, value: c.id }, c.name)))),
             navCollapsed && yearStatusControls(true),
             moduleTabs.includes(tab) && EL("label", { className: "tp-sel compact" },
               EL("span", null, "Scenario"),
@@ -886,22 +1009,45 @@ function App() {
               type: "button",
               onClick: () => setToolsMode("pinned"),
               title: "Show the tools panel"
-            }, "Tools"))),
+            }, "Tools"),
+            EL("button", {
+              className: "tp-btn ghost sm",
+              type: "button",
+              onClick: () => setShowAppearance(true),
+              title: "Adjust theme, colors, fonts, borders and sizing — for this tab or the whole application"
+            }, "✎ Customize"))),
         validation.all.length > 0 && EL("div", { className: "tp-validbar" },
           EL("strong", null, active.name, ": "),
           validation.errors.map((v, i) => EL("span", { key: "e" + i, className: "tp-vchip err" }, "Blocking: ", v.msg)),
           validation.warnings.map((v, i) => EL("span", { key: "w" + i, className: "tp-vchip warn" }, v.msg)),
           validation.infos.map((v, i) => EL("span", { key: "i" + i, className: "tp-vchip info" }, v.msg))),
         tab === "dashboard" && EL(Dashboard, {
+          client: clientSafe, alignments,
           results, bestId, baseline, status, year,
           focusId: focusSafe, setFocusId, goto: setTab,
           setYear: setYearLogged, setStatus: setStatusLogged,
           onAskAI: askWorkspace, onAIReport: () => setShowAIReport(true)
         }),
+        tab === "clients" && EL(ClientProfilesPage, {
+          clients, activeId: clientId, setActiveClient, updateClient, setClients,
+          results, status, year, logEvent,
+          alignments,
+          onCreateScenario: (name, scenario) => {
+            const c2 = { ...scenario, id: uid(), name };
+            logEvent({ label: "Scenario created from profile", kind: "structure", scenarioName: name, to: name });
+            setScenarios(sc => [...sc, c2]);
+            setActiveId(c2.id);
+            setTab("scenarios");
+          },
+          onAskAI: askWorkspace,
+          onBuildReport: () => setShowAIReport(true),
+          goto: setTab
+        }),
         tab === "scenarios" && EL(ScenariosPage, {
           onAIOptimize: () => setShowOptimize(true),
           onAIReport: () => setShowAIReport(true),
           onAskAI: askWorkspace,
+          client: clientSafe, alignments,
           scenarios, results, bestId, baseline, status, year,
           update, addScenario, duplicate, remove, reset
         }),
@@ -909,14 +1055,14 @@ function App() {
         tab === "magi" && EL(MAGIModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
         tab === "qbi" && EL(QBIModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
         tab === "health" && EL(HealthModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
-        tab === "guide" && EL(PlanningGuide, { year, onAskAI: askWorkspace, onAddNote: addQuickNote }),
+        tab === "guide" && EL(PlanningGuide, { year, client: clientSafe, baseResult: baseline.r, onAskAI: askWorkspace, onAddNote: addQuickNote }),
         tab === "reference" && EL(ReferenceTables, { year, status }),
-        tab === "audit" && EL(AuditPage, { auditLog, setAuditLog, scenarios, results, year, status }),
+        tab === "audit" && EL(AuditPage, { auditLog: clientAudit, setAuditLog: setClientAudit, scenarios, results, year, status }),
         tab === "data" && EL(DataPage, {
           scenarios, setScenarios: setScenariosLogged, results, status, year,
-          auditLog, notes, logEvent, setYear: setYearLogged, setStatus: setStatusLogged
+          auditLog: clientAudit, notes, logEvent, setYear: setYearLogged, setStatus: setStatusLogged
         }),
-        tab === "report" && EL(ReportPage, { results, bestId, baseline, status, year, notes, auditLog }),
+        tab === "report" && EL(ReportPage, { client: clientSafe, alignments, results, bestId, baseline, status, year, notes, auditLog: clientAudit }),
         tab === "ai" && EL(AIAnalysisPage, {
           results, status, year, activeIdx,
           aiPrefill, clearPrefill: () => setAiPrefill(null),
@@ -953,6 +1099,8 @@ function App() {
             onClick: () => setOpenCalc(x[0])
           }, x[2]))) :
           EL(ToolsPanel, {
+            client: clientSafe,
+            alignment: alignments[results.findIndex(x => x.s.id === activeIdSafe)] || alignments[0],
             active, result: activeResult, validation, status, year,
             onOpenCalc: id => { setOpenCalc(id); setUIPref("lastTool", id); },
             onGotoScenarios: () => setTab("scenarios"),
@@ -1004,6 +1152,13 @@ function App() {
       status, year, validation: results[activeIdx].v,
       onSendToNotes: text => { setNoteDraft(d => (d ? d + "\n\n" : "") + text); setShowNotes(true); raise("notes"); },
       onApplyChange: applyAIChange
+    }),
+    showAppearance && EL(AppearancePanel, {
+      appearance: appearance,
+      setAppearance: setAppearance,
+      tab: tab,
+      tabLabel: t.label,
+      onClose: () => setShowAppearance(false)
     }),
     openCalc && EL(CalculatorDrawer, {
       type: openCalc,

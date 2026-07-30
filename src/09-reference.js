@@ -203,18 +203,60 @@ const GUIDE = [{
    filters, compact accordions. Only the selected category renders; law-change
    cards live in their own subtab instead of dominating the first screen.
    ========================================================================== */
+/* Client relevance: fact-based rules that mark a strategy as relevant to the
+   ACTIVE client, each with the reason. Strategies with no matching facts are
+   deliberately left unmarked. */
+function guideClientRelevance(client, r) {
+  const map = {};
+  if (!client || !r) return map;
+  const p = client.profile;
+  const goals = new Set((client.goals || []).map(g => g.key));
+  const schedC = r.incomeParts ? r.incomeParts.schedC : 0;
+  const hasSCorp = (p.businesses || []).some(b => b.entityType === "scorp") || (r.SCORPS || []).length > 0;
+  const charity = num(p.deductions.charitableCash) + num(p.deductions.charitableNonCash);
+  const age = num(p.household.taxpayerAge);
+  const mark = (name, reason) => {
+    map[name] = reason;
+  };
+  if (schedC > 60000 || goals.has("scorp-eval")) mark("S corporation election versus sole proprietorship", usd$(schedC) + " of Schedule C profit" + (goals.has("scorp-eval") ? " and a stated goal to evaluate an S election" : ""));
+  if (hasSCorp || goals.has("reasonable-comp")) mark("Reasonable compensation study", hasSCorp ? "The profile carries an S corporation with owner compensation" : "Stated reasonable-compensation goal");
+  if (schedC > 0 || hasSCorp) mark("Plan design for the self-employed", "Self-employment or owner compensation supports a plan; current deduction " + usd$(r.retirementDeduction));
+  if (goals.has("roth") || p.household.retired) mark("Roth conversions in low-bracket years", goals.has("roth") ? "Stated Roth-conversion goal; current bracket " + pct(r.marginal, 0) : "Retired with pre-tax balances");
+  if (r.magi && r.magi.roth > r.C.niitThreshold[p.filingStatus]) mark("Backdoor and mega-backdoor Roth", "MAGI is above the direct Roth contribution range");
+  if (/HDHP/i.test(p.household.healthCoverage || "") || goals.has("hsa")) mark("Health savings account", (p.household.healthCoverage || "HDHP coverage") + (goals.has("hsa") ? " and a stated HSA goal" : ""));
+  if (r.qbi && r.qbi.totalQBI > 0) {
+    const dist = r.tiBeforeQBI - r.C.qbiThreshold[p.filingStatus];
+    if (Math.abs(dist) < 200000) mark("Threshold management", "Taxable income before QBI is " + usd$(Math.abs(dist)) + (dist < 0 ? " under" : " over") + " the \u00a7199A threshold");
+    mark("The taxable income cap", "QBI deduction of " + usd$(r.qbi.deduction) + " is in the model");
+    if ((r.qbi.entities || []).length > 1) mark("Aggregation", (r.qbi.entities || []).length + " QBI entities could be aggregated");
+  }
+  if (p.household.medicare || age >= 63) mark("Medicare IRMAA", age >= 63 ? "Age " + age + " \u2014 IRMAA lookback window is live" : "Medicare enrolled");
+  if (r.niit > 0 || goals.has("niit")) mark("Net investment income tax", r.niit > 0 ? usd$(r.niit) + " of NIIT in the current model" : "Stated NIIT goal");
+  if (charity > 10000 || goals.has("daf") || goals.has("charitable")) mark("Bunching through a donor-advised fund", usd$(charity) + " of annual giving");
+  const apprec = (p.assets || []).find(a => a.type === "brokerage" && a.basis != null && num(a.value) > num(a.basis));
+  if (apprec && charity > 0) mark("Gifting appreciated securities", usd$(num(apprec.value) - num(apprec.basis)) + " of unrealized gain in the brokerage account");
+  if (age >= 70 || goals.has("qcd")) mark("Qualified charitable distribution", age >= 70 ? "Age " + age + " \u2014 QCD-eligible" : "Stated QCD goal");
+  if (schedC > 0 && String(p.household.dependentAges || "").split(/[,;\s]+/).some(x => x !== "" && num(x) < 18)) mark("Family employment", "Sole proprietorship with dependents under 18");
+  if (num(p.deductions.stateIncomeTax) > 10000 && (schedC > 0 || hasSCorp)) mark("Pass-through entity tax election", usd$(num(p.deductions.stateIncomeTax)) + " of state income tax with passthrough income");
+  if ((p.businesses || []).some(b => num(b.depreciation) > 0) || goals.has("bonus-depr")) mark("100% bonus depreciation", "Business depreciation is in the profile");
+  if (goals.has("sec179")) mark("Section 179 expensing", "Stated \u00a7179 goal");
+  if ((p.assets || []).some(a => a.type === "real-estate" && num(a.value) > 1000000)) mark("Cost segregation", "Real estate above $1M in the profile");
+  return map;
+}
 function guideFirstSentence(text) {
   const i = text.indexOf(". ");
   return i > 0 && i < 130 ? text.slice(0, i + 1) : text.slice(0, 120) + (text.length > 120 ? "\u2026" : "");
 }
-function PlanningGuide({ year, onAskAI, onAddNote }) {
+function PlanningGuide({ year, client, baseResult, onAskAI, onAddNote }) {
+  const relevance = useMemo(() => guideClientRelevance(client, baseResult), [client, baseResult]);
+  const [onlyRelevant, setOnlyRelevant] = useState(false);
   const [cat, setCat] = useUIPref("guide:cat", GUIDE[0].cat);
   const [q, setQ] = useState("");
   const [risk, setRisk] = useState("all");
   const [openItems, setOpenItems] = useState({});
   const ql = q.trim().toLowerCase();
   const searching = ql.length > 0;
-  const matches = it => (!ql || (it.n + " " + it.b + " " + it.meta).toLowerCase().includes(ql)) && (risk === "all" || it.risk === risk);
+  const matches = it => (!ql || (it.n + " " + it.b + " " + it.meta).toLowerCase().includes(ql)) && (risk === "all" || it.risk === risk) && (!onlyRelevant || relevance[it.n]);
   const visible = searching
     ? GUIDE.map(g => ({ cat: g.cat, items: g.items.filter(matches) })).filter(g => g.items.length)
     : GUIDE.filter(g => g.cat === cat).map(g => ({ cat: g.cat, items: g.items.filter(matches) }));
@@ -257,7 +299,13 @@ function PlanningGuide({ year, onAskAI, onAddNote }) {
     value: risk,
     onChange: setRisk,
     options: [{ v: "all", l: "All risk" }, { v: "low", l: "Lower" }, { v: "med", l: "Moderate" }, { v: "high", l: "Higher" }]
-  }), EL("button", {
+  }), client && EL("label", {
+    className: "tp-check"
+  }, EL("input", {
+    type: "checkbox",
+    checked: onlyRelevant,
+    onChange: e => setOnlyRelevant(e.target.checked)
+  }), " Applicable to " + (client.name || "current client")), EL("button", {
     className: "tp-mini",
     type: "button",
     onClick: () => setAll(true)
@@ -317,11 +365,17 @@ function PlanningGuide({ year, onAskAI, onAddNote }) {
       className: "tp-acc-name"
     }, it.n), !openIt && EL("span", {
       className: "tp-acc-blurb"
-    }, guideFirstSentence(it.b)), EL("span", {
+    }, guideFirstSentence(it.b)), relevance[it.n] && EL("span", {
+      className: "tp-pill ok",
+      title: relevance[it.n]
+    }, "Relevant"), EL("span", {
       className: "tp-pill " + RISK[it.risk].c
     }, RISK[it.risk].label)), openIt && EL("div", {
       className: "tp-acc-body"
-    }, it.b, EL("div", {
+    }, relevance[it.n] && EL("div", {
+      className: "tp-subline",
+      style: { marginBottom: 8 }
+    }, EL("span", null, "Relevant to ", client ? client.name : "this client"), EL("strong", null, relevance[it.n])), it.b, EL("div", {
       className: "tp-consid-meta"
     }, it.meta), EL("div", {
       className: "tp-acc-actions"

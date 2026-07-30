@@ -211,6 +211,8 @@ function BracketHeadroom({ r, status }) {
 
 /* ---- The rail itself ---- */
 function ToolsPanel({
+  client,
+  alignment,
   active,
   result,
   validation,
@@ -222,15 +224,16 @@ function ToolsPanel({
 }) {
   const r = result;
   const overrides = (validation.warnings || []).filter(v => /override|manual/i.test(v.msg)).length;
+  const topGoal = client && (client.goals || []).slice().sort((a, b) => a.priority - b.priority)[0];
   return EL("div", {
     className: "tp-tools-inner"
   }, EL(ToolSection, {
     id: "snapshot",
-    title: "Active scenario"
+    title: "Client snapshot"
   }, EL("div", {
     className: "tp-tool-scname",
-    title: active.name
-  }, active.name, EL("em", null, TY[year].label, " · ", STATUSES.find(s => s.v === status).l)), EL("div", {
+    title: (client ? client.name + " — " : "") + active.name
+  }, client ? client.name : active.name, EL("em", null, (client ? client.clientId + " · " : "") + TY[year].label, " · ", STATUSES.find(s => s.v === status).l), EL("em", null, "Scenario: ", active.name)), EL("div", {
     className: "tp-statstack"
   }, EL(StatLine, {
     label: "Total income",
@@ -253,7 +256,26 @@ function ToolsPanel({
     label: "Spendable after-tax cash",
     value: usd$(r.spendableAfterTaxCash),
     cls: "good"
-  }))), EL(ToolSection, {
+  }), topGoal && EL(StatLine, {
+    label: "Primary goal",
+    value: topGoal.label,
+    title: topGoal.reason || ""
+  }))), client && alignment && alignment.rows.length > 0 && EL(ToolSection, {
+    id: "goals",
+    title: "Goal monitor"
+  }, alignment.pct != null && EL(StatLine, {
+    label: "Goal alignment (this scenario)",
+    value: alignment.pct + "%",
+    cls: alignment.pct >= 80 ? "good" : alignment.pct >= 50 ? "warn" : "bad"
+  }), EL("div", {
+    className: "tp-statstack"
+  }, alignment.rows.slice(0, 6).map((row, i) => EL(StatLine, {
+    key: i,
+    label: row.label,
+    value: row.status === "strong" ? "Strong" : row.status === "met" ? "Met" : row.status === "moderate" ? "Moderate" : row.status === "at-risk" ? "At risk" : "Review",
+    cls: row.status === "strong" || row.status === "met" ? "good" : row.status === "at-risk" ? "bad" : row.status === "moderate" ? "warn" : "",
+    title: row.detail
+  })))), EL(ToolSection, {
     id: "headroom",
     title: "Bracket headroom"
   }, EL(BracketHeadroom, {
