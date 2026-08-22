@@ -52,14 +52,27 @@ def _header_row(ws, row: int, headers: list[str]) -> None:
         cell.fill = GRAY
 
 
+# Critical totals re-read from the saved workbook and reconciled against the
+# persisted calculation results. Generation fails visibly on any mismatch.
+VERIFIED_LINE_IDS = {
+    "F1040.L11": ("agi", "AGI"),
+    "F1040.L15": ("taxable_income", "taxable income"),
+    "F1040.L24": ("total_tax", "total tax"),
+    "F1040.L33": ("total_payments", "total payments"),
+}
+
+
 class AuditPackageBuilder:
     def __init__(self, store: CaseStore, case_id: str, calculation_ids: list[str],
-                 comparison: dict[str, Any] | None, created_by: str):
+                 comparison: dict[str, Any] | None, created_by: str,
+                 manifest_id: str | None = None):
         self.store = store
         self.case_id = case_id
         self.results: list[CalculationResult] = [store.get_calculation(c) for c in calculation_ids]
         self.comparison = comparison
         self.created_by = created_by
+        self.manifest_id = manifest_id or store.new_id("pkg")
+        self.generated_at = store.now()
         self.wb = Workbook()
         self.detail_index: list[tuple[str, str, str]] = []  # line_id, sheet, cell
 
@@ -94,7 +107,37 @@ class AuditPackageBuilder:
             raise RuntimeError(
                 f"workbook verification failed: {[c.check_id for c in failed]}")
         self.store.register_package(self.case_id, out_path.name, file_hash, self.created_by)
+        self._store_manifest(out_path.name, file_hash)
         return out_path, file_hash
+
+    def _store_manifest(self, filename: str, file_hash: str) -> None:
+        """Immutable PackageManifest record — the out-of-band identity the
+        workbook's cover references."""
+        from .records import PackageManifest
+
+        base_calc = next((r for r in self.results if r.target_kind == "base"), None)
+        case_doc = self.store._load(self.case_id)
+        manifest = PackageManifest(
+            manifest_id=self.manifest_id,
+            tenant_id=case_doc.get("tenant_id", "tenant_default"),
+            case_id=self.case_id,
+            filename=filename,
+            file_sha256=file_hash.removeprefix("sha256:"),
+            generated_at=self.generated_at,
+            generated_by=self.created_by,
+            engine_version=ENGINE_VERSION,
+            ruleset_versions=dict(self.results[0].ruleset_versions) if self.results else {},
+            base_version_id=base_calc.target_id if base_calc else "",
+            scenario_refs=[f"{r.target_id}@v{r.scenario_version}"
+                           for r in self.results if r.target_kind == "scenario"],
+            calculation_ids=[r.calculation_id for r in self.results],
+            reconciliation_status=("failed" if any(r.reconciliation_status == "failed"
+                                                   for r in self.results) else "passed"),
+            review_status=("required" if any(r.review_status == "required"
+                                             for r in self.results) else "not_required"),
+        )
+        self.store.backend.put_immutable(
+            "manifests", self.manifest_id, manifest.model_dump(mode="json"))
 
     # ------------------------------------------------------------------
     def _cover(self) -> None:
@@ -107,6 +150,10 @@ class AuditPackageBuilder:
             ("Engine version", ENGINE_VERSION),
             ("Schema version", SCHEMA_VERSION),
             ("Prepared by", self.created_by),
+            ("Generated at", self.generated_at),
+            ("Manifest reference", self.manifest_id + " — this workbook's SHA-256 and full "
+             "identity are recorded immutably in the case package registry and the "
+             "manifests store under this id; verify a copy against them"),
             ("", ""),
             ("Certification", "All calculated values in this workbook were produced by the "
              "deterministic calculation engine identified above. No value was produced by "
@@ -279,9 +326,9 @@ class AuditPackageBuilder:
                 value="Differences trace to the Scenario Change Log and engine line IDs — "
                       "never to AI reasoning.").font = Font(italic=True)
 
-    def _calculation_sheets(self) -> dict[tuple[str, int], str]:
+    def _calculation_sheets(self) -> dict[tuple[str, int, str], str]:
         """One sheet per calculation-year with grouped rows per form."""
-        cells: dict[tuple[str, int], str] = {}
+        cells: dict[tuple[str, int, str], str] = {}
         for res in self.results:
             for year, yr in sorted(res.years.items()):
                 ws = self.wb.create_sheet(_sheet_title(f"Calc {res.calculation_id[-6:]} {year}"))
@@ -311,8 +358,8 @@ class AuditPackageBuilder:
                         ws.cell(row=r, column=8, value=li.rounding)
                         self.detail_index.append(
                             (f"{res.calculation_id}.{year}.{li.line_id}", ws.title, f"C{r}"))
-                        if li.line_id == "F1040.L24":
-                            cells[(res.calculation_id, year)] = f"C{r}"
+                        if li.line_id in VERIFIED_LINE_IDS:
+                            cells[(res.calculation_id, year, li.line_id)] = f"C{r}"
                         r += 1
                     # collapsible supporting rows per form
                     for rr in range(start, r):
@@ -435,22 +482,25 @@ class AuditPackageBuilder:
 
 
 def verify_workbook(path: Path, results: list[CalculationResult],
-                    calc_cells: dict[tuple[str, int], str]) -> list[ReconciliationCheck]:
-    """REC-XLSX-001: exported workbook total tax equals persisted result."""
+                    calc_cells: dict[tuple[str, int, str], str]) -> list[ReconciliationCheck]:
+    """REC-XLSX: every critical total re-read from the saved workbook must
+    equal the persisted calculation result (AGI, taxable income, total tax,
+    total payments — see VERIFIED_LINE_IDS)."""
     wb = load_workbook(path, data_only=False)
     checks: list[ReconciliationCheck] = []
     for res in results:
         for year, yr in res.years.items():
             sheet = _sheet_title(f"Calc {res.calculation_id[-6:]} {year}")
-            cell = calc_cells.get((res.calculation_id, year))
-            actual = d(str(wb[sheet][cell].value)) if cell else d(-1)
-            expected = yr.summary["total_tax"]
-            checks.append(ReconciliationCheck(
-                check_id=f"REC-XLSX-001-{res.calculation_id[-6:]}-{year}",
-                description=f"Workbook total tax matches persisted result for {year}",
-                status="passed" if actual == expected else "failed",
-                expected=expected, actual=actual, difference=actual - expected,
-                supporting_line_ids=[f"{sheet}!{cell}"]))
+            for n, (line_id, (summary_key, label)) in enumerate(sorted(VERIFIED_LINE_IDS.items()), start=1):
+                cell = calc_cells.get((res.calculation_id, year, line_id))
+                actual = d(str(wb[sheet][cell].value)) if cell else d(-1)
+                expected = yr.summary[summary_key]
+                checks.append(ReconciliationCheck(
+                    check_id=f"REC-XLSX-{n:03d}-{res.calculation_id[-6:]}-{year}",
+                    description=f"Workbook {label} matches persisted result for {year}",
+                    status="passed" if actual == expected else "failed",
+                    expected=expected, actual=actual, difference=actual - expected,
+                    supporting_line_ids=[f"{sheet}!{cell}"]))
     return checks
 
 
@@ -459,6 +509,5 @@ def generate_audit_package(
     comparison: dict[str, Any] | None, created_by: str, out_dir: Path,
 ) -> tuple[Path, str]:
     builder = AuditPackageBuilder(store, case_id, calculation_ids, comparison, created_by)
-    package_id = store.new_id("pkg")
-    out_path = Path(out_dir) / f"{package_id}_{case_id}.xlsx"
+    out_path = Path(out_dir) / f"{builder.manifest_id}_{case_id}.xlsx"
     return builder.build(out_path)
