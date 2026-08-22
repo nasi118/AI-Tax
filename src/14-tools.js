@@ -121,14 +121,36 @@ function Calculator({
   scenarioName,
   onSendToNotes,
   onFocus,
-  z
+  z,
+  tape: tapeProp,
+  setTape: setTapeProp
 }) {
   const [display, setDisplay] = useState("0");
   const [acc, setAcc] = useState(null);
   const [op, setOp] = useState(null);
   const [fresh, setFresh] = useState(true);
-  const [tape, setTape] = useState([]);
+  /* The tape can be owned by the app shell so it survives navigation between
+     pages and reloads; standalone use keeps the original local state. */
+  const [tapeLocal, setTapeLocal] = useState([]);
+  const tape = tapeProp || tapeLocal;
+  const setTape = setTapeProp || setTapeLocal;
   const [mem, setMem] = useState(0);
+  const [flashMsg, setFlashMsg] = useState("");
+  const flash = m => {
+    setFlashMsg(m);
+    setTimeout(() => setFlashMsg(""), 1600);
+  };
+  /* Write the displayed result into the money input the user last focused —
+     the same mechanism the quick calculator uses. */
+  const insertIntoInput = () => {
+    const el = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("tp-money") ? document.activeElement : window.__tpLastMoneyInput;
+    if (el && el.classList && el.classList.contains("tp-money")) {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      setter.call(el, display.replace(/^-/, "-"));
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      flash("Inserted");
+    } else flash("Focus a money input first");
+  };
   const tapeRef = useRef(null);
   useEffect(() => {
     if (tapeRef.current) tapeRef.current.scrollTop = tapeRef.current.scrollHeight;
@@ -400,13 +422,24 @@ function Calculator({
     className: "tp-calc-foot"
   }, /*#__PURE__*/React.createElement("button", {
     className: "tp-mini",
+    onClick: insertIntoInput,
+    title: "Write the displayed result into the money input that was last focused"
+  }, "Insert into input"), /*#__PURE__*/React.createElement("button", {
+    className: "tp-mini",
+    disabled: !tape.length,
+    onClick: () => wbCopyText(tapeText()).then(ok => flash(ok ? "Tape copied" : "Copy blocked")),
+    title: "Copy the whole tape to the clipboard"
+  }, "Copy tape"), /*#__PURE__*/React.createElement("button", {
+    className: "tp-mini",
     disabled: !tape.length,
     onClick: () => onSendToNotes("Calculator tape\n" + tapeText())
   }, "Send tape to notes"), /*#__PURE__*/React.createElement("button", {
     className: "tp-mini",
     disabled: !tape.length,
     onClick: () => setTape([])
-  }, "Clear tape")));
+  }, "Clear tape"), flashMsg && /*#__PURE__*/React.createElement("em", {
+    className: "tp-qcalc-msg"
+  }, flashMsg)));
 }
 
 /* ============================================================================
@@ -506,6 +539,7 @@ function AuditPage({
     ...e,
     memo
   } : e));
+  const tblRef = useRef(null);
   return /*#__PURE__*/React.createElement("div", {
     className: "tp-stack"
   }, /*#__PURE__*/React.createElement("div", {
@@ -542,6 +576,8 @@ function AuditPage({
       placeholder: "Search…",
       value: q,
       onChange: e => setQ(e.target.value)
+    }), /*#__PURE__*/React.createElement(CopyForExcel, {
+      forRef: tblRef
     }), /*#__PURE__*/React.createElement("button", {
       className: "tp-btn ghost sm",
       disabled: !auditLog.length,
@@ -550,7 +586,8 @@ function AuditPage({
       }
     }, "Clear"))
   }, /*#__PURE__*/React.createElement("div", {
-    className: "tp-tblwrap"
+    className: "tp-tblwrap",
+    ref: tblRef
   }, /*#__PURE__*/React.createElement("table", {
     className: "tp-tbl"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
@@ -601,10 +638,11 @@ function DataPage({
   notes,
   logEvent,
   setYear,
-  setStatus
+  setStatus,
+  clientRecord
 }) {
   const [msg, setMsg] = useState(null);
-  const [client, setClient] = useState("");
+  const [client, setClient] = useState(clientRecord ? clientRecord.name : "");
   const [preparer, setPreparer] = useState("");
   const [firm, setFirm] = useState("");
   const [mode, setMode] = useState("replace");
@@ -630,6 +668,7 @@ function DataPage({
         notes,
         meta: {
           client,
+          clientId: clientRecord ? clientRecord.clientId : "",
           preparer,
           firm,
           exportedAt: d.toLocaleString(),

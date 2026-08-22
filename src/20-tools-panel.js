@@ -223,6 +223,11 @@ function ToolsPanel({
   onAddNote
 }) {
   const r = result;
+  /* Pinned calculators float to the top of the launcher; the pin set is a
+     device-local interface preference. */
+  const [pinned, setPinned] = useUIPref("pinnedCalcs", []);
+  const togglePin = id => setPinned(pinned.includes(id) ? pinned.filter(x => x !== id) : [...pinned, id]);
+  const orderedCalcs = [...TOOL_CALCS].sort((a, b) => (pinned.includes(b.id) ? 1 : 0) - (pinned.includes(a.id) ? 1 : 0));
   const overrides = (validation.warnings || []).filter(v => /override|manual/i.test(v.msg)).length;
   const topGoal = client && (client.goals || []).slice().sort((a, b) => a.priority - b.priority)[0];
   return EL("div", {
@@ -319,12 +324,21 @@ function ToolsPanel({
     title: "Calculators"
   }, EL("div", {
     className: "tp-launcher"
-  }, TOOL_CALCS.map(c => EL("button", {
+  }, orderedCalcs.map(c => EL("div", {
     key: c.id,
+    className: "tp-launchrow" + (pinned.includes(c.id) ? " pinned" : "")
+  }, EL("button", {
     type: "button",
     className: "tp-launchbtn",
     onClick: () => onOpenCalc(c.id)
-  }, c.label))), EL("p", {
+  }, c.label), EL("button", {
+    type: "button",
+    className: "tp-pinbtn" + (pinned.includes(c.id) ? " on" : ""),
+    title: pinned.includes(c.id) ? "Unpin from the top of this list" : "Pin to the top of this list",
+    "aria-label": (pinned.includes(c.id) ? "Unpin " : "Pin ") + c.label,
+    "aria-pressed": pinned.includes(c.id),
+    onClick: () => togglePin(c.id)
+  }, "★")))), EL("p", {
     className: "tp-hint",
     style: { marginTop: 7 }
   }, "Calculators prefill from the active scenario. Overrides are temporary and never modify the scenario itself.")), EL(ToolSection, {

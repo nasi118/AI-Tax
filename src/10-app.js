@@ -36,10 +36,25 @@ function ReportPage({
     day: "numeric"
   });
   const statusLabel = STATUSES.find(s => s.v === status).l;
+  /* Section-level export: any report section can be left out of the printed
+     or downloaded copy. The on-screen report always stays complete, and the
+     disclaimer block is never removable. */
+  const [omitSecs, setOmitSecs] = useState({});
   const buildHTML = () => {
-    const body = ref.current ? ref.current.innerHTML : "";
+    let body = "";
+    if (ref.current) {
+      const clone = ref.current.cloneNode(true);
+      clone.querySelectorAll("section").forEach(sec => {
+        const h = sec.querySelector("h2");
+        const label = h ? h.textContent.trim() : "";
+        if (label && omitSecs[label]) sec.remove();
+      });
+      body = clone.innerHTML;
+    }
     return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + (client || "Tax Planning Report").replace(/</g, "") + " — Tax Planning Report</title><style>" + REPORT_CSS + "</style></head><body><div class=\"rp\">" + body + "</div></body></html>";
   };
+  const sectionLabels = ["Key figures", "Tax reconciliation", "Income", "Deductions", "Analysis by type of tax", "Scenario comparison", "Client objectives and planning constraints", "Opportunities identified", "Recommendations", "Working notes", "Audit trail"];
+  const omittedCount = sectionLabels.filter(l => omitSecs[l]).length;
   const flash = m => {
     setMsg(m);
     setTimeout(() => setMsg(""), 4000);
@@ -117,7 +132,16 @@ function ReportPage({
   }) => /*#__PURE__*/React.createElement("option", {
     key: s.id,
     value: s.id
-  }, s.name, s.id === bestId ? "  ★ lowest modeled tax" : ""))))), /*#__PURE__*/React.createElement("div", {
+  }, s.name, s.id === bestId ? "  ★ lowest modeled tax" : ""))))), EL("div", {
+    className: "tp-rp-sections"
+  }, EL("span", { className: "tp-rp-sections-lbl" }, "Sections to print/export", omittedCount ? " (" + omittedCount + " excluded)" : ""), sectionLabels.map(l => EL("label", {
+    key: l,
+    className: "tp-rp-secchk" + (omitSecs[l] ? " off" : "")
+  }, EL("input", {
+    type: "checkbox",
+    checked: !omitSecs[l],
+    onChange: () => setOmitSecs(o => ({ ...o, [l]: !o[l] }))
+  }), l)), EL("em", { className: "tp-hint" }, "The on-screen report always shows every section; the disclaimer always prints.")), /*#__PURE__*/React.createElement("div", {
     className: "tp-rp-actions"
   }, /*#__PURE__*/React.createElement("button", {
     className: "tp-btn solid",
@@ -501,13 +525,24 @@ function App() {
      data persists separately from UI preferences and never mixes across
      clients. ---- */
   const [clients, setClients] = useState(loadClients);
-  const [activeClientId, setActiveClientIdRaw] = useState(() => getUIPref("activeClient", null));
+  const [activeClientId, setActiveClientIdRaw] = useState(() => wbInitialViewParams().client || getUIPref("activeClient", null));
   const clientSafe = clients.find(c => c.id === activeClientId && !c.archived) || clients.find(c => !c.archived) || clients[0];
   const clientId = clientSafe.id;
   TP_ACTIVE_CLIENT = clientSafe;
   useEffect(() => {
     saveClients(clients);
   }, [clients]);
+  /* Cross-view sync: a duplicated view or pop-out saving the shared client
+     store refreshes this one. All views read ONE store — opening a new tab
+     never duplicates case data. */
+  useEffect(() => {
+    const onStorage = e => {
+      if (e.key !== CLIENTS_KEY || e.newValue == null) return;
+      setClients(loadClients());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
   const setActiveClient = id => {
     setActiveClientIdRaw(id);
     setUIPref("activeClient", id);
@@ -531,7 +566,13 @@ function App() {
     ...c,
     profile: { ...c.profile, taxYear: y }
   }));
-  const [tab, setTabRaw] = useState(() => getUIPref("tab", "dashboard"));
+  /* A pop-out or duplicated view opens with ?tab= and ?client= in the URL;
+     those parameters steer only this view's start state and are never
+     written back to the shared preferences on load. */
+  const [tab, setTabRaw] = useState(() => {
+    const v = wbInitialViewParams();
+    return v.tab && TABS.find(x => x.id === v.tab) ? v.tab : getUIPref("tab", "dashboard");
+  });
   const setTab = t => {
     setTabRaw(t);
     setUIPref("tab", t);
@@ -541,7 +582,13 @@ function App() {
   const [focusId, setFocusId] = useState(null);
 
   /* ---- Interface preferences (never mixed with tax data) ---- */
-  const [navCollapsed, setNavCollapsed] = useUIPref("navCollapsed", false);
+  /* Navigation shows in three persisted states — expanded, icon rail, or
+     fully hidden — with the legacy boolean preference migrating in place. */
+  const [navModePref, setNavMode] = useUIPref("navMode", null);
+  const navMode = navModePref || (getUIPref("navCollapsed", false) ? "rail" : "expanded");
+  const navCollapsed = navMode === "rail";
+  const navHidden = navMode === "hidden";
+  const setNavCollapsed = v => setNavMode(v ? "rail" : "expanded");
   const [navGroupsOpen, setNavGroupsOpen] = useUIPref("navGroups", {});
   const [toolsMode, setToolsMode] = useUIPref("toolsMode", "pinned"); // pinned | collapsed | hidden
   const [openCalc, setOpenCalc] = useState(null);
@@ -706,17 +753,81 @@ function App() {
       taxBefore
     });
   };
-  const update = (id, field, value) => {
+  const update = (id, field, value, opts) => {
     const before = scenarios.find(s => s.id === id);
     if (!before) return;
     const after = {
       ...before,
       [field]: value
     };
+    if (!opts || !opts.noHistory) {
+      const snap = v => v && typeof v === "object" ? JSON.parse(JSON.stringify(v)) : v;
+      setUndoStack(st => [...st.slice(-99), {
+        id, field,
+        before: snap(before[field]),
+        after: snap(value),
+        label: humanKey(field)
+      }]);
+      setRedoStack([]);
+    }
     recordChange(before, after);
     setScenarios(sc => sc.map(s => s.id === id ? after : s));
   };
   const updateActive = (field, value) => update(activeIdSafe, field, value);
+
+  /* ---- UNDO / REDO for scenario input edits ----
+     Scope: field-level edits made through update() — the editable scenario
+     inputs on every tab. Structural actions (add/copy/delete scenario,
+     imports, AI scenario creation) are not on this stack; they keep their own
+     confirmations. Undo and redo REPLAY the change through the same update
+     pipeline, so the audit trail records each one as a new entry — history is
+     appended to, never rewritten or corrupted. */
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+  const undoEdit = () => {
+    const e = undoStack[undoStack.length - 1];
+    if (!e) return;
+    setUndoStack(st => st.slice(0, -1));
+    if (scenarios.find(s => s.id === e.id)) {
+      update(e.id, e.field, e.before, { noHistory: true });
+      setRedoStack(r => [...r, e]);
+    }
+  };
+  const redoEdit = () => {
+    const e = redoStack[redoStack.length - 1];
+    if (!e) return;
+    setRedoStack(st => st.slice(0, -1));
+    if (scenarios.find(s => s.id === e.id)) {
+      update(e.id, e.field, e.after, { noHistory: true });
+      setUndoStack(st => [...st, e]);
+    }
+  };
+  const undoRef = useRef(null);
+  undoRef.current = { undoEdit, redoEdit };
+  const [cmdOpen, setCmdOpen] = useState(false);
+  useEffect(() => {
+    const onKey = e => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const k = (e.key || "").toLowerCase();
+      if (k === "k") {
+        setCmdOpen(v => !v);
+        e.preventDefault();
+        return;
+      }
+      const t = e.target;
+      if (t && (/input|textarea|select/i.test(t.tagName) || t.isContentEditable)) return;
+      if (k === "z" && !e.shiftKey) {
+        undoRef.current.undoEdit();
+        e.preventDefault();
+      } else if (k === "z" && e.shiftKey || k === "y") {
+        undoRef.current.redoEdit();
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [aiHistory, setAiHistory] = useState([]);
   const [aiPrefill, setAiPrefill] = useState(null);
   const [reportInbox, setReportInbox] = useState([]);
@@ -926,11 +1037,20 @@ function App() {
   const pickTab = id => {
     setTab(id);
     setNavOpen(false);
+    const x = TABS.find(tb => tb.id === id);
+    if (x) wbPushRecent({ kind: "tab", id, label: x.label });
   };
+  /* Trace drawer: which figure is being explained, and for which scenario */
+  const [traceReq, setTraceReq] = useState(null);
+  /* Persistent desk-calculator tape — survives navigation and reload */
+  const [calcTape, setCalcTape] = useState(() => getUIPref("calcTape", []) || []);
+  useEffect(() => {
+    setUIPref("calcTape", calcTape.slice(-200));
+  }, [calcTape]);
   const t = TABS.find(x => x.id === tab);
   const validation = results[activeIdx].v;
   const toolsVisible = toolsMode !== "hidden";
-  const shellCls = "tp-shell" + (navCollapsed ? " nav-collapsed" : "") + (toolsMode === "collapsed" ? " tools-collapsed" : "") + (!toolsVisible ? " tools-hidden" : "");
+  const shellCls = "tp-shell" + (navCollapsed ? " nav-collapsed" : "") + (navHidden ? " nav-hidden" : "") + (toolsMode === "collapsed" ? " tools-collapsed" : "") + (!toolsVisible ? " tools-hidden" : "");
   const yearStatusControls = compact => EL(React.Fragment, null, EL("label", {
     className: compact ? "tp-sel compact" : "tp-sidefield"
   }, EL("span", null, "Tax year"), EL(Seg, {
@@ -994,6 +1114,35 @@ function App() {
     });
   }, [recalcState, results]);
 
+  /* Command bar items — navigation and real in-app actions only. The bar
+     never fabricates content or authority results. */
+  const cmdItems = [
+    ...TABS.map(x => ({
+      kind: "tab", id: x.id, label: x.label, hint: "page", group: "Pages",
+      run: () => pickTab(x.id)
+    })),
+    ...clients.filter(c => !c.archived).map(c => ({
+      kind: "client", id: c.id, label: c.name, hint: (c.clientId || "") + " · switch client", group: "Clients",
+      run: () => { setActiveClient(c.id); wbPushRecent({ kind: "client", id: c.id, label: c.name }); }
+    })),
+    ...scenarios.map(s => ({
+      kind: "scenario", id: s.id, label: s.name, hint: "open in Scenarios", group: "Scenarios — active client",
+      run: () => { setActiveId(s.id); setFocusId(s.id); pickTab("scenarios"); }
+    })),
+    ...TOOL_CALCS.map(c => ({
+      kind: "calc", id: c.id, label: c.label + " calculator", group: "Calculators",
+      run: () => { setOpenCalc(c.id); wbPushRecent({ kind: "calc", id: c.id, label: c.label + " calculator" }); }
+    })),
+    { kind: "action", id: "recalc", label: "Recalculate (" + recalcScope + ")", hint: "re-run the engine", group: "Actions", run: () => runRecalculate(recalcScope) },
+    { kind: "action", id: "deskcalc", label: "Open desk calculator", hint: "running tape", group: "Actions", run: () => { setShowCalc(true); raise("calc"); } },
+    { kind: "action", id: "notes", label: "Open notes", group: "Actions", run: () => { setShowNotes(true); raise("notes"); } },
+    { kind: "action", id: "export", label: "Export Excel workbook", hint: "Import / Export page", group: "Actions", run: () => pickTab("data") },
+    { kind: "action", id: "report", label: "Build client report", group: "Actions", run: () => pickTab("report") },
+    { kind: "action", id: "customize", label: "Customize appearance", group: "Actions", run: () => setShowAppearance(true) },
+    { kind: "action", id: "newtab", label: "Open this view in a new tab", hint: "shared data, not duplicated", group: "Actions", run: () => wbOpenNewTab(tab, clientId) },
+    { kind: "action", id: "undo", label: "Undo last input edit", group: "Actions", run: undoEdit },
+    { kind: "action", id: "tools", label: toolsVisible ? "Hide tools panel" : "Show tools panel", group: "Actions", run: () => setToolsMode(toolsVisible ? "hidden" : "pinned") }
+  ];
   const apEff = effectiveAppearance(appearance, tab);
   /* Presentation-only: pushes the user's number-format choices into the one
      shared formatter service before children render. Never touches inputs,
@@ -1024,10 +1173,20 @@ function App() {
             className: "tp-navcollapse",
             type: "button",
             onClick: () => setNavCollapsed(!navCollapsed),
-            title: navCollapsed ? "Expand navigation" : "Collapse navigation",
+            title: navCollapsed ? "Expand navigation" : "Collapse navigation to an icon rail",
             "aria-label": navCollapsed ? "Expand navigation" : "Collapse navigation",
             "aria-expanded": !navCollapsed
-          }, navCollapsed ? "»" : "«")),
+          }, navCollapsed ? "»" : "«"),
+          EL("button", {
+            className: "tp-navhide",
+            type: "button",
+            onClick: () => {
+              setNavOpen(false);
+              if (window.innerWidth > 900) setNavMode("hidden");
+            },
+            title: "Hide navigation",
+            "aria-label": "Hide navigation"
+          }, I.x)),
         !navCollapsed && EL("div", { className: "tp-side-client" },
           EL("span", null, "Active client"),
           EL("select", {
@@ -1076,13 +1235,20 @@ function App() {
         EL("div", { className: "tp-topbar" },
           EL("div", null, EL("h2", null, t.label), EL("p", null, t.blurb)),
           EL("div", { className: "tp-topbar-controls" },
-            navCollapsed && EL("label", { className: "tp-sel compact" },
+            navHidden && EL("button", {
+              className: "tp-btn ghost sm tp-navrestore",
+              type: "button",
+              onClick: () => setNavMode("expanded"),
+              title: "Show navigation",
+              "aria-label": "Show navigation"
+            }, "☰ Menu"),
+            (navCollapsed || navHidden) && EL("label", { className: "tp-sel compact" },
               EL("span", null, "Client"),
               EL("select", {
                 value: clientId,
                 onChange: e => setActiveClient(e.target.value)
               }, clients.filter(c => !c.archived).map(c => EL("option", { key: c.id, value: c.id }, c.name)))),
-            navCollapsed && yearStatusControls(true),
+            (navCollapsed || navHidden) && yearStatusControls(true),
             moduleTabs.includes(tab) && EL("label", { className: "tp-sel compact" },
               EL("span", null, "Scenario"),
               EL("select", {
@@ -1115,6 +1281,44 @@ function App() {
               onClick: () => runRecalculate(recalcScope),
               title: "Stage edits, validate, re-run the deterministic engine, refresh every dependent view, and log the action"
             }, recalcState && recalcState.running ? "Recalculating\u2026" : "\u27F3 Recalculate"),
+            EL("div", { className: "tp-undoredo", role: "group", "aria-label": "Undo and redo input edits" },
+              EL("button", {
+                className: "tp-btn ghost sm",
+                type: "button",
+                disabled: !undoStack.length,
+                title: undoStack.length ? "Undo " + undoStack[undoStack.length - 1].label + " (Ctrl+Z)" : "Nothing to undo — covers scenario input edits",
+                "aria-label": "Undo input edit",
+                onClick: undoEdit
+              }, "↶"),
+              EL("button", {
+                className: "tp-btn ghost sm",
+                type: "button",
+                disabled: !redoStack.length,
+                title: redoStack.length ? "Redo " + redoStack[redoStack.length - 1].label + " (Ctrl+Shift+Z)" : "Nothing to redo",
+                "aria-label": "Redo input edit",
+                onClick: redoEdit
+              }, "↷")),
+            EL("button", {
+              className: "tp-btn ghost sm tp-searchbtn",
+              type: "button",
+              onClick: () => setCmdOpen(true),
+              title: "Search pages, clients, scenarios, calculators and actions (Ctrl+K)",
+              "aria-label": "Search and commands"
+            }, "⌕ Search"),
+            EL("button", {
+              className: "tp-btn ghost sm tp-popout-tab",
+              type: "button",
+              onClick: () => wbOpenNewTab(tab, clientId),
+              title: "Open this view in a new browser tab — every view shares the same saved data; nothing is duplicated",
+              "aria-label": "Open this view in a new tab"
+            }, "⧉"),
+            EL("button", {
+              className: "tp-btn ghost sm tp-popout-win",
+              type: "button",
+              onClick: () => wbOpenPopout(tab, clientId),
+              title: "Pop this view out into its own window",
+              "aria-label": "Pop out this view"
+            }, "⇱"),
             !toolsVisible && EL("button", {
               className: "tp-btn ghost sm",
               type: "button",
@@ -1150,7 +1354,8 @@ function App() {
           results, bestId, baseline, status, year,
           focusId: focusSafe, setFocusId, goto: setTab,
           setYear: setYearLogged, setStatus: setStatusLogged,
-          onAskAI: askWorkspace, onAIReport: () => setShowAIReport(true)
+          onAskAI: askWorkspace, onAIReport: () => setShowAIReport(true),
+          onTrace: (lineId, scenarioId) => setTraceReq({ lineId, scenarioId })
         }),
         tab === "clients" && EL(ClientProfilesPage, {
           clients, activeId: clientId, setActiveClient, updateClient, setClients,
@@ -1184,7 +1389,8 @@ function App() {
         tab === "audit" && EL(AuditPage, { auditLog: clientAudit, setAuditLog: setClientAudit, scenarios, results, year, status }),
         tab === "data" && EL(DataPage, {
           scenarios, setScenarios: setScenariosLogged, results, status, year,
-          auditLog: clientAudit, notes, logEvent, setYear: setYearLogged, setStatus: setStatusLogged
+          auditLog: clientAudit, notes, logEvent, setYear: setYearLogged, setStatus: setStatusLogged,
+          clientRecord: clientSafe
         }),
         tab === "report" && EL(ReportPage, { client: clientSafe, alignments, results, bestId, baseline, status, year, notes, auditLog: clientAudit }),
         tab === "ai" && EL(AIAnalysisPage, {
@@ -1197,7 +1403,11 @@ function App() {
           }]),
           onAddToReport: addToReportInbox,
           logEvent, history: aiHistory, setHistory: setAiHistory
-        })),
+        }),
+        /* Ownership line: always visible on every tab, desktop and mobile,
+           without opening any menu. */
+        EL("footer", { className: "tp-main-copyright" },
+          "© 2026 AI Tax Strategy Advisors. All Rights Reserved.")),
 
       /* ---------------- Right tools panel ---------------- */
       toolsVisible && EL("aside", { className: "tp-tools" + (toolsMobile ? " open" : "") },
@@ -1239,6 +1449,11 @@ function App() {
         title: "Tools"
       }, I.calc, EL("span", null, "Tools")),
       EL("button", {
+        className: "tp-dockbtn " + (showCalc ? "on" : ""),
+        onClick: () => { setShowCalc(v => !v); raise("calc"); },
+        title: "Desk calculator with a running tape"
+      }, I.calc, EL("span", null, "Calculator")),
+      EL("button", {
         className: "tp-dockbtn " + (showNotes ? "on" : ""),
         onClick: () => { setShowNotes(v => !v); raise("notes"); },
         title: "Notes"
@@ -1249,6 +1464,20 @@ function App() {
         title: "Ask AI"
       }, I.chat, EL("span", null, "Ask AI"))),
     toolsMobile && EL("div", { className: "tp-navoverlay tools-overlay", onClick: () => setToolsMobile(false) }),
+    showCalc && EL(Calculator, {
+      onClose: () => setShowCalc(false),
+      result: activeResult,
+      scenarioName: active.name,
+      onSendToNotes: text => {
+        setNoteDraft(d => (d ? d + "\n\n" : "") + text);
+        setShowNotes(true);
+        raise("notes");
+      },
+      onFocus: () => raise("calc"),
+      z: zTop.calc,
+      tape: calcTape,
+      setTape: setCalcTape
+    }),
     showNotes && EL(Notepad, {
       onClose: () => setShowNotes(false),
       notes, setNotes,
@@ -1284,6 +1513,23 @@ function App() {
       tabLabel: t.label,
       onClose: () => setShowAppearance(false)
     }),
+    EL(CommandBar, {
+      open: cmdOpen,
+      onClose: () => setCmdOpen(false),
+      items: cmdItems,
+      recents: wbGetRecents()
+    }),
+    traceReq && (() => {
+      const tr = results.find(x => x.s.id === traceReq.scenarioId) || results[activeIdx];
+      return EL(TraceDrawer, {
+        lineId: traceReq.lineId,
+        scenario: tr.s,
+        result: tr.r,
+        status, year, lastCalc,
+        onClose: () => setTraceReq(null),
+        onAskAI: askWorkspace
+      });
+    })(),
     openCalc && EL(CalculatorDrawer, {
       type: openCalc,
       scenario: active,

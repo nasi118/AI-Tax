@@ -118,12 +118,15 @@ function buildTaxWorkbook(opts) {
     }]
   });
   coverRow("Client", meta.client || "—");
+  if (meta.clientId) coverRow("Client ID", meta.clientId);
   coverRow("Prepared by", meta.preparer || "—");
   coverRow("Firm", meta.firm || "—");
   coverRow("Date exported", meta.exportedAt);
   coverRow("Tax year", C.label);
   coverRow("Filing status", statusLabel);
   coverRow("Scenarios", scenarios.map(s => s.name).join(" | "));
+  coverRow("Engine / rules", "engine " + ENGINE_VERSION + " \u00b7 rules " + RULES_VERSION);
+  coverRow("Generated", meta.createdISO || meta.exportedAt);
   cover.blank();
   cover.add({
     cells: [{
