@@ -71,7 +71,10 @@ function ClientCard({ c, active, tax, onSetActive, onCopy, onArchive, onExport }
     className: "tp-tag"
   }, "Age ", p.household.taxpayerAge), String(c.clientId).indexOf("DEMO") === 0 && EL("span", {
     className: "tp-tag amber"
-  }, "Demo")), EL("div", {
+  }, "Demo"), (c.reviewFlags || []).length > 0 && EL("span", {
+    className: "tp-tag amber",
+    title: c.reviewFlags.join("\n")
+  }, "Identity review")), EL("div", {
     className: "tp-statstack"
   }, EL(StatLine, {
     label: "Net business income",
@@ -156,7 +159,7 @@ function ClientProfilesPage({
   }));
 
   const addClient = () => {
-    const nc = blankClient("New client");
+    const nc = blankClient("New client", clients);
     nc.scenarios = [profileToScenario(nc)];
     setClients(cs => [...cs, nc]);
     setActiveClient(nc.id);
@@ -166,7 +169,10 @@ function ClientProfilesPage({
   const copyClient = src => {
     const nc = structuredClone(src);
     nc.id = uid();
-    nc.clientId = src.clientId + "-COPY";
+    /* Copies get their own unique client number; the source is recorded. */
+    nc.clientId = nextClientNumber(clients);
+    nc.legacyClientId = src.clientId;
+    nc.reviewFlags = [];
     nc.name = src.name + " (copy)";
     nc.archived = false;
     nc.scenarios = nc.scenarios.map(s => ({ ...s, id: uid() }));
@@ -202,6 +208,13 @@ function ClientProfilesPage({
         if (!c || !c.profile || !Array.isArray(c.scenarios)) throw new Error("Not a client file");
         c.id = uid();
         c.archived = false;
+        /* An imported file may carry a client number already in use here —
+           keep both records, give the import a fresh number, flag it. */
+        if (clients.some(x => String(x.clientId) === String(c.clientId))) {
+          c.legacyClientId = c.clientId;
+          c.clientId = nextClientNumber(clients);
+          c.reviewFlags = (c.reviewFlags || []).concat("Imported with client number " + c.legacyClientId + " already used by another client; now shown as " + c.clientId + ".");
+        }
         c.scenarios = c.scenarios.map(s => ({ ...s, id: uid() }));
         setClients(cs => [...cs, c]);
         setActiveClient(c.id);

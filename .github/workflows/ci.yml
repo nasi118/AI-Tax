@@ -43,6 +43,7 @@ jobs:
         with:
           node-version: "22"
       - run: node tests/golden.test.mjs
+      - run: node tests/client-identity.test.mjs
 
   standalone-build:
     name: Standalone application build
