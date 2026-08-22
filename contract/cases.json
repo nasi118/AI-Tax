@@ -1,0 +1,102 @@
+{
+  "$comment": "Canonical cross-engine contract cases. Each case is expressible in BOTH engines' native input models and stays inside their documented shared scope: no self-employment, QBI, S-corp, retirement-plan, SEHI, HSA, IRA/401(k) adjustment, Social Security, senior/blind, student-loan, Schedule 1-A, or Additional-Medicare-triggering inputs (all of those are one-engine features — see capabilities/registry.json). Wages are kept below the Additional Medicare thresholds because the JS engine models that tax and the Python engine does not. Itemized cases are TY2025-only because the JS engine models the TY2026 charitable 0.5% AGI floor and the Sec. 68-style 2/37 limitation, which the Python engine does not.",
+  "tolerances": {
+    "$comment": "The Python engine rounds every line item to whole dollars (IRS half-up) as it goes; the JS engine computes in floats and rounds at display. Accumulated per-line rounding can differ by a few dollars on derived totals, so dollar quantities compare within +/- 5. Rates compare within 0.005 (effective rate is defined for comparison as total_federal_tax / AGI on both sides). Marginal ordinary rates must match exactly; cases are deliberately kept off bracket boundaries.",
+    "dollars": 5,
+    "rate": 0.005,
+    "marginal_rate": 0
+  },
+  "cases": [
+    {
+      "id": "X1-2025-single-wages-standard",
+      "description": "Single, wages + interest, standard deduction, refund position",
+      "year": 2025,
+      "filing_status": "single",
+      "taxpayer_age": 45,
+      "spouse_age": null,
+      "ctc_children": 0,
+      "income": {"wages": 60000, "taxable_interest": 500},
+      "itemized": {},
+      "itemize": false,
+      "payments": {"federal_withholding": 7000, "estimated_payments": 0}
+    },
+    {
+      "id": "X2-2025-mfj-dividends-ctc",
+      "description": "MFJ, wages + interest + qualified dividends, two CTC children, standard deduction",
+      "year": 2025,
+      "filing_status": "married_filing_jointly",
+      "taxpayer_age": 45,
+      "spouse_age": 44,
+      "ctc_children": 2,
+      "income": {"wages": 150000, "taxable_interest": 3000, "ordinary_dividends": 8000, "qualified_dividends": 6000},
+      "itemized": {},
+      "itemize": false,
+      "payments": {"federal_withholding": 18000, "estimated_payments": 0}
+    },
+    {
+      "id": "X3-2025-single-niit-ctc-phaseout",
+      "description": "Single, high income: NIIT triggered, CTC fully phased out, 15%/20% LTCG stacking",
+      "year": 2025,
+      "filing_status": "single",
+      "taxpayer_age": 50,
+      "spouse_age": null,
+      "ctc_children": 1,
+      "income": {"wages": 190000, "ordinary_dividends": 20000, "qualified_dividends": 15000, "long_term_capital_gain": 80000},
+      "itemized": {},
+      "itemize": false,
+      "payments": {"federal_withholding": 40000, "estimated_payments": 20000}
+    },
+    {
+      "id": "X4-2025-mfj-itemized",
+      "description": "MFJ itemized: SALT under cap, mortgage, charity below 60% AGI, medical above the 7.5% floor; balance due",
+      "year": 2025,
+      "filing_status": "married_filing_jointly",
+      "taxpayer_age": 55,
+      "spouse_age": 54,
+      "ctc_children": 0,
+      "income": {"wages": 220000, "taxable_interest": 2000},
+      "itemized": {"state_local_taxes_paid": 30000, "mortgage_interest": 12000, "charitable_cash": 15000, "medical_expenses": 20000},
+      "itemize": true,
+      "payments": {"federal_withholding": 10000, "estimated_payments": 15000}
+    },
+    {
+      "id": "X5-2025-single-caploss-limit",
+      "description": "Single: ST loss absorbs LT gain, net loss beyond the $3,000 limit is capped identically in both engines (carryforward tracking differs and is out of contract scope)",
+      "year": 2025,
+      "filing_status": "single",
+      "taxpayer_age": 45,
+      "spouse_age": null,
+      "ctc_children": 0,
+      "income": {"wages": 90000, "short_term_capital_gain": -12000, "long_term_capital_gain": 4000},
+      "itemized": {},
+      "itemize": false,
+      "payments": {"federal_withholding": 12000, "estimated_payments": 0}
+    },
+    {
+      "id": "X6-2026-single-roth-conversion",
+      "description": "TY2026 (provisional ruleset in Python): single, wages + Roth conversion + IRA distribution, standard deduction",
+      "year": 2026,
+      "filing_status": "single",
+      "taxpayer_age": 58,
+      "spouse_age": null,
+      "ctc_children": 0,
+      "income": {"wages": 110000, "ira_conversion": 40000, "ira_distribution": 10000},
+      "itemized": {},
+      "itemize": false,
+      "payments": {"federal_withholding": 20000, "estimated_payments": 5000}
+    },
+    {
+      "id": "X7-2026-mfj-zero-band-ltcg",
+      "description": "TY2026 MFJ: modest wages with LTCG and qualified dividends largely inside the 0% band",
+      "year": 2026,
+      "filing_status": "married_filing_jointly",
+      "taxpayer_age": 45,
+      "spouse_age": 45,
+      "ctc_children": 0,
+      "income": {"wages": 70000, "ordinary_dividends": 5000, "qualified_dividends": 5000, "long_term_capital_gain": 20000},
+      "itemized": {},
+      "itemize": false,
+      "payments": {"federal_withholding": 6000, "estimated_payments": 0}
+    }
+  ]
+}

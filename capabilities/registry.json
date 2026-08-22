@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0",
+  "$comment": "Machine-readable capability boundary for the two calculation engines in this repository. docs/CAPABILITIES.md is GENERATED from this file by scripts/build_capability_matrix.py — edit here, then regenerate. Statuses: 'calculated' = modeled by the engine with real computation; 'approximated' = modeled with a documented simplification (the notes say which); 'blocked' = the condition is detected from inputs and produces a blocking/review-forcing diagnostic instead of a number; 'not_detected' = out of scope AND not detectable from the engine's inputs — callers and UIs must not imply support.",
+  "statuses": ["calculated", "approximated", "blocked", "not_detected"],
+  "engines": {
+    "tax-advisory-pro": {
+      "display_name": "Tax Advisory Pro workbench engine (JavaScript)",
+      "language": "JavaScript",
+      "code": ["src/01-constants.js", "src/02-engine.js", "src/03-scenario.js"],
+      "version_source": "ENGINE_VERSION / RULES_VERSION in src/01-constants.js",
+      "supported_tax_years": [2025, 2026],
+      "tax_year_status": {"2025": "enacted (Rev. Proc. 2024-40 et al.)", "2026": "enacted (Rev. Proc. 2025-32, Notice 2025-67)"},
+      "filing_statuses": ["single", "married_filing_jointly", "married_filing_separately", "head_of_household"],
+      "capabilities": {
+        "ordinary_income_tax": {"status": "calculated", "notes": "Progressive brackets per filing status; formula method (no tax-table lookup)."},
+        "capital_gains_qualified_dividends": {"status": "calculated", "notes": "ST/LT netting, Sec. 1211(b) loss limit, 0/15/20% stacking; only net LT gain plus qualified dividends reach the preferential bands."},
+        "niit": {"status": "calculated", "notes": "3.8% on min(net investment income, MAGI excess); Sec. 1411 activity classification per passthrough entity with review flags when facts are insufficient."},
+        "self_employment_tax": {"status": "calculated", "notes": "Schedule C SE tax with the W-2 Social Security wage-base coordination; S-corp payroll FICA modeled per entity."},
+        "qbi_deduction": {"status": "calculated", "notes": "Sec. 199A with SSTB phase-out, W-2/UBIA limits, aggregation, prior negative-QBI carryforward in and carryforward-out reporting; entity figures derivable from linked Schedule C / S-corp entities."},
+        "retirement_plan_calculations": {"status": "calculated", "notes": "Solo 401(k), SEP-IRA, and defined-benefit design with limits; S-corp employer-plan capacity reported but never double-deducted at the shareholder level."},
+        "ira_and_sehi": {"status": "calculated", "notes": "IRA deduction with active-participant MAGI phase-outs; self-employed health insurance with the earned-income cap; each provision uses its own MAGI variant."},
+        "itemized_deductions": {"status": "calculated", "notes": "SALT cap with the TY2026 phase-down and income-vs-sales-tax election, mortgage interest (acquisition-debt limit NOT modeled), charitable with AGI caps and the TY2026 0.5% floor, medical 7.5% floor, TY2026 Sec. 68-style 2/37 overall limitation."},
+        "credits": {"status": "calculated", "notes": "Nonrefundable CTC with the per-$1,000 phase-out; user-entered 'other credits' pass through uncalculated."},
+        "amt": {"status": "not_detected", "notes": "Alternative minimum tax is not modeled and not detected."},
+        "additional_medicare_tax": {"status": "calculated", "notes": "0.9% on wages/SE earnings over the threshold."},
+        "estimated_tax_safe_harbor": {"status": "not_detected", "notes": "Sec. 6654 safe harbors and penalties are not modeled."},
+        "state_calculations": {"status": "not_detected", "notes": "No state or local return computation; state taxes enter only as itemized-deduction inputs."},
+        "trust_estate_calculations": {"status": "not_detected", "notes": "No Form 1041, trust, estate, or K-1 fiduciary modeling."},
+        "carryforwards": {"status": "approximated", "notes": "Capital-loss and negative-QBI carryforward amounts are computed and reported for the year, but no multi-year carryforward ledger is maintained."},
+        "five_year_projections": {"status": "not_detected", "notes": "Two-year planning (TY2025 + TY2026) only; no five-year projection."},
+        "reconciliation_coverage": {"status": "approximated", "notes": "41 golden regression tests and an in-app audit trail; no machine-readable per-calculation reconciliation gate."}
+      },
+      "known_limitations": [
+        "Floating-point arithmetic (display rounding only, no Decimal); differences vs the Python engine bounded by the cross-engine contract tolerances.",
+        "Mortgage acquisition-debt limit not modeled.",
+        "No AMT, no estimated-tax safe harbor, no state returns.",
+        "Results carry ENGINE_VERSION/RULES_VERSION but there is no immutable calculation snapshot store."
+      ]
+    },
+    "ai_tax": {
+      "display_name": "ai_tax deterministic engine (Python)",
+      "language": "Python",
+      "code": ["ai_tax/engine.py", "ai_tax/money.py", "ai_tax/rulesets/"],
+      "version_source": "ai_tax.ENGINE_VERSION (engine-0.1.0); per-year ruleset versions pinned on every calculation",
+      "supported_tax_years": [2025, 2026, 2027, 2028, 2029, 2030],
+      "tax_year_status": {"2025": "enacted", "2026": "provisional projection", "2027": "provisional projection", "2028": "provisional projection", "2029": "provisional projection", "2030": "provisional projection"},
+      "filing_statuses": ["single", "married_filing_jointly", "married_filing_separately", "head_of_household"],
+      "capabilities": {
+        "ordinary_income_tax": {"status": "calculated", "notes": "Progressive brackets; formula method with ENG-TABLE-001 disclosure under $100,000 taxable."},
+        "capital_gains_qualified_dividends": {"status": "calculated", "notes": "Current-year ST/LT netting, Sec. 1211(b) limit, 0/15/20% stacking via the QDCG worksheet; min(stacked, all-ordinary) safeguard."},
+        "niit": {"status": "calculated", "notes": "3.8% on min(interest + dividends + allowed capital gain, MAGI excess)."},
+        "self_employment_tax": {"status": "blocked", "diagnostics": ["UNSUP-SE-001"], "notes": "Any self-employment income produces a blocking, review-forcing diagnostic; SE tax and QBI are not computed."},
+        "qbi_deduction": {"status": "blocked", "diagnostics": ["UNSUP-SE-001"], "notes": "Not modeled; blocked together with self-employment income."},
+        "retirement_plan_calculations": {"status": "approximated", "notes": "Pre-tax 401(k) deferral modeled as an adjustment with limit + catch-up caps (ENG-401K-001 when exceeded); no employer-plan design."},
+        "ira_and_sehi": {"status": "approximated", "diagnostics": ["ENG-IRA-001"], "notes": "Traditional IRA deduction capped at the limit; active-participant MAGI phase-outs NOT modeled. SEHI not modeled."},
+        "itemized_deductions": {"status": "approximated", "diagnostics": ["ENG-CHAR-001"], "notes": "SALT cap with phase-down, mortgage (no acquisition-debt limit), charitable at face value with a review warning above 60% of AGI (no cap/carryover), medical 7.5% floor. No Sec. 68-style overall limitation."},
+        "credits": {"status": "calculated", "diagnostics": ["ENG-ACTC-001"], "notes": "Nonrefundable CTC/ODC with phase-out; refundable additional CTC not modeled (disclosed)."},
+        "amt": {"status": "not_detected", "notes": "Documented out of scope in docs/UNSUPPORTED.md."},
+        "additional_medicare_tax": {"status": "not_detected", "notes": "Documented out of scope; NIIT is modeled, Additional Medicare is not."},
+        "estimated_tax_safe_harbor": {"status": "not_detected", "notes": "Estimated-tax penalties and safe harbors not modeled."},
+        "state_calculations": {"status": "not_detected", "notes": "SALT modeled only as an itemized-deduction input."},
+        "trust_estate_calculations": {"status": "not_detected", "notes": "Trusts, estates, entities, K-1s out of scope."},
+        "carryforwards": {"status": "blocked", "diagnostics": ["ENG-CLCF-001"], "notes": "Net capital loss beyond the annual limit triggers a review-forcing diagnostic; no carryforward ledger."},
+        "five_year_projections": {"status": "calculated", "notes": "projection.py: explicit per-field methods (hold/growth/explicit), provenance, REC-YOY roll-forward reconciliation."},
+        "reconciliation_coverage": {"status": "calculated", "notes": "Machine-readable checks computed inside the engine (REC-*), again for scenario deltas (REC-DELTA), projections (REC-YOY), and the Excel workbook (REC-XLSX); failed material checks block 'final' status."}
+      },
+      "known_limitations": [
+        "TY2026+ parameters are provisional projections generated before the applicable revenue procedure; every provisional-year calculation carries RULES-PROV-001 and forces review.",
+        "Bounded 1040 scope per docs/UNSUPPORTED.md; unsupported-but-detectable situations block rather than approximate.",
+        "JSON-file store; production persistence is a documented follow-up behind the existing narrow interface."
+      ]
+    }
+  },
+  "cross_engine_contract": {
+    "cases": "contract/cases.json",
+    "tests": "tests/test_cross_engine_contract.py",
+    "tolerances": {"enacted_dollars": 5, "enacted_rate": 0.005, "marginal_rate": 0, "provisional_drift_dollars": 250, "provisional_drift_rate": 0.02},
+    "notes": "Shared scope compared on canonical inputs: total income, AGI, deduction, taxable income, ordinary/preferential split, ordinary tax, regular tax, credits, NIIT, total federal tax, payments, balance due/refund, effective rate (total tax / AGI on both sides), marginal ordinary rate. TY2026 differences are parameter-level (enacted vs provisional projection) and bounded; releasing an enacted-sourced us-federal-2026-v2 ruleset tightens the contract to strict."
+  }
+}
