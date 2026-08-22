@@ -1067,7 +1067,9 @@ function App() {
             EL("strong", null, results.find(x => x.s.id === bestId).s.name)),
           EL("div", { className: "tp-sidestat" },
             EL("span", null, "Total modeled federal tax"),
-            EL("strong", { className: "green" }, usd$(results.find(x => x.s.id === bestId).r.totalTax))))),
+            EL("strong", { className: "green" }, usd$(results.find(x => x.s.id === bestId).r.totalTax))),
+          EL("div", { className: "tp-copyright" },
+            "\u00a9 2026 AI Tax Strategy Advisors. All Rights Reserved."))),
 
       /* ---------------- Main working area ---------------- */
       EL("main", { className: "tp-main" },

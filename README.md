@@ -169,3 +169,7 @@ See `docs/RUNBOOK.md` for the agent runtime and operations, and
   `AI-Tax-APP` capabilities (migrate / redesign / defer / reject) and defines
   archival acceptance criteria; the prioritized work plan is
   `docs/ISSUE_BACKLOG.md`.
+
+---
+
+**Ownership Notice:** The proprietary software, workflows, methodologies, original tax scenarios, documentation, and related materials in this project are © 2026 AI Tax Strategy Advisors. All Rights Reserved. Third-party and public-domain materials retain their respective ownership status. See `NOTICE.md`.

@@ -151,7 +151,7 @@ function buildTaxWorkbook(opts) {
   cover.add({
     cells: [null, {
       t: "s",
-      v: "Directional planning estimates for discussion. Not a tax return, formal opinion, or legal advice. No source documents were verified. State and local tax and the alternative minimum tax are not modelled. Confirm entity facts, basis, eligibility and documentation before acting.",
+      v: "Directional planning estimates for discussion. Not a tax return, formal opinion, or legal advice. No source documents were verified. State and local tax and the alternative minimum tax are not modelled. Confirm entity facts, basis, eligibility and documentation before acting. \u00a9 2026 AI Tax Strategy Advisors. All Rights Reserved.",
       s: ST.wrap
     }],
     height: 46

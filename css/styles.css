@@ -949,3 +949,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
   .tp-layout-grid>*{margin-bottom:12px}
 }
 @media print{.tp-layout-chrome{display:none}}
+
+/* ---- Ownership notice (sidebar footer) ---- */
+.tp-copyright{margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);
+  font-size:9.5px;color:var(--muted);line-height:1.4}
