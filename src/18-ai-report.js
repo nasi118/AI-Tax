@@ -41,6 +41,12 @@ function AIReportPanel({
   const [error, setError] = useState(null);
   const [report, setReport] = useState(null);
   const [builtHash, setBuiltHash] = useState(null);
+  /* Timestamp of the built report, compared against the client's updatedAt
+     to mark the report STALE when inputs change after it was generated. */
+  const [reportTs, setReportTs] = useState(null);
+  useEffect(() => {
+    if (report) setReportTs(Date.now());
+  }, [report]);
   const [secBusy, setSecBusy] = useState(null);
   const abortRef = useRef(null);
   const previewRef = useRef(null);
@@ -317,7 +323,7 @@ function AIReportPanel({
     className: "rp-sub"
   }, statusLabel, " · ", entries.length, " scenario", entries.length === 1 ? "" : "s", " analyzed · ", new Date().toLocaleDateString())), /*#__PURE__*/React.createElement("div", {
     className: "rp-meta"
-  }, /*#__PURE__*/React.createElement("div", null, rtype), /*#__PURE__*/React.createElement("div", null, "Engine ", ENGINE_VERSION), /*#__PURE__*/React.createElement("div", null, "Rules ", RULES_VERSION))), /*#__PURE__*/React.createElement("section", {
+  }, /*#__PURE__*/React.createElement("div", null, rtype), /*#__PURE__*/React.createElement("div", null, "Engine ", ENGINE_VERSION), /*#__PURE__*/React.createElement("div", null, "Rules ", RULES_VERSION), typeof TP_ACTIVE_CLIENT !== "undefined" && TP_ACTIVE_CLIENT && reportTs && TP_ACTIVE_CLIENT.updatedAt > reportTs ? /*#__PURE__*/React.createElement("div", { className: "tp-tag amber", title: "Client inputs changed after this report was built. Rebuild it before delivering." }, "STALE \u2014 rebuild") : null)), /*#__PURE__*/React.createElement("section", {
     className: "rp-sec"
   }, /*#__PURE__*/React.createElement("h2", null, "Key figures — ", base.s.name), /*#__PURE__*/React.createElement("div", {
     className: "rp-kpis"

@@ -152,6 +152,17 @@ const APPEARANCE_FONTS = [{
   label: "System Sans",
   stack: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 }, {
+  id: "calibri",
+  /* Uses the locally installed Calibri where present; falls back to the
+     metric-compatible Carlito, then Segoe UI/Arial. No font binaries are
+     bundled (Calibri is proprietary; Carlito is OFL). */
+  label: "Calibri",
+  stack: "Calibri,Carlito,'Segoe UI',Arial,sans-serif"
+}, {
+  id: "arial",
+  label: "Arial",
+  stack: "Arial,'Helvetica Neue',Helvetica,sans-serif"
+}, {
   id: "humanist",
   label: "Humanist",
   stack: "Verdana,'Segoe UI',Geneva,Tahoma,sans-serif"
@@ -184,6 +195,10 @@ const APPEARANCE_DEFAULTS = {
   background: "theme",
   customBackground: "",
   font: "system",
+  numberFont: "same",     // "same" = follow the text font
+  numberWeight: "default", // default | medium | bold
+  numberSize: "default",   // default | sm | lg
+  numberFormat: {},        // patch over TP_NUMFMT_DEFAULTS (00-format.js)
   size: "md",
   borderTone: "light", // light | medium | strong
   borderWidth: "1", // 1 | 2
@@ -212,6 +227,10 @@ function appearanceStyle(eff) {
   }
   const font = APPEARANCE_FONTS.find(f => f.id === eff.font);
   if (font && font.id !== "system") style["--app-font"] = font.stack;
+  if (eff.numberFont && eff.numberFont !== "same") {
+    const nf = APPEARANCE_FONTS.find(f => f.id === eff.numberFont);
+    if (nf) style["--app-font-num"] = nf.stack;
+  }
   if (eff.borderTone === "medium") {
     style["--line"] = theme.dark ? "#475569" : "#cbd5e1";
     style["--line2"] = theme.dark ? "#334155" : "#dde3ea";
@@ -223,7 +242,10 @@ function appearanceStyle(eff) {
 }
 function appearanceClasses(eff) {
   const theme = APPEARANCE_THEMES.find(t => t.id === eff.theme) || APPEARANCE_THEMES[0];
-  return ["ap-fs-" + eff.size, "ap-bw-" + eff.borderWidth, "ap-rad-" + eff.radius, eff.gridlines ? "ap-gridv" : "", theme.dark ? "ap-dark" : ""].filter(Boolean).join(" ");
+  return ["ap-fs-" + eff.size, "ap-bw-" + eff.borderWidth, "ap-rad-" + eff.radius,
+    eff.numberWeight && eff.numberWeight !== "default" ? "ap-numw-" + eff.numberWeight : "",
+    eff.numberSize && eff.numberSize !== "default" ? "ap-nums-" + eff.numberSize : "",
+    eff.gridlines ? "ap-gridv" : "", theme.dark ? "ap-dark" : ""].filter(Boolean).join(" ");
 }
 
 /* ---- The Customize drawer ---- */
@@ -263,6 +285,23 @@ function AppearancePanel({ appearance, setAppearance, tab, tabLabel, onClose }) 
     });
   };
   const tabHasOverrides = !!(appearance.tabs && appearance.tabs[tab] && Object.keys(appearance.tabs[tab]).length);
+  const setNumFmtPref = patch => set({ numberFormat: { ...(eff.numberFormat || {}), ...patch } });
+  /* Accessibility guard: warn when a custom background leaves body text
+     below WCAG AA contrast against the theme's ink color. */
+  const contrastWarning = (() => {
+    if (eff.background !== "custom" || !/^#[0-9a-fA-F]{6}$/.test(eff.customBackground)) return null;
+    const lum = hex => {
+      const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    };
+    const theme = APPEARANCE_THEMES.find(t => t.id === eff.theme) || APPEARANCE_THEMES[0];
+    const ink = theme.dark ? "#e2e8f0" : "#0f172a";
+    const [a, b] = [lum(eff.customBackground), lum(ink)];
+    const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    return ratio < 4.5 ? "this background gives body text a contrast ratio of " +
+      ratio.toFixed(1) + ":1 (below the 4.5:1 accessibility minimum). Pick a lighter or darker background." : null;
+  })();
   return EL(Drawer, {
     title: "Customize appearance",
     sub: "Presentation only — calculations, data and exports are unaffected. Settings are saved on this device.",
@@ -341,6 +380,35 @@ function AppearancePanel({ appearance, setAppearance, tab, tabLabel, onClose }) 
     },
     onClick: () => set({ font: f.id })
   }, f.label))), EL(SwatchRow, {
+    label: "Number font"
+  }, [EL("button", {
+    key: "same",
+    type: "button",
+    className: "tp-mini" + (eff.numberFont === "same" ? " on" : ""),
+    title: "Numbers use the same font as text",
+    onClick: () => set({ numberFont: "same" })
+  }, "Same as text")].concat(APPEARANCE_FONTS.map(f => EL("button", {
+    key: f.id,
+    type: "button",
+    className: "tp-mini" + (eff.numberFont === f.id ? " on" : ""),
+    style: { fontFamily: f.stack, fontVariantNumeric: "tabular-nums lining-nums" },
+    title: "Applies to currency, percentages, table totals, KPI values, chart labels and calculation figures",
+    onClick: () => set({ numberFont: f.id })
+  }, f.label, " 1,234")))), EL(SwatchRow, {
+    label: "Number size"
+  }, EL(Seg, {
+    small: true,
+    value: eff.numberSize,
+    onChange: v => set({ numberSize: v }),
+    options: [{ v: "sm", l: "Smaller" }, { v: "default", l: "Default" }, { v: "lg", l: "Larger" }]
+  })), EL(SwatchRow, {
+    label: "Number weight"
+  }, EL(Seg, {
+    small: true,
+    value: eff.numberWeight,
+    onChange: v => set({ numberWeight: v }),
+    options: [{ v: "default", l: "Default" }, { v: "medium", l: "Medium" }, { v: "bold", l: "Bold" }]
+  })), EL(SwatchRow, {
     label: "Text size"
   }, EL(Seg, {
     small: true,
@@ -403,7 +471,50 @@ function AppearancePanel({ appearance, setAppearance, tab, tabLabel, onClose }) 
     type: "checkbox",
     checked: !!eff.gridlines,
     onChange: e => set({ gridlines: e.target.checked })
-  }), " Show vertical column rules in tables")), EL(Note, null, "Column widths for the scenario comparison ledger are adjusted on the Scenarios tab itself — use the sliders in the ledger toolbar. They persist just like these settings."), EL("div", {
+  }), " Show vertical column rules in tables")), EL(SwatchRow, {
+    label: "Currency"
+  }, EL(Seg, {
+    small: true,
+    value: String((eff.numberFormat || {}).currencyDecimals != null ? eff.numberFormat.currencyDecimals : 0),
+    onChange: v => setNumFmtPref({ currencyDecimals: Number(v) }),
+    options: [{ v: "0", l: "$1,234" }, { v: "2", l: "$1,234.00" }]
+  })), EL(SwatchRow, {
+    label: "Negative numbers"
+  }, EL(Seg, {
+    small: true,
+    value: (eff.numberFormat || {}).negativeStyle || "parentheses",
+    onChange: v => setNumFmtPref({ negativeStyle: v }),
+    options: [{ v: "parentheses", l: "($1,234)" }, { v: "minus", l: "-$1,234" }]
+  })), EL(SwatchRow, {
+    label: "Zero currency"
+  }, EL(Seg, {
+    small: true,
+    value: (eff.numberFormat || {}).currencyZeroStyle || "dollar",
+    onChange: v => setNumFmtPref({ currencyZeroStyle: v }),
+    options: [{ v: "dollar", l: "$0" }, { v: "dash", l: "\u2014" }, { v: "blank", l: "Blank" }]
+  })), EL(SwatchRow, {
+    label: "Zero amounts"
+  }, EL(Seg, {
+    small: true,
+    value: (eff.numberFormat || {}).zeroStyle || "dash",
+    onChange: v => setNumFmtPref({ zeroStyle: v }),
+    options: [{ v: "dash", l: "\u2014" }, { v: "zero", l: "0" }, { v: "blank", l: "Blank" }]
+  })), EL(SwatchRow, {
+    label: "Percent precision"
+  }, EL(Seg, {
+    small: true,
+    value: String((eff.numberFormat || {}).percentDecimals != null ? eff.numberFormat.percentDecimals : 1),
+    onChange: v => setNumFmtPref({ percentDecimals: Number(v) }),
+    options: [{ v: "0", l: "12%" }, { v: "1", l: "12.3%" }, { v: "2", l: "12.34%" }]
+  })), EL(SwatchRow, {
+    label: "Separators"
+  }, EL("label", {
+    className: "tp-check"
+  }, EL("input", {
+    type: "checkbox",
+    checked: (eff.numberFormat || {}).thousandsSeparator !== false,
+    onChange: e => setNumFmtPref({ thousandsSeparator: e.target.checked })
+  }), " Thousands separators (1,234)")), EL(Note, null, "Number formatting is presentation-only: the stored values, the deterministic engine, and every export of raw data are unaffected."), contrastWarning && EL(Note, null, EL("strong", null, "Readability warning: "), contrastWarning), EL(Note, null, "Column widths for the scenario comparison ledger are adjusted on the Scenarios tab itself — use the sliders in the ledger toolbar. They persist just like these settings."), EL("div", {
     className: "tp-calc-actions"
   }, EL("button", {
     className: "tp-btn ghost sm",

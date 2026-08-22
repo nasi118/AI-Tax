@@ -142,9 +142,7 @@ function Dashboard({
     ["After-tax economic income", A.afterTaxCash, "tot"],
     ["Spendable after-tax cash", A.spendableAfterTaxCash, "tot"]
   ];
-  return EL("div", {
-    className: "tp-stack"
-  }, EL("div", {
+  return layoutContainer("dashboard", "tp-stack tp-layout-grid", EL("div", {
     className: "tp-selector"
   }, EL("label", {
     className: "tp-sel"
@@ -184,7 +182,8 @@ function Dashboard({
   }, EL(SectionControls, {
     page: "dashboard"
   }))), EL("div", {
-    className: "tp-kpis"
+    className: "tp-kpis",
+    "data-layout": "kpis"
   }, kpis.map(k => EL("div", {
     key: k.label,
     className: "tp-kpi " + (k.cls || "")
@@ -375,7 +374,8 @@ function Dashboard({
   }, "Form 1040 only; excludes the S corporation's share of payroll tax")), EL("td", {
     className: "num"
   }, usd$(Math.abs(A.balanceDue))))))))), EL("div", {
-    className: "tp-2col"
+    className: "tp-2col",
+    "data-layout": "analysis"
   }, EL(Section, {
     page: "dashboard",
     id: "bytype",

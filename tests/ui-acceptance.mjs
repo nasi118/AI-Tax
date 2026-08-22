@@ -211,7 +211,7 @@ ok((await page.$eval(".tp-root", el => getComputedStyle(el).backgroundColor)) ==
 await page.click('button:has-text("Extra large")');
 await page.waitForTimeout(150);
 ok(await page.$(".tp-root.ap-fs-xl"), "text size scales the application");
-await page.click('.tp-drawer button:has-text("Bold")');
+await page.click('.tp-ap-row:has-text("Border width") button:has-text("Bold")');
 await page.click('.tp-drawer button:has-text("Square")');
 await page.waitForTimeout(150);
 ok(await page.$(".tp-root.ap-bw-2.ap-rad-square"), "border width and corner style apply");

@@ -906,3 +906,46 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 .tp-goalalign-rows{padding:3px 0 1px}
 .tp-goalalign-rows strong.up{color:var(--green)}
 .tp-goalalign-rows strong.down{color:var(--red)}
+
+/* ---- Number typography (Customize: number font / size / weight) ----
+   Applies only to numeric presentation elements; text elements keep the
+   text font. tabular-nums keeps financial columns aligned. */
+.tp-kpi strong, .tp-tbl th.num, .tp-tbl td.num, .tp-money, .tp-vtotal,
+.tp-cell, .tp-calc-val, .tp-calc-disp, .tp-qcalc-disp, .tp-statline strong {
+  font-family: var(--app-font-num, inherit);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.ap-numw-medium .tp-tbl td.num, .ap-numw-medium .tp-cell, .ap-numw-medium .tp-money { font-weight: 600 }
+.ap-numw-bold .tp-tbl td.num, .ap-numw-bold .tp-cell, .ap-numw-bold .tp-money { font-weight: 700 }
+.ap-nums-sm .tp-tbl td.num, .ap-nums-sm .tp-cell, .ap-nums-sm .tp-money { font-size: .92em }
+.ap-nums-lg .tp-tbl td.num, .ap-nums-lg .tp-cell, .ap-nums-lg .tp-money { font-size: 1.08em }
+.ap-nums-sm .tp-kpi strong { font-size: 23px }
+.ap-nums-lg .tp-kpi strong { font-size: 31px }
+
+/* ---- Calculation identity strip (critical status — never hideable) ---- */
+.tp-calcid{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:3px 18px;
+  font-size:10.5px;color:var(--muted);border-bottom:1px solid var(--line2);background:var(--hdr)}
+.tp-calcid .tp-calcid-ok{color:var(--green);font-weight:600}
+.tp-calcid .tp-calcid-bad{color:#b42318;font-weight:600}
+
+/* ---- Edit Layout: 6-column grid, spans, chrome ---- */
+.tp-layout-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;align-items:start}
+.tp-layout-grid>*{grid-column:1/-1;min-width:0}
+.tp-layout-cell{min-width:0}
+.tp-layout-cell.tp-w-full{grid-column:1/-1}
+.tp-layout-cell.tp-w-half{grid-column:span 3}
+.tp-layout-cell.tp-w-third{grid-column:span 2}
+.tp-layout-cell>.tp-card{height:100%}
+.tp-layout-cell .tp-tblwrap{overflow-x:auto}
+.tp-layout-editing .tp-layout-cell{outline:1.5px dashed var(--indigo);outline-offset:2px;border-radius:10px}
+.tp-layout-cell.dragover{outline:2.5px solid var(--indigo)}
+.tp-layout-cell.layout-hidden{opacity:.45}
+.tp-layout-chrome{display:flex;gap:5px;align-items:center;flex-wrap:wrap;padding:3px 4px;
+  background:var(--hdr);border:1px solid var(--line2);border-radius:7px;margin-bottom:5px;font-size:10.5px}
+.tp-layout-grip{cursor:grab;user-select:none;font-weight:700;color:var(--muted);padding:1px 6px}
+.tp-layout-mode{font-size:10.5px;font-weight:700;color:var(--indigo);text-transform:uppercase;letter-spacing:.05em}
+@media (max-width:900px){
+  .tp-layout-grid{display:block}
+  .tp-layout-grid>*{margin-bottom:12px}
+}
+@media print{.tp-layout-chrome{display:none}}

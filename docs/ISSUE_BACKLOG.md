@@ -111,6 +111,20 @@ add store-level scoping (list/read by tenant) ahead of P1-1. **Risk:**
 a future multi-tenant deployment could read across tenants via direct
 store calls.
 
+### P1-7 · Complete the remaining interface-mandate items
+The canonical recalculation service (scoped Recalculate on every tab, identity
+strip, fault isolation, audit logging), the shared number-format service with
+Customize controls, Calibri + separate text/number fonts, and the Edit Layout
+mode (move/resize/hide with versioned persistence) are implemented and tested
+(`tests/ui-format-layout.mjs`). Remaining, in scope order: named layout views
++ "set as my default"/firm default, per-KPI-card granularity and an optional
+freeform mode, accounting column alignment + date-format + compact-threshold
+controls, prefs export/import with preview, an end-to-end AI test matrix
+against a live provider covering every entry point (the context/staleness
+plumbing is in place), and executing the duplicate-tab removals per
+`docs/UI_CONSOLIDATION.md` once their gates are met. **Risk:** the mandate's
+final acceptance list stays partially open.
+
 ## P2 — maintainability & planned feature work
 
 ### P2-1 · Execute the consolidation plan (`docs/CONSOLIDATION.md`)

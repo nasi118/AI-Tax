@@ -567,14 +567,54 @@ function App() {
       [which]: top + 1
     };
   });
-  const results = useMemo(() => scenarios.map(s => {
-    const r = computeScenario(s, status, year);
-    return {
-      s,
-      r,
-      v: validateScenario(s, r, status, year)
-    };
-  }), [scenarios, status, year]);
+  /* ---- CANONICAL RECALCULATION SERVICE ----
+     One computation pipeline serves every tab: the deterministic engine runs
+     here (and only here) for all of the active client's scenarios, in
+     dependency order (S-corp entities feed the return inside computeScenario).
+     Every derived view — modules, charts, comparisons, reports, AI context,
+     exports — reads these results, so a recalculation refreshes all of them.
+     recalcNonce lets the manual Recalculate actions force a fresh engine run
+     through this same pipeline; there is no second implementation anywhere.
+     Failures are isolated per scenario: one scenario throwing keeps its last
+     known valid result (marked failed) and never blocks the others. */
+  const [recalcNonce, setRecalcNonce] = useState(0);
+  const lastGoodRef = useRef({});
+  const results = useMemo(() => {
+    void recalcNonce;
+    return scenarios.map(s => {
+      let r, calcError = null;
+      try {
+        r = computeScenario(s, status, year);
+        lastGoodRef.current[s.id] = r;
+      } catch (err) {
+        calcError = String(err && err.message || err);
+        r = lastGoodRef.current[s.id] || computeScenario(blankScenario(s.name), status, year);
+      }
+      return {
+        s,
+        r,
+        calcError,
+        v: validateScenario(s, r, status, year)
+      };
+    });
+  }, [scenarios, status, year, recalcNonce]);
+  /* Identity of the newest completed calculation — displayed on every tab and
+     attached to AI context so staleness is visible. */
+  const [lastCalc, setLastCalc] = useState(null);
+  useEffect(() => {
+    setLastCalc({
+      at: Date.now(),
+      atLabel: new Date().toLocaleTimeString(),
+      engine: ENGINE_VERSION,
+      rules: RULES_VERSION,
+      year,
+      status,
+      clientId,
+      scenarioCount: results.length,
+      failures: results.filter(x => x.calcError).map(x => ({ name: x.s.name, error: x.calcError })),
+      warnings: results.reduce((a, x) => a + x.v.all.length, 0)
+    });
+  }, [results, year, status, clientId]);
   const bestId = useMemo(() => {
     if (!results.length) return null;
     return results.reduce((a, b) => b.r.totalTax < a.r.totalTax ? b : a).s.id;
@@ -905,7 +945,60 @@ function App() {
     onChange: e => setStatusLogged(e.target.value)
   }, STATUSES.map(s => EL("option", { key: s.v, value: s.v }, s.l)))));
 
+  /* ---- Manual recalculation actions ----
+     Three scopes, ONE orchestration: every scope drives the same canonical
+     pipeline above. "tab" focuses reporting on the active scenario,
+     "affected" covers the active client's dependency set (all its
+     scenarios — they share the client inputs), "all" additionally sweeps
+     every other client's scenarios for failures. Double-clicks and
+     concurrent runs are guarded; each run stages pending edits (blur),
+     re-runs the engine, refreshes every dependent view via the shared
+     results, logs one audit event, and reports success/warning/failure. */
+  const [recalcScope, setRecalcScope] = useState("affected");
+  const [recalcState, setRecalcState] = useState(null);
+  const runRecalculate = scope => {
+    if (recalcState && recalcState.running) return; // concurrency guard
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    let sweepFailures = [];
+    if (scope === "all") {
+      clients.forEach(c => {
+        if (c.id === clientId || c.archived) return;
+        (c.scenarios || []).forEach(sc => {
+          try {
+            computeScenario(sc, c.profile.filingStatus, c.profile.taxYear);
+          } catch (err) {
+            sweepFailures.push({ name: c.name + " · " + sc.name, error: String(err && err.message || err) });
+          }
+        });
+      });
+    }
+    setRecalcState({ running: true, scope, sweepFailures, startedAt: Date.now() });
+    setTimeout(() => {
+      setRecalcNonce(n => n + 1);
+      setRecalcState(st => st && { ...st, running: false });
+    }, 30);
+  };
+  useEffect(() => {
+    if (!recalcState || recalcState.running || recalcState.reported) return;
+    const scoped = recalcState.scope === "tab" ? results.filter(x => x.s.id === activeIdSafe) : results;
+    const failures = scoped.filter(x => x.calcError)
+      .map(x => ({ name: x.s.name, error: x.calcError }))
+      .concat(recalcState.sweepFailures || []);
+    const warnings = scoped.reduce((a, x) => a + x.v.all.length, 0);
+    setRecalcState(st => ({ ...st, reported: true, ok: failures.length === 0, failures, warnings, at: Date.now() }));
+    logEvent({
+      kind: "structure",
+      label: "Recalculated (" + recalcState.scope + ")",
+      scenarioName: active.name,
+      detail: failures.length ? failures.length + " module failure(s)" : "all modules recomputed"
+    });
+  }, [recalcState, results]);
+
   const apEff = effectiveAppearance(appearance, tab);
+  /* Presentation-only: pushes the user's number-format choices into the one
+     shared formatter service before children render. Never touches inputs,
+     calculations, scenarios, or stored values. */
+  setNumberFormat(apEff.numberFormat);
   return EL("div", {
     className: "tp-root " + appearanceClasses(apEff),
     style: appearanceStyle(apEff)
@@ -1004,6 +1097,22 @@ function App() {
                 autoRun: true
               })
             }, I.chat, " Ask AI"),
+            EL("select", {
+              className: "tp-select sm",
+              "aria-label": "Recalculation scope",
+              value: recalcScope,
+              onChange: e => setRecalcScope(e.target.value),
+              title: "Recalculate this tab (active scenario), affected tabs (every view of this client), or all clients"
+            }, EL("option", { value: "tab" }, "This tab"),
+              EL("option", { value: "affected" }, "Affected tabs"),
+              EL("option", { value: "all" }, "All")),
+            EL("button", {
+              className: "tp-btn solid sm",
+              type: "button",
+              disabled: !!(recalcState && recalcState.running),
+              onClick: () => runRecalculate(recalcScope),
+              title: "Stage edits, validate, re-run the deterministic engine, refresh every dependent view, and log the action"
+            }, recalcState && recalcState.running ? "Recalculating\u2026" : "\u27F3 Recalculate"),
             !toolsVisible && EL("button", {
               className: "tp-btn ghost sm",
               type: "button",
@@ -1016,6 +1125,19 @@ function App() {
               onClick: () => setShowAppearance(true),
               title: "Adjust theme, colors, fonts, borders and sizing — for this tab or the whole application"
             }, "✎ Customize"))),
+        EL("div", { className: "tp-calcid", role: "status" },
+          EL("span", null, "Calc ", lastCalc ? lastCalc.atLabel : "\u2014"),
+          EL("span", null, "engine ", ENGINE_VERSION),
+          EL("span", null, "rules ", RULES_VERSION),
+          EL("span", null, "TY", year, " \u00b7 ", active.name),
+          EL("span", null, lastCalc ? lastCalc.warnings : 0, " validation notice", lastCalc && lastCalc.warnings === 1 ? "" : "s"),
+          lastCalc && lastCalc.failures.length > 0
+            ? EL("span", { className: "tp-calcid-bad", title: lastCalc.failures.map(f => f.name + ": " + f.error).join("\n") },
+                "\u26A0 ", lastCalc.failures.length, " module failure", lastCalc.failures.length === 1 ? "" : "s", " \u2014 showing last valid figures")
+            : EL("span", { className: "tp-calcid-ok" }, "\u2713 current"),
+          recalcState && recalcState.reported && EL("span", {
+            className: recalcState.ok ? "tp-calcid-ok" : "tp-calcid-bad"
+          }, recalcState.ok ? "Recalculated \u2713 (" + recalcState.scope + ")" : "Recalculation found failures (" + recalcState.scope + ")")),
         validation.all.length > 0 && EL("div", { className: "tp-validbar" },
           EL("strong", null, active.name, ": "),
           validation.errors.map((v, i) => EL("span", { key: "e" + i, className: "tp-vchip err" }, "Blocking: ", v.msg)),
