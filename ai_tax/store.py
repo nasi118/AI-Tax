@@ -7,13 +7,19 @@ appended to an audit log.
 """
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
 from .engine import validate_inputs
+from .persistence import (
+    ConflictError,
+    ImmutableViolation,
+    JsonFileBackend,
+    PersistenceBackend,
+    UnknownRecord,
+)
 from .projection import project_years
 from .schemas import (
     BaseCaseVersion,
@@ -57,56 +63,64 @@ class CaseStore:
         root: Path,
         now_fn: Callable[[], str] = _utc_now,
         id_fn: Callable[[str], str] | None = None,
+        backend: PersistenceBackend | None = None,
     ):
+        """All storage flows through a PersistenceBackend (see persistence.py).
+
+        The default JsonFileBackend preserves the historical on-disk layout,
+        so existing stores load unchanged; passing a different backend is the
+        supported path to a real database.
+        """
         self.root = Path(root)
-        (self.root / "cases").mkdir(parents=True, exist_ok=True)
-        (self.root / "calculations").mkdir(parents=True, exist_ok=True)
+        self.backend = backend or JsonFileBackend(self.root)
         (self.root / "packages").mkdir(parents=True, exist_ok=True)
         self.now = now_fn
         self._id_fn = id_fn or (lambda prefix: f"{prefix}_{uuid.uuid4().hex[:12]}")
-        self._audit_path = self.root / "audit.jsonl"
 
-    # -- audit -------------------------------------------------------------
+    # -- audit (append-only stream) ----------------------------------------
     def audit(self, actor: str, action: str, target: str, detail: str = "") -> None:
-        entry = {"at": self.now(), "actor": actor, "action": action,
-                 "target": target, "detail": detail}
-        with self._audit_path.open("a") as f:
-            f.write(json.dumps(entry) + "\n")
+        self.backend.append("audit", {"at": self.now(), "actor": actor,
+                                      "action": action, "target": target,
+                                      "detail": detail})
 
     def new_id(self, prefix: str) -> str:
         return self._id_fn(prefix)
 
     # -- case document persistence ----------------------------------------
-    def _case_path(self, case_id: str) -> Path:
-        if not case_id.replace("_", "").replace("-", "").isalnum():
-            raise StoreError(f"invalid case id {case_id!r}")
-        return self.root / "cases" / f"{case_id}.json"
-
     def _load(self, case_id: str) -> dict:
-        path = self._case_path(case_id)
-        if not path.exists():
+        """Read a case document; the revision rides along for optimistic
+        concurrency and is consumed again by _save."""
+        try:
+            doc, rev = self.backend.read_doc("cases", case_id)
+        except UnknownRecord:
             raise StoreError(f"unknown case {case_id!r}")
-        return json.loads(path.read_text())
+        doc["_rev_loaded"] = rev
+        return doc
 
     def _save(self, case_id: str, doc: dict) -> None:
-        self._case_path(case_id).write_text(json.dumps(doc, indent=1, default=str))
+        rev = doc.pop("_rev_loaded", None)
+        try:
+            self.backend.write_doc("cases", case_id, doc, expected_revision=rev)
+        except ConflictError as e:
+            raise StoreError(f"concurrent modification of case {case_id}: {e}")
 
     # -- cases -------------------------------------------------------------
-    def create_case(self, created_by: str, case_id: Optional[str] = None) -> str:
+    def create_case(self, created_by: str, case_id: Optional[str] = None,
+                    tenant_id: str = "tenant_default") -> str:
         case_id = case_id or self.new_id("case")
-        path = self._case_path(case_id)
-        if path.exists():
+        if self.backend.doc_exists("cases", case_id):
             raise StoreError(f"case {case_id} already exists")
-        self._save(case_id, {
-            "case_id": case_id, "created_by": created_by, "created_at": self.now(),
+        self.backend.write_doc("cases", case_id, {
+            "case_id": case_id, "tenant_id": tenant_id,
+            "created_by": created_by, "created_at": self.now(),
             "base_versions": [], "scenarios": [], "reviews": [],
             "calculation_ids": [], "idempotency": {}, "packages": [],
-        })
-        self.audit(created_by, "create_case", case_id)
+        }, expected_revision=None)
+        self.audit(created_by, "create_case", case_id, f"tenant={tenant_id}")
         return case_id
 
     def case_exists(self, case_id: str) -> bool:
-        return self._case_path(case_id).exists()
+        return self.backend.doc_exists("cases", case_id)
 
     # -- base versions (immutable content; state transitions only) ---------
     def create_base_version(
@@ -226,12 +240,12 @@ class CaseStore:
 
     # -- calculations (write-once snapshots) -------------------------------
     def record_calculation(self, result: CalculationResult, actor: str) -> None:
-        path = self.root / "calculations" / f"{result.calculation_id}.json"
-        if path.exists():
-            raise StoreError(f"calculation {result.calculation_id} already recorded (immutable)")
         payload = result.model_dump(mode="json")
         payload["_result_hash"] = result.result_hash()
-        path.write_text(json.dumps(payload, indent=1, default=str))
+        try:
+            self.backend.put_immutable("calculations", result.calculation_id, payload)
+        except ImmutableViolation:
+            raise StoreError(f"calculation {result.calculation_id} already recorded (immutable)")
         doc = self._load(result.case_id)
         doc["calculation_ids"].append(result.calculation_id)
         self._save(result.case_id, doc)
@@ -239,10 +253,10 @@ class CaseStore:
                    f"target={result.target_id} recon={result.reconciliation_status}")
 
     def get_calculation(self, calculation_id: str) -> CalculationResult:
-        path = self.root / "calculations" / f"{calculation_id}.json"
-        if not path.exists():
+        try:
+            raw = self.backend.get_immutable("calculations", calculation_id)
+        except UnknownRecord:
             raise StoreError(f"unknown calculation {calculation_id!r}")
-        raw = json.loads(path.read_text())
         stored_hash = raw.pop("_result_hash", None)
         result = CalculationResult.model_validate(raw)
         if stored_hash is not None and result.result_hash() != stored_hash:
