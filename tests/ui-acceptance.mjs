@@ -26,6 +26,19 @@ const errors = [];
 page.on("pageerror", e => errors.push(String(e)));
 await page.goto(BASE, { waitUntil: "networkidle" });
 await page.waitForTimeout(600);
+/* Pin the legacy three-scenario planning fixture. Since the 3.2 multi-client
+   feature, a fresh profile loads one "Base — from profile" scenario, but this
+   suite's scenario/calculator assertions were written against the classic
+   seed (Sole prop / +401(k)+HSA / S-corp). Swap the active client's scenarios
+   to seed() through the app's own persistence functions, then reload — no
+   test-only pathways exist in the app itself. */
+await page.evaluate(() => {
+  const clients = loadClients();
+  clients[0].scenarios = seed();
+  saveClients(clients);
+});
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForTimeout(600);
 const nav = label => page.click(`button.tp-navitem:has-text("${label}")`).then(() => page.waitForTimeout(350));
 
 /* ---- shell ---- */
@@ -160,7 +173,9 @@ ok((await page.$$(".tp-lawcard")).length === 9, "law changes live in their own s
 await page.reload({ waitUntil: "networkidle" });
 await page.waitForTimeout(700);
 ok(await page.$(".tp-bubble.on >> text=Law Changes"), "selected guide category persists");
-await page.click(".tp-toolsec-head >> nth=4"); // quick calculator
+/* Select by name, not index — the tools panel gained sections (client
+   snapshot, goal monitor) after this suite was written. */
+await page.click('.tp-toolsec-head:has-text("Quick calculator")');
 await page.waitForTimeout(200);
 await page.click('.tp-calcbtn:has-text("7")');
 await page.click('.tp-qcalc-pad .tp-calcbtn:has-text("+")');

@@ -1,0 +1,121 @@
+# Mandatory CI: calculation, reconciliation, and security gates.
+# All jobs run with least-privilege permissions; nothing here deploys.
+# Branch-protection recommendations (which of these to make required) are in
+# docs/CI.md.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-tests:
+    name: Python tests + cross-engine contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      # Node is required by tests/test_cross_engine_contract.py, which runs
+      # the JavaScript engine through contract/run_js.mjs.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -e .[dev]
+      - run: python -m pytest -q
+
+  js-golden-tests:
+    name: JavaScript golden regression tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node tests/golden.test.mjs
+
+  standalone-build:
+    name: Standalone application build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node tools/build-standalone.mjs
+      - name: Verify build output
+        run: test -s dist/tax-advisory-pro.html
+
+  ui-acceptance:
+    name: UI acceptance (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Serve the app and run the acceptance suite
+        run: |
+          python3 -m http.server 8321 &
+          sleep 1
+          CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
+            node tests/ui-acceptance.mjs
+
+  excel-audit-smoke:
+    name: Excel audit package generation + reconciliation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e .
+      - name: End-to-end example (workbook generated, verified, reconciled)
+        run: |
+          python examples/build_example_case.py | tee example.log
+          test -n "$(find examples/output -name 'pkg_*.xlsx')"
+          grep -q "recon=passed" example.log
+          if grep -q "recon=failed" example.log; then
+            echo "reconciliation failure in example output" >&2; exit 1
+          fi
+      - name: S-corp reconciliation workbook
+        run: python examples/generate_s_corp_reconciliation.py
+
+  artifact-hygiene:
+    name: No generated artifacts or client exports in git
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/check_no_generated_artifacts.py
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+
+  secret-scan:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
