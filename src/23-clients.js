@@ -156,10 +156,133 @@ function blankClientProfile() {
     businesses: []
   };
 }
-function blankClient(name) {
+/* ----------------------------------------------------------------------------
+   CLIENT IDENTITY
+   Every client carries two identifiers with different jobs:
+
+   - `id`      — the immutable SYSTEM ID (crypto.randomUUID via uid()). It is
+                 the referential key: the active-client preference, audit-log
+                 scoping, and scenario ownership all use `id`. It is assigned
+                 once and never regenerated for an existing record.
+   - `clientId` — an OPTIONAL human-readable client number shown on cards,
+                 reports and AI context ("CLIENT-007", "DEMO-001"). Editable;
+                 generated sequentially and collision-checked, never random.
+
+   Records loaded from storage pass through migrateClients(), which assigns
+   missing identifiers and resolves duplicates WITHOUT merging records —
+   ambiguous cases are flagged on the record for human review.
+   ---------------------------------------------------------------------- */
+const CLIENT_IDENTITY_VERSION = 2;
+
+function nextClientNumber(clients, extraUsed) {
+  const used = new Set(extraUsed || []);
+  let maxN = 0;
+  (clients || []).forEach(c => {
+    const v = String(c.clientId || "");
+    used.add(v);
+    const m = /^CLIENT-(\d+)$/.exec(v);
+    if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+  });
+  let n = maxN + 1;
+  let num = "CLIENT-" + String(n).padStart(3, "0");
+  while (used.has(num)) {
+    n++;
+    num = "CLIENT-" + String(n).padStart(3, "0");
+  }
+  return num;
+}
+
+/* Assign missing identity fields and resolve duplicates. Never merges two
+   records and never regenerates an existing unique system ID. Returns
+   { clients, changed, issues } — issues are also recorded on each affected
+   record's reviewFlags so the ambiguity stays visible until a human clears it. */
+function migrateClients(list) {
+  const out = (list || []).map(c => ({ ...c }));
+  const issues = [];
+  let changed = false;
+  const seenIds = new Set();
+  for (const c of out) {
+    if (!Array.isArray(c.reviewFlags)) c.reviewFlags = c.reviewFlags ? [].concat(c.reviewFlags) : [];
+    if (!c.id) {
+      c.id = uid();
+      changed = true;
+    } else if (seenIds.has(c.id)) {
+      /* Two records share one system ID. Merging would destroy one client's
+         history, so keep both, give the later record a fresh ID, and flag
+         both facts for review — audit entries recorded under the shared ID
+         cannot be attributed automatically. */
+      const legacy = c.id;
+      c.id = uid();
+      c.legacySystemId = legacy;
+      const msg = "Duplicate internal ID " + legacy + " was shared with another client; this record received a new ID. Review audit-trail attribution for both records.";
+      c.reviewFlags.push(msg);
+      issues.push({ clientName: c.name, issue: msg });
+      changed = true;
+    }
+    seenIds.add(c.id);
+  }
+  const seenNumbers = new Set();
+  for (const c of out) {
+    let num = String(c.clientId || "");
+    if (!num) {
+      c.clientId = nextClientNumber(out, seenNumbers);
+      num = c.clientId;
+      changed = true;
+    } else if (seenNumbers.has(num)) {
+      c.legacyClientId = num;
+      c.clientId = nextClientNumber(out, seenNumbers);
+      const msg = "Client number " + num + " was shared with another client; this record now shows " + c.clientId + ". Confirm which external records belong to each client.";
+      c.reviewFlags.push(msg);
+      issues.push({ clientName: c.name, issue: msg });
+      num = c.clientId;
+      changed = true;
+    }
+    seenNumbers.add(num);
+  }
+  for (const c of out) {
+    if (c.identityVersion !== CLIENT_IDENTITY_VERSION) {
+      c.identityVersion = CLIENT_IDENTITY_VERSION;
+      changed = true;
+    }
+  }
+  return { clients: out, changed: changed, issues: issues };
+}
+
+/* Referential-integrity validation across clients, their scenarios, and the
+   session audit log. Read-only: reports issues, changes nothing. */
+function validateClientIntegrity(clients, auditLog) {
+  const issues = [];
+  const ids = new Set();
+  const numbers = new Set();
+  const scenarioIds = new Set();
+  (clients || []).forEach(c => {
+    if (!c.id) issues.push({ kind: "missing-system-id", client: c.name });
+    else if (ids.has(c.id)) issues.push({ kind: "duplicate-system-id", client: c.name, id: c.id });
+    ids.add(c.id);
+    const num = String(c.clientId || "");
+    if (num) {
+      if (numbers.has(num)) issues.push({ kind: "duplicate-client-number", client: c.name, clientId: num });
+      numbers.add(num);
+    }
+    (c.scenarios || []).forEach(s => {
+      if (scenarioIds.has(s.id)) issues.push({ kind: "duplicate-scenario-id", client: c.name, scenarioId: s.id });
+      scenarioIds.add(s.id);
+    });
+  });
+  (auditLog || []).forEach(e => {
+    if (e.clientId && !ids.has(e.clientId)) {
+      issues.push({ kind: "orphaned-audit-entry", auditId: e.id, clientId: e.clientId });
+    }
+  });
+  return issues;
+}
+
+function blankClient(name, existingClients) {
   return {
     id: uid(),
-    clientId: "CLIENT-" + String(Math.floor(Math.random() * 900) + 100),
+    clientId: nextClientNumber(existingClients),
+    identityVersion: CLIENT_IDENTITY_VERSION,
+    reviewFlags: [],
     name: name || "New client",
     archived: false,
     createdAt: Date.now(),
@@ -480,7 +603,14 @@ function saveClients(clients) {
 function loadClients() {
   try {
     const raw = JSON.parse(localStorage.getItem(CLIENTS_KEY));
-    if (Array.isArray(raw) && raw.length && raw[0].profile) return raw;
+    if (Array.isArray(raw) && raw.length && raw[0].profile) {
+      /* Identity migration: assign missing IDs, resolve duplicate IDs and
+         client numbers without merging records, flag ambiguity for review.
+         Persist immediately so the migration runs once, not on every load. */
+      const migrated = migrateClients(raw);
+      if (migrated.changed) saveClients(migrated.clients);
+      return migrated.clients;
+    }
   } catch (e) {}
   return demoClients();
 }

@@ -906,3 +906,132 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 .tp-goalalign-rows{padding:3px 0 1px}
 .tp-goalalign-rows strong.up{color:var(--green)}
 .tp-goalalign-rows strong.down{color:var(--red)}
+
+/* ---- Number typography (Customize: number font / size / weight) ----
+   Applies only to numeric presentation elements; text elements keep the
+   text font. tabular-nums keeps financial columns aligned. */
+.tp-kpi strong, .tp-tbl th.num, .tp-tbl td.num, .tp-money, .tp-vtotal,
+.tp-cell, .tp-calc-val, .tp-calc-disp, .tp-qcalc-disp, .tp-statline strong {
+  font-family: var(--app-font-num, inherit);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.ap-numw-medium .tp-tbl td.num, .ap-numw-medium .tp-cell, .ap-numw-medium .tp-money { font-weight: 600 }
+.ap-numw-bold .tp-tbl td.num, .ap-numw-bold .tp-cell, .ap-numw-bold .tp-money { font-weight: 700 }
+.ap-nums-sm .tp-tbl td.num, .ap-nums-sm .tp-cell, .ap-nums-sm .tp-money { font-size: .92em }
+.ap-nums-lg .tp-tbl td.num, .ap-nums-lg .tp-cell, .ap-nums-lg .tp-money { font-size: 1.08em }
+.ap-nums-sm .tp-kpi strong { font-size: 23px }
+.ap-nums-lg .tp-kpi strong { font-size: 31px }
+
+/* ---- Calculation identity strip (critical status — never hideable) ---- */
+.tp-calcid{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:3px 18px;
+  font-size:10.5px;color:var(--muted);border-bottom:1px solid var(--line2);background:var(--hdr)}
+.tp-calcid .tp-calcid-ok{color:var(--green);font-weight:600}
+.tp-calcid .tp-calcid-bad{color:#b42318;font-weight:600}
+
+/* ---- Edit Layout: 6-column grid, spans, chrome ---- */
+.tp-layout-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;align-items:start}
+.tp-layout-grid>*{grid-column:1/-1;min-width:0}
+.tp-layout-cell{min-width:0}
+.tp-layout-cell.tp-w-full{grid-column:1/-1}
+.tp-layout-cell.tp-w-half{grid-column:span 3}
+.tp-layout-cell.tp-w-third{grid-column:span 2}
+.tp-layout-cell>.tp-card{height:100%}
+.tp-layout-cell .tp-tblwrap{overflow-x:auto}
+.tp-layout-editing .tp-layout-cell{outline:1.5px dashed var(--indigo);outline-offset:2px;border-radius:10px}
+.tp-layout-cell.dragover{outline:2.5px solid var(--indigo)}
+.tp-layout-cell.layout-hidden{opacity:.45}
+.tp-layout-chrome{display:flex;gap:5px;align-items:center;flex-wrap:wrap;padding:3px 4px;
+  background:var(--hdr);border:1px solid var(--line2);border-radius:7px;margin-bottom:5px;font-size:10.5px}
+.tp-layout-grip{cursor:grab;user-select:none;font-weight:700;color:var(--muted);padding:1px 6px}
+.tp-layout-mode{font-size:10.5px;font-weight:700;color:var(--indigo);text-transform:uppercase;letter-spacing:.05em}
+@media (max-width:900px){
+  .tp-layout-grid{display:block}
+  .tp-layout-grid>*{margin-bottom:12px}
+}
+@media print{.tp-layout-chrome{display:none}}
+
+/* ---- Ownership notice (sidebar footer) ---- */
+.tp-copyright{margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);
+  font-size:9.5px;color:var(--muted);line-height:1.4}
+
+/* ============================================================================
+   PROFESSIONAL WORKBENCH POLISH — copyright footer, hidden-nav state, command
+   bar, calculation trace, copy-for-Excel, pinned calculators (src/26-workbench)
+   ========================================================================== */
+
+/* Ownership line: always visible on every viewport without opening a menu */
+.tp-main-copyright{margin-top:auto;padding:14px 4px 10px;font-size:11px;color:var(--muted);text-align:center;letter-spacing:.2px}
+.tp-main{display:flex;flex-direction:column}
+
+/* Fully hidden navigation (third state) — desktop only; the mobile drawer
+   keeps working regardless of the desktop state */
+@media (min-width:901px){
+  .tp-shell.nav-hidden{grid-template-columns:minmax(0,1fr) var(--toolsw)}
+  .tp-shell.nav-hidden.tools-collapsed{grid-template-columns:minmax(0,1fr) var(--toolsw-c)}
+  .tp-shell.nav-hidden.tools-hidden{grid-template-columns:minmax(0,1fr)}
+  .tp-shell.nav-hidden .tp-side{display:none}
+}
+@media (max-width:1280px) and (min-width:901px){
+  .tp-shell.nav-hidden{grid-template-columns:minmax(0,1fr) var(--toolsw-c)}
+  .tp-shell.nav-hidden.tools-collapsed{grid-template-columns:minmax(0,1fr) var(--toolsw-c)}
+  .tp-shell.nav-hidden.tools-hidden{grid-template-columns:minmax(0,1fr)}
+}
+.tp-navhide{background:none;border:none;color:var(--navy-mut,#8ea0bd);cursor:pointer;padding:4px;border-radius:6px;line-height:0}
+.tp-navhide:hover{color:#fff;background:rgba(255,255,255,.08)}
+.nav-collapsed .tp-navhide{display:none}
+@media (max-width:900px){.nav-collapsed .tp-navhide{display:block}}
+
+/* Undo / redo, search, pop-out topbar controls */
+.tp-undoredo{display:inline-flex;gap:4px}
+.tp-undoredo .tp-btn{min-width:34px;padding-left:8px;padding-right:8px}
+@media (max-width:900px){
+  .tp-popout-win,.tp-navrestore{display:none}
+}
+
+/* Copy for Excel */
+.tp-copyxl-msg{font-size:11px;color:var(--green,#047857);font-style:normal;white-space:nowrap}
+
+/* Trace buttons and drawer */
+.tp-tracebtn{margin-left:6px;width:17px;height:17px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:11px;line-height:1;cursor:pointer;vertical-align:1px}
+.tp-tracebtn:hover{color:var(--indigo-deep,#1d4ed8);border-color:var(--indigo-deep,#1d4ed8)}
+.tp-trace-amt{display:flex;justify-content:space-between;align-items:baseline;padding:10px 12px;background:var(--hdr);border:1px solid var(--line);border-radius:9px;margin-bottom:10px}
+.tp-trace-amt strong{font-size:19px;font-variant-numeric:tabular-nums lining-nums}
+.tp-trace-formula{font-size:12.5px;color:var(--ink2);line-height:1.55;margin:0 0 12px}
+.tp-trace-rows{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.tp-trace-row{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:6px 8px;border:1px solid var(--line2);border-radius:7px;font-size:12.5px}
+.tp-trace-row.input{border-left:3px solid #0b5cab}
+.tp-trace-row.calc{border-left:3px solid var(--line)}
+.tp-trace-row.const{border-left:3px solid #9a3412}
+.tp-trace-kind{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.tp-trace-lbl em{display:block;font-size:11px;color:var(--muted);font-style:normal}
+.tp-trace-val{font-variant-numeric:tabular-nums lining-nums;white-space:nowrap}
+.tp-trace-prov{border-top:1px solid var(--line2);padding-top:10px;font-size:12px;color:var(--ink2);display:flex;flex-direction:column;gap:4px}
+
+/* Command bar */
+.tp-cmdbar-overlay{position:fixed;inset:0;background:rgba(11,21,38,.38);z-index:120}
+.tp-cmdbar{position:fixed;top:min(14vh,120px);left:50%;transform:translateX(-50%);width:min(620px,94vw);background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(11,21,38,.35);z-index:121;display:flex;flex-direction:column;overflow:hidden}
+.tp-cmdbar-input{border:none;border-bottom:1px solid var(--line);padding:14px 16px;font-size:15px;background:var(--card);color:var(--ink);outline:none}
+.tp-cmdbar-list{max-height:min(46vh,380px);overflow:auto;padding:6px}
+.tp-cmdbar-group{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 10px 3px}
+.tp-cmdbar-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;border:none;background:none;border-radius:8px;cursor:pointer;font-size:13.5px;color:var(--ink)}
+.tp-cmdbar-item.on{background:var(--hdr)}
+.tp-cmdbar-item em{margin-left:auto;font-size:11.5px;color:var(--muted);font-style:normal;white-space:nowrap}
+.tp-cmdbar-ic{width:18px;text-align:center;color:var(--muted);flex-shrink:0}
+.tp-cmdbar-lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-cmdbar-empty{padding:16px 14px;font-size:12.5px;color:var(--muted);line-height:1.6}
+.tp-cmdbar-foot{display:flex;justify-content:space-between;border-top:1px solid var(--line2);padding:7px 14px;font-size:11px;color:var(--muted)}
+@media (max-width:640px){.tp-cmdbar{top:8px;width:calc(100vw - 16px)}.tp-cmdbar-foot span:last-child{display:none}}
+
+/* Pinned calculators */
+.tp-launchrow{display:flex;align-items:stretch;gap:4px}
+.tp-launchrow .tp-launchbtn{flex:1;min-width:0}
+.tp-pinbtn{border:1px solid var(--line);background:var(--card);border-radius:7px;color:var(--line);cursor:pointer;width:26px;flex-shrink:0;font-size:12px;padding:0}
+.tp-pinbtn:hover{color:var(--amber,#b45309)}
+.tp-pinbtn.on{color:var(--amber,#b45309);border-color:var(--amber,#b45309)}
+
+/* Report section selection */
+.tp-rp-sections{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:10px 0 2px;border-top:1px dashed var(--line2);margin-top:10px}
+.tp-rp-sections-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);width:100%}
+.tp-rp-secchk{display:inline-flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--line);border-radius:14px;padding:3px 10px;cursor:pointer;background:var(--card)}
+.tp-rp-secchk.off{color:var(--muted);text-decoration:line-through;background:var(--hdr)}
+.tp-rp-sections .tp-hint{width:100%}

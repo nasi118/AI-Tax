@@ -58,7 +58,8 @@ function Dashboard({
   setYear,
   setStatus,
   onAskAI,
-  onAIReport
+  onAIReport,
+  onTrace
 }) {
   const focus = results.find(x => x.s.id === focusId) || results[0];
   const A = focus.r;
@@ -107,16 +108,19 @@ function Dashboard({
   }, {
     label: "Adjusted gross income",
     value: usd$(A.agi),
-    sub: "total income " + usd$(A.grossIncome)
+    sub: "total income " + usd$(A.grossIncome),
+    trace: "agi"
   }, {
     label: "Taxable income",
     value: usd$(A.taxableIncome),
-    sub: A.deductionKind.toLowerCase() + " deduction " + usd$(A.deductionUsed)
+    sub: A.deductionKind.toLowerCase() + " deduction " + usd$(A.deductionUsed),
+    trace: "taxableIncome"
   }, {
     label: "Total modeled federal tax",
     value: usd$(A.totalTax),
     sub: pct(A.effectiveRate) + " effective · " + pct(A.marginal) + " bracket",
-    warn: warnKPI
+    warn: warnKPI,
+    trace: "totalTax"
   }, {
     label: "After-tax economic income",
     value: usd$(A.afterTaxCash),
@@ -129,22 +133,21 @@ function Dashboard({
     cls: totalOpportunity > 0 ? "warn" : "good"
   }];
   const walkKey = [
-    ["Total income", A.grossIncome],
-    ["Adjusted gross income", A.agi],
-    [A.deductionKind + " deduction", -A.deductionUsed],
-    ["QBI deduction", -A.qbi.deduction],
-    ["Taxable income", A.taxableIncome, "tot"],
-    ["Income tax net of credits", clamp0(A.fedIncomeTax - A.creditsApplied)],
-    ["Employment taxes", A.seTax + A.sCorpFICA],
-    ["Surtaxes (Add'l Medicare, NIIT)", A.addlMedicare + A.niit],
-    ["Total modeled federal tax", A.totalTax, "grand"],
+    ["Total income", A.grossIncome, "", "totalIncome"],
+    ["Adjusted gross income", A.agi, "", "agi"],
+    [A.deductionKind + " deduction", -A.deductionUsed, "", "deduction"],
+    ["QBI deduction", -A.qbi.deduction, "", "qbi"],
+    ["Taxable income", A.taxableIncome, "tot", "taxableIncome"],
+    ["Income tax net of credits", clamp0(A.fedIncomeTax - A.creditsApplied), "", "incomeTax"],
+    ["Employment taxes", A.seTax + A.sCorpFICA, "", "employment"],
+    ["Surtaxes (Add'l Medicare, NIIT)", A.addlMedicare + A.niit, "", "surtaxes"],
+    ["Total modeled federal tax", A.totalTax, "grand", "totalTax"],
     ["Economic income", A.economicIncome],
     ["After-tax economic income", A.afterTaxCash, "tot"],
     ["Spendable after-tax cash", A.spendableAfterTaxCash, "tot"]
   ];
-  return EL("div", {
-    className: "tp-stack"
-  }, EL("div", {
+  const walkRef = useRef(null);
+  return layoutContainer("dashboard", "tp-stack tp-layout-grid", EL("div", {
     className: "tp-selector"
   }, EL("label", {
     className: "tp-sel"
@@ -184,14 +187,21 @@ function Dashboard({
   }, EL(SectionControls, {
     page: "dashboard"
   }))), EL("div", {
-    className: "tp-kpis"
+    className: "tp-kpis",
+    "data-layout": "kpis"
   }, kpis.map(k => EL("div", {
     key: k.label,
     className: "tp-kpi " + (k.cls || "")
   }, EL("span", null, k.label, k.warn && EL("span", {
     title: "Includes a manual override or items flagged for review",
     style: { marginLeft: 5, color: "var(--amber)" }
-  }, I.alert)), EL("strong", null, k.value), EL("em", null, k.sub)))), EL(Section, {
+  }, I.alert), onTrace && k.trace && EL("button", {
+    type: "button",
+    className: "tp-tracebtn",
+    title: "Where did this come from?",
+    "aria-label": "Trace " + k.label,
+    onClick: () => onTrace(k.trace, focus.s.id)
+  }, "?")), EL("strong", null, k.value), EL("em", null, k.sub)))), EL(Section, {
     page: "dashboard",
     id: "chart",
     title: "Scenario comparison",
@@ -223,26 +233,36 @@ function Dashboard({
     id: "walk",
     title: "Form 1040 walk",
     summary: focus.s.name,
-    right: EL("button", {
+    right: EL(React.Fragment, null, typeof CopyForExcel !== "undefined" && EL(CopyForExcel, {
+      forRef: walkRef
+    }), EL("button", {
       className: "tp-mini",
       type: "button",
       onClick: () => setWalkDetail(!walkDetail),
       "aria-expanded": walkDetail
-    }, walkDetail ? "Key totals only" : "Show detailed lines"),
+    }, walkDetail ? "Key totals only" : "Show detailed lines")),
     flush: true,
     fullable: true
   }, !walkDetail ? EL("div", {
-    className: "tp-tblwrap"
+    className: "tp-tblwrap",
+    ref: walkRef
   }, EL("table", {
     className: "tp-tbl"
   }, EL("tbody", null, walkKey.map(row => EL("tr", {
     key: row[0],
     className: row[2] || ""
-  }, EL("td", null, row[0]), EL("td", {
+  }, EL("td", null, row[0], onTrace && row[3] && EL("button", {
+    type: "button",
+    className: "tp-tracebtn",
+    title: "Where did this come from? Inputs, intermediate values and the formula behind this figure",
+    "aria-label": "Trace " + row[0],
+    onClick: () => onTrace(row[3], focus.s.id)
+  }, "?")), EL("td", {
     className: "num" + (row[2] ? " strong" : "")
   }, row[1] < 0 ? "(" + usd(Math.abs(row[1])) + ")" : usd$(row[1])))))))
     : EL("div", {
-    className: "tp-tblwrap"
+    className: "tp-tblwrap",
+    ref: walkRef
   }, EL("table", {
     className: "tp-tbl"
   }, EL("tbody", null, EL("tr", {
@@ -375,7 +395,8 @@ function Dashboard({
   }, "Form 1040 only; excludes the S corporation's share of payroll tax")), EL("td", {
     className: "num"
   }, usd$(Math.abs(A.balanceDue))))))))), EL("div", {
-    className: "tp-2col"
+    className: "tp-2col",
+    "data-layout": "analysis"
   }, EL(Section, {
     page: "dashboard",
     id: "bytype",
@@ -512,6 +533,8 @@ function ScenariosPage({
   const toggle = k => setOpen({ ...open, [k]: !open[k] });
   const setAllGroups = v => setOpen({ income: v, sched: v, ded: v, other: v, econ: v });
   const [density, setDensity] = useUIPref("ledger:density", "standard");
+  const ledgerRef = useRef(null);
+  const [copyMsg, setCopyMsg] = useState("");
   /* Column sizing within bounded limits, persisted like every UI preference */
   const [labWidth, setLabWidth] = useUIPref("ledger:labw", 235);
   const [colWidth, setColWidth] = useUIPref("ledger:colw", 185);
@@ -681,9 +704,23 @@ function ScenariosPage({
     value: colW,
     onChange: e => setColWidth(num(e.target.value)),
     "aria-label": "Scenario column width"
-  })), EL("em", null, "Line-item column and scenario headers stay pinned while you scroll")), /*#__PURE__*/React.createElement("div", {
+  })), EL("button", {
+    className: "tp-mini tp-copyxl",
+    type: "button",
+    title: "Copy the ledger as tab-separated values that paste into Excel as real numbers",
+    onClick: () => {
+      const tsv = wbGridToTSV(ledgerRef.current, scenarios.length + 1);
+      wbCopyText(tsv).then(ok => {
+        setCopyMsg(ok ? "Copied for Excel" : "Copy blocked");
+        setTimeout(() => setCopyMsg(""), 1600);
+      });
+    }
+  }, "⧉ Copy for Excel"), copyMsg && EL("em", {
+    className: "tp-copyxl-msg"
+  }, copyMsg), EL("em", null, "Line-item column and scenario headers stay pinned while you scroll")), /*#__PURE__*/React.createElement("div", {
     className: "tp-ledger",
-    style: cols
+    style: cols,
+    ref: ledgerRef
   },/*#__PURE__*/React.createElement("div", {
     className: "tp-cell tp-corner"
   }, "Line item"), scenarios.map(s => /*#__PURE__*/React.createElement("div", {

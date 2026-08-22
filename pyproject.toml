@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "ai-tax"
 version = "0.1.0"
 description = "Tax planning application: deterministic tax engine, scenario planning, audit packages, and a constrained Tax Planning Analyst Agent"
+license = {text = "Proprietary - see NOTICE.md"}
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.5",

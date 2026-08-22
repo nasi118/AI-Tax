@@ -144,7 +144,7 @@ function SectionControls({ page }) {
     className: "tp-mini",
     onClick: () => setAllSections(page, null),
     title: "Restore the default open and collapsed sections"
-  }, "Default view"));
+  }, "Default view"), typeof LayoutControls !== "undefined" && EL(LayoutControls, { page }));
 }
 
 /* ----------------------------------------------------------------------------

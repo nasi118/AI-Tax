@@ -6,4 +6,5 @@ build/
 dist/
 .venv/
 node_modules/
-examples/output/*.xlsx
+examples/output/
+node_modules

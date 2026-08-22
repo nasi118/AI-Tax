@@ -1,0 +1,155 @@
+{
+  "governance_version": "1.0",
+  "rulesets": {
+    "us-federal-2025-v1": {
+      "approved_at": null,
+      "checksum": "sha256:1e2218ee63bb59d6fc61f943e8f76f2db5583b06b1456f73e0a8746bda735174",
+      "compatible_engine_versions": [
+        "engine-0.1.0"
+      ],
+      "effective_from": "2025-01-01",
+      "effective_to": "2025-12-31",
+      "generator": "scripts/build_rulesets.py",
+      "generator_version": "1.0",
+      "jurisdiction": "US-FEDERAL",
+      "legal_status": "enacted",
+      "review_status": "legacy-unreviewed",
+      "reviewer": null,
+      "source_citations": [
+        "Rev. Proc. 2024-40 (inflation adjustments for 2025)",
+        "P.L. 119-21 One Big Beautiful Bill Act (2025 standard deduction, CTC, SALT cap)",
+        "IRC \u00a71 (rates), \u00a763 (standard deduction), \u00a724 (CTC), \u00a7164(b)(6) (SALT)",
+        "IRC \u00a71411 (net investment income tax)",
+        "IRS Notice 2024-80 (2025 retirement plan limits)"
+      ],
+      "source_retrieved_at": "2026-07-28",
+      "superseded_by": null,
+      "tax_year": 2025
+    },
+    "us-federal-2026-v1": {
+      "approved_at": null,
+      "checksum": "sha256:23bf1850505e938745ce846eba7fedfbd0e418fb8e7c49a25dfda12a16e92b8f",
+      "compatible_engine_versions": [
+        "engine-0.1.0"
+      ],
+      "effective_from": "2026-01-01",
+      "effective_to": "2026-12-31",
+      "generator": "scripts/build_rulesets.py",
+      "generator_version": "1.0",
+      "jurisdiction": "US-FEDERAL",
+      "legal_status": "projected",
+      "review_status": "legacy-unreviewed",
+      "reviewer": null,
+      "source_citations": [
+        "Rev. Proc. 2024-40 (inflation adjustments for 2025)",
+        "P.L. 119-21 One Big Beautiful Bill Act (2025 standard deduction, CTC, SALT cap)",
+        "IRC \u00a71 (rates), \u00a763 (standard deduction), \u00a724 (CTC), \u00a7164(b)(6) (SALT)",
+        "IRC \u00a71411 (net investment income tax)",
+        "IRS Notice 2024-80 (2025 retirement plan limits)"
+      ],
+      "source_retrieved_at": "2026-07-28",
+      "superseded_by": null,
+      "tax_year": 2026
+    },
+    "us-federal-2027-v1": {
+      "approved_at": null,
+      "checksum": "sha256:b74c7c53be49537dce045b33e5d4f9422bedd0c1255bb6da28fa39a355db3720",
+      "compatible_engine_versions": [
+        "engine-0.1.0"
+      ],
+      "effective_from": "2027-01-01",
+      "effective_to": "2027-12-31",
+      "generator": "scripts/build_rulesets.py",
+      "generator_version": "1.0",
+      "jurisdiction": "US-FEDERAL",
+      "legal_status": "projected",
+      "review_status": "legacy-unreviewed",
+      "reviewer": null,
+      "source_citations": [
+        "Rev. Proc. 2024-40 (inflation adjustments for 2025)",
+        "P.L. 119-21 One Big Beautiful Bill Act (2025 standard deduction, CTC, SALT cap)",
+        "IRC \u00a71 (rates), \u00a763 (standard deduction), \u00a724 (CTC), \u00a7164(b)(6) (SALT)",
+        "IRC \u00a71411 (net investment income tax)",
+        "IRS Notice 2024-80 (2025 retirement plan limits)"
+      ],
+      "source_retrieved_at": "2026-07-28",
+      "superseded_by": null,
+      "tax_year": 2027
+    },
+    "us-federal-2028-v1": {
+      "approved_at": null,
+      "checksum": "sha256:d354062377de6d5fa7ce98f6e6c8471c40d0809492810e249a049d80d94ab022",
+      "compatible_engine_versions": [
+        "engine-0.1.0"
+      ],
+      "effective_from": "2028-01-01",
+      "effective_to": "2028-12-31",
+      "generator": "scripts/build_rulesets.py",
+      "generator_version": "1.0",
+      "jurisdiction": "US-FEDERAL",
+      "legal_status": "projected",
+      "review_status": "legacy-unreviewed",
+      "reviewer": null,
+      "source_citations": [
+        "Rev. Proc. 2024-40 (inflation adjustments for 2025)",
+        "P.L. 119-21 One Big Beautiful Bill Act (2025 standard deduction, CTC, SALT cap)",
+        "IRC \u00a71 (rates), \u00a763 (standard deduction), \u00a724 (CTC), \u00a7164(b)(6) (SALT)",
+        "IRC \u00a71411 (net investment income tax)",
+        "IRS Notice 2024-80 (2025 retirement plan limits)"
+      ],
+      "source_retrieved_at": "2026-07-28",
+      "superseded_by": null,
+      "tax_year": 2028
+    },
+    "us-federal-2029-v1": {
+      "approved_at": null,
+      "checksum": "sha256:2b18b78627ed5d67d19338dbeef3780b413bc156bd0562df7bccf9e283e73eaa",
+      "compatible_engine_versions": [
+        "engine-0.1.0"
+      ],
+      "effective_from": "2029-01-01",
+      "effective_to": "2029-12-31",
+      "generator": "scripts/build_rulesets.py",
+      "generator_version": "1.0",
+      "jurisdiction": "US-FEDERAL",
+      "legal_status": "projected",
+      "review_status": "legacy-unreviewed",
+      "reviewer": null,
+      "source_citations": [
+        "Rev. Proc. 2024-40 (inflation adjustments for 2025)",
+        "P.L. 119-21 One Big Beautiful Bill Act (2025 standard deduction, CTC, SALT cap)",
+        "IRC \u00a71 (rates), \u00a763 (standard deduction), \u00a724 (CTC), \u00a7164(b)(6) (SALT)",
+        "IRC \u00a71411 (net investment income tax)",
+        "IRS Notice 2024-80 (2025 retirement plan limits)"
+      ],
+      "source_retrieved_at": "2026-07-28",
+      "superseded_by": null,
+      "tax_year": 2029
+    },
+    "us-federal-2030-v1": {
+      "approved_at": null,
+      "checksum": "sha256:8d74dd5cff5aa03d52f1f6f1c9d24cac51f0fb9471bcba1166db76094265f097",
+      "compatible_engine_versions": [
+        "engine-0.1.0"
+      ],
+      "effective_from": "2030-01-01",
+      "effective_to": "2030-12-31",
+      "generator": "scripts/build_rulesets.py",
+      "generator_version": "1.0",
+      "jurisdiction": "US-FEDERAL",
+      "legal_status": "projected",
+      "review_status": "legacy-unreviewed",
+      "reviewer": null,
+      "source_citations": [
+        "Rev. Proc. 2024-40 (inflation adjustments for 2025)",
+        "P.L. 119-21 One Big Beautiful Bill Act (2025 standard deduction, CTC, SALT cap)",
+        "IRC \u00a71 (rates), \u00a763 (standard deduction), \u00a724 (CTC), \u00a7164(b)(6) (SALT)",
+        "IRC \u00a71411 (net investment income tax)",
+        "IRS Notice 2024-80 (2025 retirement plan limits)"
+      ],
+      "source_retrieved_at": "2026-07-28",
+      "superseded_by": null,
+      "tax_year": 2030
+    }
+  }
+}
