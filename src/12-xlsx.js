@@ -284,9 +284,9 @@ ${sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.open
 </Relationships>`);
   push("docProps/core.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-<dc:title>${xmlEsc(meta.title || "Tax Advisory Pro export")}</dc:title>
-<dc:creator>${xmlEsc(meta.creator || "Tax Advisory Pro")}</dc:creator>
-<cp:lastModifiedBy>${xmlEsc(meta.creator || "Tax Advisory Pro")}</cp:lastModifiedBy>
+<dc:title>${xmlEsc(meta.title || "Tax Planning Workbench export")}</dc:title>
+<dc:creator>${xmlEsc(meta.creator || "Tax Planning Workbench")}</dc:creator>
+<cp:lastModifiedBy>${xmlEsc(meta.creator || "Tax Planning Workbench")}</cp:lastModifiedBy>
 <dcterms:created xsi:type="dcterms:W3CDTF">${meta.created || "2025-01-01T00:00:00Z"}</dcterms:created>
 </cp:coreProperties>`);
   push("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

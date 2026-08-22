@@ -675,7 +675,7 @@ function DataPage({
           createdISO: d.toISOString().replace(/\.\d+Z$/, "Z")
         }
       });
-      downloadBlob(bytes, (client || "Tax_Advisory_Pro").replace(/[^\w-]+/g, "_") + "_" + TY[year].label + "_" + stamp() + ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      downloadBlob(bytes, (client || "Tax_Planning_Workbench").replace(/[^\w-]+/g, "_") + "_" + TY[year].label + "_" + stamp() + ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       flash("ok", "Workbook exported. Every computed cell is a live formula — open the Cover sheet for how to trace figures, and check the tie-out block at the foot of each schedule.");
     } catch (err) {
       flash("bad", "Export failed: " + err.message);
@@ -683,7 +683,7 @@ function DataPage({
   };
   const doTemplate = () => {
     try {
-      downloadBlob(buildTemplateWorkbook(year, status), "Tax_Advisory_Pro_input_template_" + TY[year].label + ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      downloadBlob(buildTemplateWorkbook(year, status), "Tax_Planning_Workbench_input_template_" + TY[year].label + ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       flash("ok", "Blank template exported. Fill the scenario columns, then import it back here.");
     } catch (err) {
       flash("bad", "Template export failed: " + err.message);
@@ -721,7 +721,7 @@ function DataPage({
       notes,
       auditLog
     };
-    downloadBlob(new TextEncoder().encode(JSON.stringify(payload, null, 2)), "Tax_Advisory_Pro_session_" + stamp() + ".json", "application/json");
+    downloadBlob(new TextEncoder().encode(JSON.stringify(payload, null, 2)), "Tax_Planning_Workbench_session_" + stamp() + ".json", "application/json");
     flash("ok", "Session saved. This file restores scenarios, notes and the audit trail exactly.");
   };
   const doLoadJSON = async file => {

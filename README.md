@@ -2,7 +2,7 @@
 
 Two complementary components live in this repository:
 
-1. **Tax Advisory Pro** — a dependency-free static web app (React 18, no
+1. **Tax Planning Workbench** (formerly Tax Advisory Pro) — a dependency-free static web app (React 18, no
    build step) for TY2025/TY2026 individual tax planning. Served from the
    repo root; this is what Vercel deploys.
 2. **`ai_tax` (Python)** — an audit-grade deterministic tax calculation
@@ -12,7 +12,7 @@ Two complementary components live in this repository:
 
 ---
 
-## Tax Advisory Pro — Individual Planning Workbench (TY2025 / TY2026)
+## Tax Planning Workbench — Individual Planning (TY2025 / TY2026)
 
 A deterministic federal individual income tax planning engine for tax years
 2025 and 2026, built as a dependency-free static web app (React 18, no build

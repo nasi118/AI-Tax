@@ -1167,8 +1167,8 @@ function App() {
           EL("div", { className: "tp-brand" },
             EL("div", { className: "tp-mark" }, "§"),
             !navCollapsed && EL("div", null,
-              EL("h1", null, "Tax Advisory Pro"),
-              EL("p", null, "Individual planning workbench"))),
+              EL("h1", null, "Tax Planning Workbench"),
+              EL("p", null, "Individual federal tax planning"))),
           EL("button", {
             className: "tp-navcollapse",
             type: "button",

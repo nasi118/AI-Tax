@@ -101,7 +101,7 @@ function buildTaxWorkbook(opts) {
   cover.add({
     cells: [{
       t: "s",
-      v: "Tax Advisory Pro — planning workbook",
+      v: "Tax Planning Workbench — planning workbook",
       s: ST.title
     }]
   });
@@ -2924,7 +2924,7 @@ function buildTaxWorkbook(opts) {
   sheets.push(nt);
   return buildWorkbook(sheets, definedNames, {
     title: (meta.client || "Tax planning") + " — " + C.label,
-    creator: meta.preparer || "Tax Advisory Pro",
+    creator: meta.preparer || "Tax Planning Workbench",
     created: meta.createdISO
   });
 }
@@ -3018,7 +3018,7 @@ function buildTemplateWorkbook(year, status) {
   sh.add({
     cells: [{
       t: "s",
-      v: "Tax Advisory Pro — input template (" + C.label + ", " + STATUSES.find(s => s.v === status).l + ")",
+      v: "Tax Planning Workbench — input template (" + C.label + ", " + STATUSES.find(s => s.v === status).l + ")",
       s: ST.title
     }]
   });
@@ -3088,7 +3088,7 @@ function buildTemplateWorkbook(year, status) {
     height: 28
   }));
   return buildWorkbook([sh, guide], [], {
-    title: "Tax Advisory Pro input template"
+    title: "Tax Planning Workbench input template"
   });
 }
 
