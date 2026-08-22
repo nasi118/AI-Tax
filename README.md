@@ -113,9 +113,11 @@ ai_tax/
   agent/          typed tools, runtime policy, Anthropic-backed runtime
 scripts/build_rulesets.py   deterministic ruleset generator
 examples/build_example_case.py   full workflow demo (no LLM needed)
-tests/*.py        55 tests: golden cases, lifecycle, isolation, guardrails
+tests/*.py        pytest suite: golden cases, lifecycle, isolation, guardrails,
+                  cross-engine contract, persistence, imports, governance
 docs/             ASSESSMENT · ARCHITECTURE · RUNBOOK · THREAT_MODEL ·
-                  UNSUPPORTED · CONTROLS
+                  UNSUPPORTED · CONTROLS · CAPABILITIES · CI · PERSISTENCE ·
+                  CONSOLIDATION · ISSUE_BACKLOG · BASELINE-2026-08-22
 ```
 
 ### Quick start
@@ -132,3 +134,38 @@ See `docs/RUNBOOK.md` for the agent runtime and operations, and
 > All output is a **planning estimate**, not filed-return advice. Future-year
 > parameters (2026+) are provisional projections of enacted 2025 law and are
 > labeled as such everywhere they appear.
+
+---
+
+## Canonical-foundation layer (both components)
+
+- **Capability boundary** — `capabilities/registry.json` is the
+  machine-readable matrix of what each engine calculates, approximates,
+  blocks, or does not detect; `docs/CAPABILITIES.md` is generated from it
+  (`python scripts/build_capability_matrix.py`). Results and reports must
+  identify their engine and ruleset; UIs must not imply unsupported scope.
+- **Cross-engine contract** — `contract/` runs identical canonical cases
+  through both engines and reconciles them within explicit tolerances
+  (`tests/test_cross_engine_contract.py`).
+- **CI** — `.github/workflows/ci.yml` gates every PR: pytest + contract, JS
+  golden tests, Playwright UI acceptance, standalone build, Excel
+  audit-package smoke with reconciliation, artifact hygiene, dependency
+  review, secret scanning. See `docs/CI.md` (includes the branch-protection
+  recommendation).
+- **Ruleset governance** — `ai_tax/rulesets/GOVERNANCE.json` records legal
+  status, citations, retrieval dates, reviewer, checksums, and engine
+  compatibility per release; `ai_tax/rulesets/governance.py` validates
+  deterministically (tamper detection, duplicate scopes, undisclosed
+  projections). Corrections are new `-vN` releases, never edits.
+- **Persistence** — `ai_tax/persistence.py` is the narrow backend interface
+  (documents with optimistic concurrency, write-once records, append-only
+  streams, retention hooks); `docs/PERSISTENCE.md` maps every canonical
+  record and the database migration boundary.
+- **Document imports** — `ai_tax/imports.py`: upload → validate → classify →
+  extract → review-queue → human decision → provenance-linked facts;
+  extractions are never authoritative and approved facts are superseded,
+  never overwritten.
+- **Consolidation** — `docs/CONSOLIDATION.md` classifies the legacy
+  `AI-Tax-APP` capabilities (migrate / redesign / defer / reject) and defines
+  archival acceptance criteria; the prioritized work plan is
+  `docs/ISSUE_BACKLOG.md`.
