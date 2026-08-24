@@ -306,8 +306,22 @@ function blankClient(name, existingClients) {
     },
     missingFacts: [],
     notes: "",
+    workingNotes: [],
+    auditLog: [],
+    aiHistory: [],
+    reportInbox: [],
     scenarios: []
   };
+}
+
+/* Rebuild only the profile-owned base case while preserving its stable
+   identity. Planning scenarios remain deliberate user-owned alternatives. */
+function syncClientBaseScenario(client) {
+  const current = (client.scenarios || [])[0];
+  const mapped = profileToScenario(client, current ? current.name : undefined);
+  if (current) mapped.id = current.id;
+  mapped.profileUpdatedAt = client.updatedAt || Date.now();
+  return { ...client, scenarios: [mapped, ...(client.scenarios || []).slice(1)] };
 }
 
 /* ----------------------------------------------------------------------------
@@ -417,6 +431,12 @@ function profileToScenario(client, name) {
         active: true
       });
     } else {
+      const expenses = [
+        ["Operating expenses", b.operatingExpenses],
+        ["Depreciation", b.depreciation],
+        ["Amortization", b.amortization],
+        ["Business interest", b.interestExpense]
+      ].filter(x => num(x[1]) !== 0).map(x => ({ id: uid(), label: x[0], amount: num(x[1]) }));
       const biz = {
         id: uid(),
         name: b.name,
@@ -425,11 +445,7 @@ function profileToScenario(client, name) {
         cogs: 0,
         w2wages: num(b.otherW2),
         ubia: num(b.ubia),
-        expenses: num(b.operatingExpenses) > 0 ? [{
-          id: uid(),
-          label: "Operating expenses",
-          amount: num(b.operatingExpenses)
-        }] : []
+        expenses
       };
       s.schedC.businesses.push(biz);
       s.qbi.entities.push({
@@ -608,6 +624,13 @@ function loadClients() {
          client numbers without merging records, flag ambiguity for review.
          Persist immediately so the migration runs once, not on every load. */
       const migrated = migrateClients(raw);
+      migrated.clients = migrated.clients.map(c => ({
+        ...c,
+        workingNotes: Array.isArray(c.workingNotes) ? c.workingNotes : [],
+        auditLog: Array.isArray(c.auditLog) ? c.auditLog : [],
+        aiHistory: Array.isArray(c.aiHistory) ? c.aiHistory : [],
+        reportInbox: Array.isArray(c.reportInbox) ? c.reportInbox : []
+      }));
       if (migrated.changed) saveClients(migrated.clients);
       return migrated.clients;
     }

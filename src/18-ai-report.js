@@ -15,7 +15,13 @@ const AI_REPORT_SECTIONS = ["Executive summary", "Current tax position", "Income
 
 function reportDataHash(entries) {
   try {
-    return JSON.stringify(entries.map(x => [x.s.id, x.s].concat(Math.round(x.r.totalTax)))).length + ":" + entries.map(x => Math.round(x.r.totalTax)).join(",");
+    const raw = JSON.stringify(entries.map(x => ({ scenario: x.s, result: x.r, validation: x.v })));
+    let hash = 2166136261;
+    for (let i = 0; i < raw.length; i++) {
+      hash ^= raw.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16) + ":" + raw.length;
   } catch (e) {
     return String(Date.now());
   }

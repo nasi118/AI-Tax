@@ -152,10 +152,9 @@ function ClientProfilesPage({
   }, [clients]);
 
   const upC = fn => updateClient(client.id, fn);
-  const upProfile = patch => upC(c => ({ ...c, profile: { ...c.profile, ...patch } }));
+  const upProfile = patch => upC(c => syncClientBaseScenario({ ...c, profile: { ...c.profile, ...patch } }));
   const upSub = (key, patch) => upC(c => ({
-    ...c,
-    profile: { ...c.profile, [key]: { ...c.profile[key], ...patch } }
+    ...syncClientBaseScenario({ ...c, profile: { ...c.profile, [key]: { ...c.profile[key], ...patch } } })
   }));
 
   const addClient = () => {
@@ -226,7 +225,7 @@ function ClientProfilesPage({
     reader.readAsText(file);
   };
   const rebuildBase = () => {
-    upC(c => ({ ...c, scenarios: [profileToScenario(c), ...c.scenarios.slice(1)] }));
+    upC(c => syncClientBaseScenario(c));
     logEvent({ label: "Base scenario rebuilt from profile facts", kind: "structure", scenarioName: client.name });
   };
 

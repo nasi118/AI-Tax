@@ -635,11 +635,14 @@ function DataPage({
   status,
   year,
   auditLog,
+  setAuditLog,
   notes,
+  setNotes,
   logEvent,
   setYear,
   setStatus,
-  clientRecord
+  clientRecord,
+  restoreSession
 }) {
   const [msg, setMsg] = useState(null);
   const [client, setClient] = useState(clientRecord ? clientRecord.name : "");
@@ -715,6 +718,7 @@ function DataPage({
     const payload = {
       version: 2,
       savedAt: new Date().toISOString(),
+      client: clientRecord ? { id: clientRecord.id, clientId: clientRecord.clientId, name: clientRecord.name } : null,
       year,
       status,
       scenarios,
@@ -729,7 +733,15 @@ function DataPage({
     try {
       const data = JSON.parse(await file.text());
       if (!data.scenarios || !data.scenarios.length) throw new Error("No scenarios found in this file.");
-      setScenarios(data.scenarios.map(s => Object.assign(blankScenario(s.name), s)));
+      if (data.client && clientRecord && data.client.id && data.client.id !== clientRecord.id) {
+        throw new Error("This session belongs to " + (data.client.name || data.client.clientId || "another client") + ". Switch to that client before restoring it.");
+      }
+      if (restoreSession) restoreSession(data);
+      else {
+        setScenarios(data.scenarios.map(s => Object.assign(blankScenario(s.name), s)));
+        if (Array.isArray(data.notes) && setNotes) setNotes(data.notes);
+        if (Array.isArray(data.auditLog) && setAuditLog) setAuditLog(data.auditLog);
+      }
       flash("ok", "Session restored from " + file.name + ".");
     } catch (err) {
       flash("bad", "Could not read that session file: " + err.message);

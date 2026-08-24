@@ -26,7 +26,7 @@ function makeContext(cryptoImpl) {
     vm.runInContext(readFileSync(join(root, "src", f), "utf8"), ctx, { filename: f });
   }
   return vm.runInContext(
-    "({ uid, blankClient, nextClientNumber, migrateClients, validateClientIntegrity, loadClients, saveClients, demoClients, CLIENTS_KEY })",
+    "({ uid, blankClient, nextClientNumber, migrateClients, validateClientIntegrity, loadClients, saveClients, demoClients, profileToScenario, syncClientBaseScenario, CLIENTS_KEY })",
     ctx
   );
 }
@@ -140,6 +140,28 @@ const E = makeContext(crypto);
     scenarioOwners.set(s.id, c.id);
   }
   ok(E.validateClientIntegrity(demos, []).length === 0, "demo clients: pass integrity validation");
+}
+
+/* ---- profile flow and client-owned records ---- */
+{
+  const c = E.blankClient("Flow test", []);
+  c.profile.businesses = [{
+    name: "Consulting", entityType: "soleprop", grossReceipts: 200000,
+    operatingExpenses: 25000, depreciation: 7000, amortization: 3000,
+    interestExpense: 5000, otherW2: 0, ubia: 0, sstb: false
+  }];
+  c.scenarios = [E.profileToScenario(c), { id: "planning", name: "Planning" }];
+  const baseId = c.scenarios[0].id;
+  c.profile.income.w2Wages = 123456;
+  const synced = E.syncClientBaseScenario(c);
+  ok(synced.scenarios[0].id === baseId, "profile sync: preserves base scenario identity");
+  ok(synced.scenarios[0].w2Wages === 123456, "profile sync: refreshes base facts immediately");
+  ok(synced.scenarios[1].id === "planning", "profile sync: preserves planning scenarios");
+  const expenses = synced.scenarios[0].schedC.businesses[0].expenses;
+  ok(expenses.reduce((n, x) => n + x.amount, 0) === 40000,
+    "profile mapping: sole-prop operating, depreciation, amortization and interest all flow");
+  ok(Array.isArray(c.workingNotes) && Array.isArray(c.auditLog) && Array.isArray(c.aiHistory) && Array.isArray(c.reportInbox),
+    "client isolation: notes, audit, AI history and report inbox are client-owned");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

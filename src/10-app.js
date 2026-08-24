@@ -559,12 +559,10 @@ function App() {
   const status = clientSafe.profile.filingStatus;
   const year = TY[clientSafe.profile.taxYear] ? clientSafe.profile.taxYear : 2025;
   const setStatus = v => updateClient(clientId, c => ({
-    ...c,
-    profile: { ...c.profile, filingStatus: v }
+    ...syncClientBaseScenario({ ...c, profile: { ...c.profile, filingStatus: v } })
   }));
   const setYear = y => updateClient(clientId, c => ({
-    ...c,
-    profile: { ...c.profile, taxYear: y }
+    ...syncClientBaseScenario({ ...c, profile: { ...c.profile, taxYear: y } })
   }));
   /* A pop-out or duplicated view opens with ?tab= and ?client= in the URL;
      those parameters steer only this view's start state and are never
@@ -596,8 +594,14 @@ function App() {
   const [showAppearance, setShowAppearance] = useState(false);
 
   /* ---- Tools and records ---- */
-  const [auditLog, setAuditLog] = useState([]);
-  const [notes, setNotes] = useState([]);
+  const auditLog = clientSafe.auditLog || [];
+  const setAuditLog = fnOrArr => updateClient(clientId, c => ({ ...c,
+    auditLog: typeof fnOrArr === "function" ? fnOrArr(c.auditLog || []) : fnOrArr
+  }));
+  const notes = clientSafe.workingNotes || [];
+  const setNotes = fnOrArr => updateClient(clientId, c => ({ ...c,
+    workingNotes: typeof fnOrArr === "function" ? fnOrArr(c.workingNotes || []) : fnOrArr
+  }));
   const [noteDraft, setNoteDraft] = useState("");
   const [showCalc, setShowCalc] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -668,14 +672,8 @@ function App() {
   }, [results]);
   /* Transparent goal-alignment scoring for every scenario of the active client */
   const alignments = useMemo(() => results.map(e => goalAlignment(clientSafe, e, results)), [results, clientSafe]);
-  /* The audit trail is session-wide but every entry is tagged; each client
-     sees only its own history. */
-  const clientAudit = useMemo(() => auditLog.filter(e => !e.clientId || e.clientId === clientId), [auditLog, clientId]);
-  const setClientAudit = fnOrArr => setAuditLog(l => {
-    const others = l.filter(e => e.clientId && e.clientId !== clientId);
-    const mine = l.filter(e => !e.clientId || e.clientId === clientId);
-    return [...others, ...(typeof fnOrArr === "function" ? fnOrArr(mine) : fnOrArr)];
-  });
+  const clientAudit = auditLog;
+  const setClientAudit = setAuditLog;
   const baseline = results[0];
   const activeIdSafe = scenarios.find(s => s.id === activeId) ? activeId : scenarios[0].id;
   const activeIdx = scenarios.findIndex(s => s.id === activeIdSafe);
@@ -828,9 +826,15 @@ function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-  const [aiHistory, setAiHistory] = useState([]);
+  const aiHistory = clientSafe.aiHistory || [];
+  const setAiHistory = fnOrArr => updateClient(clientId, c => ({ ...c,
+    aiHistory: typeof fnOrArr === "function" ? fnOrArr(c.aiHistory || []) : fnOrArr
+  }));
   const [aiPrefill, setAiPrefill] = useState(null);
-  const [reportInbox, setReportInbox] = useState([]);
+  const reportInbox = clientSafe.reportInbox || [];
+  const setReportInbox = fnOrArr => updateClient(clientId, c => ({ ...c,
+    reportInbox: typeof fnOrArr === "function" ? fnOrArr(c.reportInbox || []) : fnOrArr
+  }));
   const [showOptimize, setShowOptimize] = useState(false);
   const [showAIReport, setShowAIReport] = useState(false);
   /* AI Optimize / test scenarios: clone the starting scenario, apply ONLY the
@@ -1008,6 +1012,17 @@ function App() {
     });
     setScenarios([profileToScenario(clientSafe)]);
   };
+  const restoreClientSession = data => updateClient(clientId, c => ({
+    ...c,
+    profile: {
+      ...c.profile,
+      taxYear: data.year && TY[data.year] ? data.year : c.profile.taxYear,
+      filingStatus: data.status || c.profile.filingStatus
+    },
+    scenarios: data.scenarios.map(s => Object.assign(blankScenario(s.name), s)),
+    workingNotes: Array.isArray(data.notes) ? data.notes : c.workingNotes || [],
+    auditLog: Array.isArray(data.auditLog) ? data.auditLog : c.auditLog || []
+  }));
   const setYearLogged = y => {
     if (y === year) return;
     logEvent({
@@ -1389,7 +1404,8 @@ function App() {
         tab === "audit" && EL(AuditPage, { auditLog: clientAudit, setAuditLog: setClientAudit, scenarios, results, year, status }),
         tab === "data" && EL(DataPage, {
           scenarios, setScenarios: setScenariosLogged, results, status, year,
-          auditLog: clientAudit, notes, logEvent, setYear: setYearLogged, setStatus: setStatusLogged,
+          auditLog: clientAudit, setAuditLog: setClientAudit, notes, setNotes, logEvent, setYear: setYearLogged, setStatus: setStatusLogged,
+          restoreSession: restoreClientSession,
           clientRecord: clientSafe
         }),
         tab === "report" && EL(ReportPage, { client: clientSafe, alignments, results, bestId, baseline, status, year, notes, auditLog: clientAudit }),
