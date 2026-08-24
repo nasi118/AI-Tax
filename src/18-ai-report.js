@@ -54,6 +54,7 @@ function AIReportPanel({
     if (report) setReportTs(Date.now());
   }, [report]);
   const [secBusy, setSecBusy] = useState(null);
+  const [progress, setProgress] = useState(null);
   const abortRef = useRef(null);
   const previewRef = useRef(null);
   useEffect(() => () => {
@@ -76,41 +77,94 @@ function AIReportPanel({
     const approved = (reportInbox || []).map(h => "APPROVED ANALYSIS (" + h.scopeLabel + "): " + h.response.slice(0, 4000)).join("\n\n");
     return AI_SYSTEM_CORE + "\n" + AI_REPORT_SCHEMA + "\nReport type: " + rtype + ". Audience: " + audience + ". Tone: " + tone + ". Detail level: " + detail + ". Requested sections (produce one JSON section per requested item, in order): " + wantSections.join("; ") + ".\nFor each strategy discussed use the structure: observation; why it matters; modeled result; economic effect; implementation considerations; risks; facts requiring confirmation; recommended next step. Organize implementation steps as: immediate; before year-end; before the filing date; future-year monitoring. Classify benefits as permanent vs deferral vs timing. Refer to the client only as \"" + clientId.replace(/"/g, "") + "\".\n\nCONTROLLED DATA PACKAGE (all amounts must come from here):\n" + JSON.stringify(pack) + (approved ? "\n\nADVISOR-SELECTED ANALYSES TO INCORPORATE:\n" + approved : "");
   };
+  /* ------------------------------------------------------------------------
+     Report generation runs ONE REQUEST PER SECTION, in order.
+
+     Asking for the whole report in a single call produced a request long
+     enough to exceed the deployment's serverless function-duration limit, so
+     the platform killed it and no report was ever produced. One section per
+     call keeps every request short and well inside that limit, shows real
+     progress, and means a single failed section degrades to a placeholder the
+     advisor can regenerate instead of losing the entire report.
+     ---------------------------------------------------------------------- */
   const generate = async () => {
     setError(null);
+    setProgress({ done: 0, total: wantSections.length, current: wantSections[0] || "" });
     setStep("building");
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    const system = buildSystem();
+    const built = [];
+    const failed = [];
     try {
-      const reply = await callAI("build-report", {
-        system: buildSystem(),
-        messages: [{
-          role: "user",
-          content: "Build the report now."
-        }],
-        signal: ctrl.signal
-      });
-      const parsed = extractAIJSON(reply);
-      if (!parsed || !Array.isArray(parsed.sections) || !parsed.sections.length) throw new Error("The AI response did not contain valid report sections. Try again.");
-      setReport(parsed.sections.map(s => ({
-        id: s.id || uid(),
-        title: s.title || "Section",
-        body: String(s.body || ""),
-        original: String(s.body || ""),
-        supportingFields: s.supportingFields || [],
-        status: "AI draft",
-        hidden: false,
-        comment: ""
-      })));
+      for (let i = 0; i < wantSections.length; i++) {
+        const title = wantSections[i];
+        setProgress({ done: i, total: wantSections.length, current: title });
+        const written = built.filter(b => b.body).map(b => b.title).join("; ");
+        let section = null;
+        try {
+          const reply = await callAI("build-report", {
+            system,
+            messages: [{
+              role: "user",
+              content: "Write ONLY the report section titled \"" + title + "\"." +
+                (written ? " Sections already written (do not repeat their content): " + written + "." : "") +
+                " Respond with one fenced JSON block: {\"sections\": [{\"id\": \"" +
+                title.toLowerCase().replace(/[^a-z0-9]+/g, "-") +
+                "\", \"title\": \"" + title.replace(/"/g, "") + "\", \"body\": \"...\", \"supportingFields\": []}]}"
+            }],
+            signal: ctrl.signal
+          });
+          const parsed = extractAIJSON(reply);
+          section = parsed && parsed.sections && parsed.sections[0];
+        } catch (err) {
+          if (err.name === "AbortError") throw err;
+          failed.push({ title: title, message: String(err.message || err) });
+        }
+        built.push(section && section.body ? {
+          id: section.id || uid(),
+          title: section.title || title,
+          body: String(section.body || ""),
+          original: String(section.body || ""),
+          supportingFields: section.supportingFields || [],
+          status: "AI draft",
+          hidden: false,
+          comment: ""
+        } : {
+          id: uid(),
+          title: title,
+          body: "",
+          original: "",
+          supportingFields: [],
+          status: "Not generated — use Regenerate on this section",
+          hidden: false,
+          comment: ""
+        });
+        /* Show each section as soon as it lands, so a long report is never a
+           blank screen and partial work survives a later failure. */
+        setReport(built.slice());
+      }
+      if (!built.some(b => b.body)) {
+        throw new Error(failed.length
+          ? "No report sections could be generated. " + failed[0].message
+          : "The AI response did not contain valid report sections. Try again.");
+      }
+      setProgress(null);
       setBuiltHash(currentHash);
       setStep("editor");
+      if (failed.length) {
+        setError(failed.length + " of " + wantSections.length + " section" + (failed.length === 1 ? "" : "s") +
+          " could not be generated (" + failed.map(f => f.title).join(", ") + "). Use Regenerate on each, or select fewer sections. First error: " + failed[0].message);
+      }
       logEvent({
-        label: "AI report built — " + rtype + " (" + entries.length + " scenarios)",
+        label: "AI report built — " + rtype + " (" + entries.length + " scenarios, " +
+          built.filter(b => b.body).length + "/" + wantSections.length + " sections)",
         kind: "ai",
         scenarioName: entries.map(x => x.s.name).join(", "),
         to: audience + " · " + tone
       });
     } catch (e) {
+      setProgress(null);
       if (e.name !== "AbortError") {
         setError(String(e.message || e));
         setStep("setup");
@@ -295,7 +349,9 @@ function AIReportPanel({
     className: "tp-ai-panel-body"
   }, /*#__PURE__*/React.createElement("p", {
     className: "tp-ai-empty"
-  }, "Building a ", rtype.toLowerCase(), " for ", audience.toLowerCase(), " from ", entries.length, " engine-calculated scenario", entries.length === 1 ? "" : "s", "…"), /*#__PURE__*/React.createElement("button", {
+  }, "Building a ", rtype.toLowerCase(), " for ", audience.toLowerCase(), " from ", entries.length, " engine-calculated scenario", entries.length === 1 ? "" : "s", "…", progress && /*#__PURE__*/React.createElement("span", {
+    className: "tp-ai-progress"
+  }, " · section ", Math.min(progress.done + 1, progress.total), " of ", progress.total, progress.current ? " · " + progress.current : "")), /*#__PURE__*/React.createElement("button", {
     className: "tp-btn ghost sm",
     type: "button",
     onClick: () => {

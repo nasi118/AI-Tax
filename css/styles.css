@@ -1035,3 +1035,5 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 .tp-rp-secchk{display:inline-flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--line);border-radius:14px;padding:3px 10px;cursor:pointer;background:var(--card)}
 .tp-rp-secchk.off{color:var(--muted);text-decoration:line-through;background:var(--hdr)}
 .tp-rp-sections .tp-hint{width:100%}
+
+.tp-ai-progress{color:var(--muted);font-style:normal}
