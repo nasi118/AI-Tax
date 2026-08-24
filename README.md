@@ -1,10 +1,18 @@
 # AI-Tax
 
+**[Open the live Tax Planning Workbench](https://nasi118.github.io/AI-Tax/)**
+
+[Architecture](docs/ARCHITECTURE.md) · [Capabilities](docs/CAPABILITIES.md) · [Controls](docs/CONTROLS.md) · [Runbook](docs/RUNBOOK.md) · [Known limitations](docs/UNSUPPORTED.md)
+
+> **Public demo:** Use fictional or de-identified information only. Client profiles and some optional AI settings are stored in the browser. Do not enter real taxpayer data, production credentials, or confidential client information in the public deployment.
+
+This is the **canonical repository and main application**. The separate `AI-Tax-APP` repository is retained as a legacy/reference implementation while selected capabilities are consolidated here; see [Consolidation](docs/CONSOLIDATION.md).
+
 Two complementary components live in this repository:
 
 1. **Tax Planning Workbench** (formerly Tax Advisory Pro) — a dependency-free static web app (React 18, no
    build step) for TY2025/TY2026 individual tax planning. Served from the
-   repo root; this is what Vercel deploys.
+   repo root; this is what GitHub Pages and connected static deployments serve.
 2. **`ai_tax` (Python)** — an audit-grade deterministic tax calculation
    engine with versioned rulesets, immutable base-case/scenario lifecycle,
    reconciliation, permanent Excel audit packages, and a constrained
@@ -44,6 +52,23 @@ python3 -m http.server 8000
 
 Then open the printed URL. There is no build step and no runtime network
 dependency (React is vendored in `vendor/`).
+
+### Tests
+
+```sh
+npm test
+python -m pytest
+```
+
+The JavaScript suite covers deterministic golden cases and client-identity/data-flow behavior. The Python suite covers calculation, lifecycle, isolation, reconciliation, import, persistence, and governance controls. CI also runs the cross-engine contract, UI acceptance, standalone-build, and audit-workbook checks described in [CI](docs/CI.md).
+
+### Data and deployment boundaries
+
+- The public URL is a demonstration and evaluation environment, not a production client portal.
+- Browser client profiles are persisted in `localStorage`; they are not a substitute for authenticated, tenant-isolated server storage.
+- Optional direct-provider AI settings may persist a user-supplied API key in that browser. Do not use production keys in the public deployment.
+- The deterministic engine—not an AI model—is the calculation authority. AI features are limited to controlled assistance and explanation.
+- Results are planning estimates and require professional review against current law, source documents, and applicable federal and state rules.
 
 ### Single-file standalone build
 
