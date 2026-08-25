@@ -126,6 +126,11 @@ button{cursor:pointer;border:none;background:none}
 .tp-kpi.good strong{color:var(--green)}
 .tp-kpi.warn{border-color:var(--amber-line);background:var(--amber-bg)}
 .tp-kpi.warn strong{color:var(--amber)}
+.tp-auditstatus{display:inline-block;margin-top:10px;padding:6px 12px;border-radius:20px;font-size:11.5px;font-weight:700;border:1px solid}
+.tp-auditstatus.ok{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
+.tp-auditstatus.warn{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
+.tp-auditstatus.bad{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
+.tp-tbl tr.warn td{background:var(--amber-bg)}
 
 /* ---------- tables ---------- */
 .tp-tblwrap{overflow-x:auto}

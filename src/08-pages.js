@@ -905,22 +905,34 @@ function ScenariosPage({
     label: "Deductible half of SE tax",
     get: r => r.seDeduction,
     results: ledgerResults
-  }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
+  }), /*#__PURE__*/React.createElement(LedgerDrillRow, {
     label: "Self-employed retirement plan",
+    hint: "click to set the plan and contribution",
     get: r => r.retirementDeduction,
-    results: ledgerResults
-  }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
+    type: "retirementPlan",
+    results: ledgerResults,
+    setDrill: setDrill
+  }), /*#__PURE__*/React.createElement(LedgerDrillRow, {
     label: "Self-employed health insurance",
+    hint: "click for premiums and LTC",
     get: r => r.sehiDeduction,
-    results: ledgerResults
-  }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
+    type: "retirementPlan",
+    results: ledgerResults,
+    setDrill: setDrill
+  }), /*#__PURE__*/React.createElement(LedgerDrillRow, {
     label: "Health savings account",
+    hint: "click to set coverage and contribution",
     get: r => r.hsa,
-    results: ledgerResults
-  }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
+    type: "retirementPlan",
+    results: ledgerResults,
+    setDrill: setDrill
+  }), /*#__PURE__*/React.createElement(LedgerDrillRow, {
     label: "IRA deduction",
+    hint: "click to set contribution and coverage",
     get: r => r.iraDeduction,
-    results: ledgerResults
+    type: "retirementPlan",
+    results: ledgerResults,
+    setDrill: setDrill
   }), /*#__PURE__*/React.createElement(LedgerDrillRow, {
     label: "Other Schedule 1 adjustments",
     hint: "student loan, educator, alimony",
@@ -1010,6 +1022,17 @@ function ScenariosPage({
     scenarios: ledgerScenarios,
     update: update,
     drillType: "payments",
+    setDrill: setDrill
+  }), /*#__PURE__*/React.createElement(LedgerDrillRow, {
+    label: "Estimated tax safe harbor",
+    hint: "click to manage quarterly payments",
+    get: (r, s) => computeEstimatedTax({
+      currentYearTax: r.totalTax, priorYearTax: num(s.priorYearTax) || null, priorYearAGI: s.priorYearAGI,
+      status: r.status, C: r.C, withholding: num(s.withholding), paymentsMade: s.estimatedPaymentSchedule || [],
+      asOfDate: new Date().toISOString().slice(0, 10)
+    }).remainingRequired,
+    type: "estimatedTax",
+    results: ledgerResults,
     setDrill: setDrill
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "householdSize",
@@ -1176,19 +1199,23 @@ function LedgerInputRow({
 }) {
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "tp-cell tp-lab" + (indent ? " ind" : "")
-  }, label, hint && /*#__PURE__*/React.createElement("em", null, hint)), scenarios.map(s => /*#__PURE__*/React.createElement("div", {
-    key: s.id,
-    className: "tp-cell tp-in" + (drillType ? " drillable" : "")
-  }, /*#__PURE__*/React.createElement(Money, {
-    value: s[field],
-    onChange: v => update(s.id, field, v)
-  }), drillType && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "tp-drillchip",
-    title: "Open the detailed editor",
-    "aria-label": "Edit " + label + " in detail for " + s.name,
-    onClick: () => setDrill({ id: s.id, type: drillType })
-  }, I.chevR))));
+  }, label, hint && /*#__PURE__*/React.createElement("em", null, hint)), scenarios.map(s => {
+    const scheduled = field === "estimatedPayments" && (s.estimatedPaymentSchedule || []).length > 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      className: "tp-cell tp-in" + (drillType ? " drillable" : "")
+    }, /*#__PURE__*/React.createElement(Money, {
+      value: scheduled ? (s.estimatedPaymentSchedule || []).reduce((a, p) => a + num(p.amount), 0) : s[field],
+      disabled: scheduled,
+      onChange: v => update(s.id, field, v)
+    }), drillType && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "tp-drillchip",
+      title: scheduled ? "Set from the dated payment schedule — click to manage it" : "Open the detailed editor",
+      "aria-label": "Edit " + label + " in detail for " + s.name,
+      onClick: () => setDrill({ id: s.id, type: scheduled ? "estimatedTax" : drillType })
+    }, I.chevR));
+  }));
 }
 function LedgerCalcRow({
   label,
@@ -1260,7 +1287,7 @@ function LedgerDrillRow({
       id: s.id,
       type
     })
-  }, usd$(get(r)))));
+  }, usd$(get(r, s)))));
 }
 
 /* ---------------------------------------------------------------------------
@@ -1431,7 +1458,9 @@ const DRILL_TITLES = {
   retirement: "Retirement, Roth & Social Security income",
   otherincome: "Other income & nonrefundable credits",
   payments: "Payments & withholding — Form 1040, lines 25–26",
-  qbiInfo: "Qualified Business Income — §199A summary"
+  qbiInfo: "Qualified Business Income — §199A summary",
+  retirementPlan: "Retirement plan, HSA, SEHI & IRA",
+  estimatedTax: "Estimated taxes — IRC §6654 safe harbor"
 };
 function DrillModal({
   scenario,
@@ -1452,7 +1481,7 @@ function DrillModal({
     className: "tp-overlay",
     onMouseDown: e => e.target === e.currentTarget && onClose()
   }, /*#__PURE__*/React.createElement("div", {
-    className: "tp-modal"
+    className: "tp-modal" + (type === "estimatedTax" || type === "retirementPlan" ? " tp-modal-wide" : "")
   }, /*#__PURE__*/React.createElement("div", {
     className: "tp-modal-head"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -1510,11 +1539,22 @@ function DrillModal({
   }), type === "payments" && /*#__PURE__*/React.createElement(PaymentsEditor, {
     scenario: scenario,
     update: update,
-    result: result
+    result: result,
+    onJump: onJump
   }), type === "qbiInfo" && /*#__PURE__*/React.createElement(QBIInfoEditor, {
     scenario: scenario,
     result: result,
     onJump: onJump
+  }), type === "retirementPlan" && /*#__PURE__*/React.createElement(RetirementPlanEditor, {
+    scenario: scenario,
+    update: update,
+    result: result
+  }), type === "estimatedTax" && /*#__PURE__*/React.createElement(EstimatedTaxEditor, {
+    scenario: scenario,
+    update: update,
+    result: result,
+    status: status,
+    year: year
   })), /*#__PURE__*/React.createElement("div", {
     className: "tp-modal-foot"
   }, /*#__PURE__*/React.createElement("button", {
@@ -2213,14 +2253,20 @@ function OtherIncomeEditor({ scenario, update }) {
       /*#__PURE__*/React.createElement(Field, { label: "Household size", hint: "ACA percentage of FPL", value: scenario.householdSize, onChange: v => update("householdSize", v) })
     ));
 }
-function PaymentsEditor({ scenario, update, result }) {
+function PaymentsEditor({ scenario, update, result, onJump }) {
+  const scheduled = (scenario.estimatedPaymentSchedule || []).length > 0;
   return /*#__PURE__*/React.createElement("div", { className: "tp-stack" },
     /*#__PURE__*/React.createElement(Note, null, "Form 1040, lines 25–26. The engine tests total payments against the estimated-tax safe harbor — IRC §6654."),
     /*#__PURE__*/React.createElement("div", { className: "tp-grid3" },
       /*#__PURE__*/React.createElement(Field, { label: "Federal withholding", hint: "1040 lines 25a–25c", value: scenario.withholding, onChange: v => update("withholding", v) }),
-      /*#__PURE__*/React.createElement(Field, { label: "Estimated payments", hint: "1040 line 26", value: scenario.estimatedPayments, onChange: v => update("estimatedPayments", v) })
+      scheduled
+        ? /*#__PURE__*/React.createElement("label", { className: "tp-field" }, /*#__PURE__*/React.createElement("span", null, "Estimated payments", /*#__PURE__*/React.createElement("em", null, "from the dated payment schedule")), /*#__PURE__*/React.createElement("div", { className: "tp-subline" }, /*#__PURE__*/React.createElement("strong", null, usd$(result ? result.estimatedPaymentsResolved : scenario.estimatedPayments))))
+        : /*#__PURE__*/React.createElement(Field, { label: "Estimated payments", hint: "1040 line 26", value: scenario.estimatedPayments, onChange: v => update("estimatedPayments", v) })
     ),
-    result && /*#__PURE__*/React.createElement("div", { className: "tp-editor-total" }, /*#__PURE__*/React.createElement("span", null, "Total payments"), /*#__PURE__*/React.createElement("strong", null, usd$(num(scenario.withholding) + num(scenario.estimatedPayments)))));
+    scheduled && /*#__PURE__*/React.createElement(Note, null, "This total comes from the dated payment schedule in the estimated-tax calculator — edit it there, not here."),
+    result && /*#__PURE__*/React.createElement("div", { className: "tp-editor-total" }, /*#__PURE__*/React.createElement("span", null, "Total payments"), /*#__PURE__*/React.createElement("strong", null, usd$(num(scenario.withholding) + (scheduled ? result.estimatedPaymentsResolved : num(scenario.estimatedPayments))))),
+    onJump && /*#__PURE__*/React.createElement("div", { className: "tp-rp-actions" },
+      /*#__PURE__*/React.createElement("button", { className: "tp-btn ghost sm", type: "button", onClick: () => onJump("estimatedTax") }, "Manage estimated payments →")));
 }
 function QBIInfoEditor({ scenario, result, onJump }) {
   const entities = scenario.qbi && scenario.qbi.entities || [];
@@ -2236,6 +2282,134 @@ function QBIInfoEditor({ scenario, result, onJump }) {
       /*#__PURE__*/React.createElement("button", { className: "tp-btn ghost sm", type: "button", onClick: () => onJump("schedC") }, "Schedule C →"),
       /*#__PURE__*/React.createElement("button", { className: "tp-btn ghost sm", type: "button", onClick: () => onJump("scorp") }, "S corporations →"),
       /*#__PURE__*/React.createElement("button", { className: "tp-btn ghost sm", type: "button", onClick: () => onJump("passthrough") }, "Passthrough / K-1 →")));
+}
+
+/* ---- Retirement plan, HSA, SEHI and IRA — one editor for the four
+   previously read-only "Adjustments and deductions" calc rows. Every field
+   here already drives the engine (03-scenario.js); this only adds a click
+   surface, it does not duplicate the calculation. ---- */
+function RetirementPlanEditor({ scenario, update, result }) {
+  const P = scenario.planning || {};
+  const setP = (k, v) => update("planning", { ...P, [k]: v });
+  const H = scenario.sehi || {};
+  const setH = (k, v) => update("sehi", { ...H, [k]: v });
+  const I = scenario.ira || {};
+  const setI = (k, v) => update("ira", { ...I, [k]: v });
+  const options = (result.RET && result.RET.options) || [];
+  return /*#__PURE__*/React.createElement("div", { className: "tp-stack" },
+    /*#__PURE__*/React.createElement("div", { className: "tp-minihead" }, "Self-employed retirement plan"),
+    /*#__PURE__*/React.createElement(Note, null, "The engine computes the maximum deductible contribution for the selected plan design from Schedule C profit less half the SE tax. IRC §401(k)/§404(h)/§408(p) apply the statutory limits automatically — enter an age for catch-up eligibility."),
+    /*#__PURE__*/React.createElement("div", { className: "tp-grid3" },
+      /*#__PURE__*/React.createElement("label", { className: "tp-field" }, /*#__PURE__*/React.createElement("span", null, "Plan"),
+        /*#__PURE__*/React.createElement("select", { className: "tp-txt", value: P.planType || "none", onChange: e => setP("planType", e.target.value) },
+          /*#__PURE__*/React.createElement("option", { value: "none" }, "No plan"),
+          options.map(o => /*#__PURE__*/React.createElement("option", { key: o.id, value: o.id }, o.name)))),
+      /*#__PURE__*/React.createElement(Field, { label: "Age (catch-up eligibility)", value: P.age, onChange: v => setP("age", v) }),
+      P.planType && P.planType !== "none" && /*#__PURE__*/React.createElement("label", { className: "tp-field" }, /*#__PURE__*/React.createElement("span", null, "Employer contribution"),
+        /*#__PURE__*/React.createElement("select", { className: "tp-txt", value: P.employerMode || "auto", onChange: e => setP("employerMode", e.target.value) },
+          /*#__PURE__*/React.createElement("option", { value: "auto" }, "Auto — engine-calculated maximum"),
+          /*#__PURE__*/React.createElement("option", { value: "manual" }, "Manual")))),
+    P.planType && P.planType !== "none" && /*#__PURE__*/React.createElement("div", { className: "tp-grid3" },
+      /*#__PURE__*/React.createElement(Field, { label: "Employee elective deferral", value: P.employeeDeferral, onChange: v => setP("employeeDeferral", v) }),
+      P.employerMode === "manual" && /*#__PURE__*/React.createElement(Field, { label: "Employer contribution (manual)", value: P.employerManual, onChange: v => setP("employerManual", v) })),
+    result.selectedPlan && /*#__PURE__*/React.createElement("div", { className: "tp-editor-total" }, /*#__PURE__*/React.createElement("span", null, "Deductible contribution — ", result.selectedPlan.name), /*#__PURE__*/React.createElement("strong", null, usd$(result.retirementDeduction))),
+
+    /*#__PURE__*/React.createElement("div", { className: "tp-minihead" }, "Health savings account"),
+    /*#__PURE__*/React.createElement("div", { className: "tp-grid3" },
+      /*#__PURE__*/React.createElement("label", { className: "tp-field" }, /*#__PURE__*/React.createElement("span", null, "Contribution"),
+        /*#__PURE__*/React.createElement("select", { className: "tp-txt", value: P.hsaMode || "off", onChange: e => setP("hsaMode", e.target.value) },
+          /*#__PURE__*/React.createElement("option", { value: "off" }, "None"),
+          /*#__PURE__*/React.createElement("option", { value: "max" }, "Max — engine-calculated limit"),
+          /*#__PURE__*/React.createElement("option", { value: "manual" }, "Manual"))),
+      /*#__PURE__*/React.createElement("label", { className: "tp-field" }, /*#__PURE__*/React.createElement("span", null, "Coverage"),
+        /*#__PURE__*/React.createElement("select", { className: "tp-txt", value: P.hsaCoverage || "self", onChange: e => setP("hsaCoverage", e.target.value) },
+          /*#__PURE__*/React.createElement("option", { value: "self" }, "Self-only"),
+          /*#__PURE__*/React.createElement("option", { value: "family" }, "Family"))),
+      P.hsaMode === "manual" && /*#__PURE__*/React.createElement(Field, { label: "Contribution (manual)", value: P.hsaManual, onChange: v => setP("hsaManual", v) })),
+    result.hsa > 0 && /*#__PURE__*/React.createElement("div", { className: "tp-editor-total" }, /*#__PURE__*/React.createElement("span", null, "HSA deduction"), /*#__PURE__*/React.createElement("strong", null, usd$(result.hsa))),
+
+    /*#__PURE__*/React.createElement("div", { className: "tp-minihead" }, "Self-employed health insurance — IRC §162(l)"),
+    /*#__PURE__*/React.createElement("div", { className: "tp-grid3" },
+      /*#__PURE__*/React.createElement(Field, { label: "Annual medical premiums", value: H.medicalPremiums, onChange: v => setH("medicalPremiums", v) })),
+    result.sehiDeduction > 0 && /*#__PURE__*/React.createElement("div", { className: "tp-editor-total" }, /*#__PURE__*/React.createElement("span", null, "SEHI deduction"), /*#__PURE__*/React.createElement("strong", null, usd$(result.sehiDeduction))),
+
+    /*#__PURE__*/React.createElement("div", { className: "tp-minihead" }, "Traditional IRA"),
+    /*#__PURE__*/React.createElement("div", { className: "tp-inline", style: { marginBottom: 10 } },
+      /*#__PURE__*/React.createElement("label", { className: "tp-check" }, /*#__PURE__*/React.createElement("input", { type: "checkbox", checked: !!I.enabled, onChange: e => setI("enabled", e.target.checked) }), " Contribution made")),
+    I.enabled && /*#__PURE__*/React.createElement("div", { className: "tp-grid3" },
+      /*#__PURE__*/React.createElement(Field, { label: "Contribution", value: I.contribution, onChange: v => setI("contribution", v) }),
+      /*#__PURE__*/React.createElement("label", { className: "tp-field" }, /*#__PURE__*/React.createElement("span", null, "Employer plan coverage"),
+        /*#__PURE__*/React.createElement("select", { className: "tp-txt", value: I.coverage || "none", onChange: e => setI("coverage", e.target.value) },
+          /*#__PURE__*/React.createElement("option", { value: "none" }, "Not covered"),
+          /*#__PURE__*/React.createElement("option", { value: "self" }, "Covered"),
+          /*#__PURE__*/React.createElement("option", { value: "spouse" }, "Spouse covered")))),
+    I.enabled && result.iraDeduction != null && /*#__PURE__*/React.createElement("div", { className: "tp-editor-total" }, /*#__PURE__*/React.createElement("span", null, "IRA deduction"), /*#__PURE__*/React.createElement("strong", null, usd$(result.iraDeduction))));
+}
+
+/* ============================================================================
+   ESTIMATED TAXES — federal quarterly-payment calculator, IRC §6654 / Form
+   1040-ES. Scenario-aware: switching scenarios recalculates every figure
+   from that scenario's own projected tax, withholding and payments. Uses
+   the versioned C.estimatedTax constants — no threshold, percentage or due
+   date is hard-coded in this component. Equal-installment method only; the
+   annualized-income method (Form 2210 Schedule AI) is explicitly flagged as
+   unsupported rather than silently assumed away. ---- */
+function EstimatedTaxEditor({ scenario, update, result, status, year }) {
+  const C = TY[year];
+  const schedule = scenario.estimatedPaymentSchedule || [];
+  // Single field write — the flat estimatedPayments total is DERIVED from
+  // this schedule inside the engine (03-scenario.js), never written here.
+  const setSchedule = items => update("estimatedPaymentSchedule", items);
+  const [asOf, setAsOf] = useState(() => new Date().toISOString().slice(0, 10));
+  const est = computeEstimatedTax({
+    currentYearTax: result.totalTax,
+    priorYearTax: num(scenario.priorYearTax) || null,
+    priorYearAGI: scenario.priorYearAGI,
+    status, C,
+    withholding: num(scenario.withholding),
+    paymentsMade: schedule,
+    asOfDate: asOf
+  });
+  return /*#__PURE__*/React.createElement("div", { className: "tp-stack" },
+    /*#__PURE__*/React.createElement(Note, null, "Federal only. Required annual payment is the lesser of 90% of this scenario's current-year projected tax or the applicable prior-year safe harbor — IRC §6654(d); Form 1040-ES. Standard equal-installment method only."),
+    /*#__PURE__*/React.createElement("div", { className: "tp-grid3" },
+      /*#__PURE__*/React.createElement(Field, { label: "Prior-year total tax", hint: "optional — enables the prior-year safe harbor", value: scenario.priorYearTax, onChange: v => update("priorYearTax", v) }),
+      /*#__PURE__*/React.createElement(Field, { label: "Prior-year AGI", hint: "determines the 100%/110% threshold", value: scenario.priorYearAGI, onChange: v => update("priorYearAGI", v) }),
+      /*#__PURE__*/React.createElement(Field, { label: "As-of date", value: asOf, onChange: setAsOf })),
+    /*#__PURE__*/React.createElement("div", { className: "tp-minihead" }, "Source figures — from this scenario"),
+    /*#__PURE__*/React.createElement("table", { className: "tp-tbl" }, /*#__PURE__*/React.createElement("tbody", null,
+      /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Current-year projected total tax"), /*#__PURE__*/React.createElement("td", { className: "num" }, usd$(result.totalTax))),
+      /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Federal withholding already applied"), /*#__PURE__*/React.createElement("td", { className: "num" }, usd$(num(scenario.withholding)))))),
+    /*#__PURE__*/React.createElement("div", { className: "tp-minihead" }, "Required annual payment"),
+    /*#__PURE__*/React.createElement("table", { className: "tp-tbl" }, /*#__PURE__*/React.createElement("tbody", null,
+      est.candidates.map((c, i) => /*#__PURE__*/React.createElement("tr", { key: i, className: c.method === est.controllingMethod ? "tot" : "" },
+        /*#__PURE__*/React.createElement("td", null, c.label, c.method === est.controllingMethod && /*#__PURE__*/React.createElement("span", { className: "tp-tag green" }, "Controls")),
+        /*#__PURE__*/React.createElement("td", { className: "num" }, usd$(c.amount)))))),
+    /*#__PURE__*/React.createElement("div", { className: "tp-editor-total" }, /*#__PURE__*/React.createElement("span", null, "Required annual payment (lesser of the above)"), /*#__PURE__*/React.createElement("strong", null, usd$(est.requiredAnnualPayment))),
+    est.warnings.map((w, i) => /*#__PURE__*/React.createElement(Note, { key: i, kind: "warn" }, w)),
+
+    /*#__PURE__*/React.createElement("div", { className: "tp-minihead" }, "Estimated payments already made"),
+    /*#__PURE__*/React.createElement(LineList, {
+      items: schedule.map(p => ({ id: p.id, label: p.date || "", amount: p.amount })),
+      onChange: items => setSchedule(items.map(p => ({ id: p.id, date: p.label, amount: p.amount }))),
+      ph: "Payment date (YYYY-MM-DD)"
+    }),
+    /*#__PURE__*/React.createElement(Note, null, "Payment dates are matched to the nearest quarterly installment below. Withholding is treated as paid evenly through the year regardless of when it was actually withheld — the standard §6654 rule."),
+
+    /*#__PURE__*/React.createElement("div", { className: "tp-minihead" }, "Quarterly installments"),
+    /*#__PURE__*/React.createElement("table", { className: "tp-tbl" },
+      /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Due"), /*#__PURE__*/React.createElement("th", { className: "num" }, "Cumulative required"), /*#__PURE__*/React.createElement("th", { className: "num" }, "Cumulative applied"), /*#__PURE__*/React.createElement("th", { className: "num" }, "Shortfall"), /*#__PURE__*/React.createElement("th", null, "Status"))),
+      /*#__PURE__*/React.createElement("tbody", null, est.installments.map(inst => /*#__PURE__*/React.createElement("tr", { key: inst.due, className: inst.status === "shortfall" ? "warn" : "" },
+        /*#__PURE__*/React.createElement("td", null, inst.due),
+        /*#__PURE__*/React.createElement("td", { className: "num" }, usd$(inst.cumulativeRequired)),
+        /*#__PURE__*/React.createElement("td", { className: "num" }, usd$(inst.cumulativeApplied)),
+        /*#__PURE__*/React.createElement("td", { className: "num" }, inst.shortfall == null ? "—" : usd$(inst.shortfall)),
+        /*#__PURE__*/React.createElement("td", null, inst.status === "met" ? "Met" : inst.status === "shortfall" ? "Shortfall" : "Upcoming — " + usd$(est.perRemainingInstallment) + " recommended"))))),
+
+    /*#__PURE__*/React.createElement("div", { className: "tp-editor-total " + (est.meetsSafeHarbor ? "" : "warn") },
+      /*#__PURE__*/React.createElement("span", null, est.meetsSafeHarbor ? "Meets the estimated-tax safe harbor" : "Remaining required payment"),
+      /*#__PURE__*/React.createElement("strong", null, est.meetsSafeHarbor ? "Yes" : usd$(est.remainingRequired))),
+    /*#__PURE__*/React.createElement("div", { className: "tp-editor-total" }, /*#__PURE__*/React.createElement("span", null, "Projected balance due at filing (refund if negative)"), /*#__PURE__*/React.createElement("strong", null, usd$(est.projectedBalance))));
 }
 
 /* ============================================================================

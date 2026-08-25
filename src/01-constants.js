@@ -251,6 +251,14 @@ const TY = {
     estate: {
       exclusion: 13990000,
       annualGift: 19000
+    },
+    // Estimated tax / underpayment safe harbor — IRC §6654; Form 1040-ES
+    estimatedTax: {
+      currentYearPct: 0.90,
+      priorYearPctBelowThreshold: 1.00,
+      priorYearPctAboveThreshold: 1.10,
+      priorAGIThreshold: { single: 150000, mfj: 150000, mfs: 75000, hoh: 150000 },
+      dueDates: ["2025-04-15", "2025-06-15", "2025-09-15", "2026-01-15"]
     }
   },
   2026: {
@@ -466,6 +474,14 @@ const TY = {
     estate: {
       exclusion: 15000000,
       annualGift: 19000
+    },
+    // Estimated tax / underpayment safe harbor — IRC §6654; Form 1040-ES
+    estimatedTax: {
+      currentYearPct: 0.90,
+      priorYearPctBelowThreshold: 1.00,
+      priorYearPctAboveThreshold: 1.10,
+      priorAGIThreshold: { single: 150000, mfj: 150000, mfs: 75000, hoh: 150000 },
+      dueDates: ["2026-04-15", "2026-06-15", "2026-09-15", "2027-01-15"]
     }
   }
 };

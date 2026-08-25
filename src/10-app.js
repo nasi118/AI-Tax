@@ -1442,7 +1442,7 @@ function App() {
         tab === "health" && EL(HealthModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
         tab === "guide" && EL(PlanningGuide, { year, client: clientSafe, baseResult: baseline.r, onAskAI: askWorkspace, onAddNote: addQuickNote }),
         tab === "reference" && EL(ReferenceTables, { year, status }),
-        tab === "audit" && EL(AuditPage, { auditLog: clientAudit, setAuditLog: setClientAudit, scenarios, results, year, status }),
+        tab === "audit" && EL(AuditPage, { auditLog: clientAudit, setAuditLog: setClientAudit, scenarios, results, year, status, baseline, bestId, activeId: activeIdSafe }),
         tab === "data" && EL(DataPage, {
           scenarios, setScenarios: setScenariosLogged, results, status, year,
           auditLog: clientAudit, setAuditLog: setClientAudit, notes, setNotes, logEvent, setYear: setYearLogged, setStatus: setStatusLogged,

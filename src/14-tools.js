@@ -517,14 +517,173 @@ function Notepad({
 /* ============================================================================
    AUDIT TRAIL PAGE
    ========================================================================== */
+/* ============================================================================
+   KNOWN-ANSWER TESTS — a small, fixed set of hand-computed cases run live
+   in the browser against the same engine every scenario uses (not a
+   description of tests that ran somewhere else). Each case is independent
+   of the active client's data. This is a subset of the tests already
+   enforced in CI (tests/golden.test.mjs); it exists here so the evidence is
+   visible inside the product, not only in a file the user can't see run.
+   ========================================================================== */
+const KNOWN_ANSWER_TESTS = [
+  {
+    label: "TY2025 sole proprietor, $120,000 Schedule C, MFJ standard — total tax",
+    run: () => {
+      const r = computeScenario(seed()[0], "mfj", 2025);
+      return { actual: Math.round(r.totalTax), expected: 24161, authority: "Frozen golden case (tests/golden.test.mjs) — Schedule SE, standard deduction, §199A QBI deduction" };
+    }
+  },
+  {
+    label: "TY2025 S-corp, $750,000 profit / $150,000 salary — employer payroll tax",
+    run: () => {
+      const r = computeSCorp({ profitBeforeComp: 750000, ownerComp: 150000, otherExpenses: 0, ownershipPct: 100 }, TY[2025]);
+      return { actual: Math.round(r.employerFICA), expected: 11475, authority: "IRC §3121 — 6.2% to the $176,100 wage base + 1.45% Medicare on $150,000" };
+    }
+  },
+  {
+    label: "TY2025 S-corp K-1 = profit − comp − employer FICA",
+    run: () => {
+      const r = computeSCorp({ profitBeforeComp: 750000, ownerComp: 150000, otherExpenses: 0, ownershipPct: 100 }, TY[2025]);
+      return { actual: Math.round(r.k1), expected: 588525, authority: "K-1 = 750,000 − 150,000 − 11,475" };
+    }
+  },
+  {
+    label: "TY2026 SALT cap, MFJ, under the phase-down threshold",
+    run: () => ({ actual: TY[2026].saltCap.mfj, expected: 40400, authority: "IRC §164(b)(6), as amended by OBBBA — 1% inflation adjustment from the $40,000 2025 base" })
+  },
+  {
+    label: "TY2025 standard deduction, MFJ (OBBBA amount, not Rev. Proc. 2024-40)",
+    run: () => ({ actual: TY[2025].stdDeduction.mfj, expected: 31500, authority: "OBBBA §70102" })
+  },
+  {
+    label: "TY2026 Social Security wage base",
+    run: () => ({ actual: TY[2026].ssWageBase, expected: 184500, authority: "SSA 2026 wage base announcement" })
+  },
+  {
+    label: "TY2026 HSA family contribution limit",
+    run: () => ({ actual: TY[2026].hsa.family, expected: 8750, authority: "Rev. Proc. 2025-19" })
+  },
+  {
+    label: "Ordinary bracket function is monotonically non-decreasing (MFJ, TY2026)",
+    run: () => {
+      const pts = [10000, 50000, 100000, 250000, 500000, 800000];
+      let ok = true, prev = -1;
+      pts.forEach(ti => { const t = ordinaryTax(ti, "mfj", TY[2026]); if (t < prev) ok = false; prev = t; });
+      return { actual: ok, expected: true, authority: "IRC §1(j) — tax owed can never fall as taxable income rises" };
+    }
+  },
+  {
+    label: "Estimated tax: lesser-of-safe-harbors selects the smaller amount",
+    run: () => {
+      const r = computeEstimatedTax({ currentYearTax: 50000, priorYearTax: 40000, priorYearAGI: 100000, status: "mfj", C: TY[2026], withholding: 0, paymentsMade: [], asOfDate: "2026-01-01" });
+      return { actual: r.requiredAnnualPayment, expected: 40000, authority: "IRC §6654(d) — lesser of 90% current-year or the prior-year safe harbor" };
+    }
+  },
+  {
+    label: "Reconciliation: AGI = gross income − adjustments on a blank scenario",
+    run: () => {
+      const s = blankScenario("KAT-blank");
+      const r = computeScenario(s, "mfj", 2026);
+      const rec = computeReconciliation(s, r, "mfj", 2026);
+      const row = rec.rows.find(x => x.key === "agi");
+      return { actual: row.result, expected: "Reconciled", authority: "Form 1040, line 11" };
+    }
+  }
+];
+function runKnownAnswerTests() {
+  return KNOWN_ANSWER_TESTS.map(t => {
+    let out;
+    try { out = t.run(); } catch (e) { out = { actual: "error: " + e.message, expected: null, authority: "" }; }
+    const pass = typeof out.expected === "number" ? Math.abs(out.actual - out.expected) <= 1 : out.actual === out.expected;
+    return { label: t.label, ...out, pass };
+  });
+}
+
+/* ---- Audit & Benchmarks summary cards ---- */
+function AuditBenchmarksSummary({ reconAll, kat }) {
+  const totalAssertions = reconAll.reduce((a, x) => a + x.rec.total, 0);
+  const passed = reconAll.reduce((a, x) => a + x.rec.reconciled, 0);
+  const failed = reconAll.reduce((a, x) => a + x.rec.variances, 0);
+  const review = reconAll.reduce((a, x) => a + x.rec.review, 0);
+  const katPassed = kat.filter(t => t.pass).length;
+  const overall = failed > 0 ? { label: "Human Review Required", cls: "bad" }
+    : review > 0 ? { label: "Passed Internal Checks — Human Review Required", cls: "warn" }
+    : katPassed === kat.length ? { label: "Reconciled · Known-Answer Checks Passed", cls: "ok" }
+    : { label: "Passed Internal Checks", cls: "warn" };
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", { className: "tp-kpis" },
+      /*#__PURE__*/React.createElement("div", { className: "tp-kpi" }, /*#__PURE__*/React.createElement("span", null, "Total assertions"), /*#__PURE__*/React.createElement("strong", null, totalAssertions), /*#__PURE__*/React.createElement("em", null, "across ", reconAll.length, " scenario", reconAll.length === 1 ? "" : "s")),
+      /*#__PURE__*/React.createElement("div", { className: "tp-kpi good" }, /*#__PURE__*/React.createElement("span", null, "Passed"), /*#__PURE__*/React.createElement("strong", null, passed), /*#__PURE__*/React.createElement("em", null, "reconciled cross-foots")),
+      /*#__PURE__*/React.createElement("div", { className: "tp-kpi " + (failed ? "warn" : "") }, /*#__PURE__*/React.createElement("span", null, "Failed"), /*#__PURE__*/React.createElement("strong", null, failed), /*#__PURE__*/React.createElement("em", null, "variances outside tolerance")),
+      /*#__PURE__*/React.createElement("div", { className: "tp-kpi " + (review ? "warn" : "") }, /*#__PURE__*/React.createElement("span", null, "Items to review"), /*#__PURE__*/React.createElement("strong", null, review), /*#__PURE__*/React.createElement("em", null, "not modeled — human review required")),
+      /*#__PURE__*/React.createElement("div", { className: "tp-kpi " + (katPassed === kat.length ? "good" : "warn") }, /*#__PURE__*/React.createElement("span", null, "Known-answer tests"), /*#__PURE__*/React.createElement("strong", null, katPassed, "/", kat.length), /*#__PURE__*/React.createElement("em", null, "run live in this session"))),
+    /*#__PURE__*/React.createElement("div", { className: "tp-auditstatus " + overall.cls }, overall.label),
+    /*#__PURE__*/React.createElement(Note, null, "“Reconciled” and “Passed Internal Checks” describe this engine's own self-consistency — component sums tying to reported subtotals, and pure functions independently recomputing a reported figure from its inputs. They are not a claim that any external authority (the IRS, a second tax product) has confirmed these results. Use “External Benchmark Validated” only when a documented independent benchmark exists — none is wired in here."));
+}
+function ScenarioBenchmarkTable({ reconAll, baseline, bestId }) {
+  return /*#__PURE__*/React.createElement("div", { className: "tp-tblwrap" }, /*#__PURE__*/React.createElement("table", { className: "tp-tbl" },
+    /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
+      /*#__PURE__*/React.createElement("th", null, "Scenario"), /*#__PURE__*/React.createElement("th", { className: "num" }, "Total tax"), /*#__PURE__*/React.createElement("th", { className: "num" }, "Effective rate"),
+      /*#__PURE__*/React.createElement("th", { className: "num" }, "Marginal rate"), /*#__PURE__*/React.createElement("th", { className: "num" }, "Δ vs. baseline"),
+      /*#__PURE__*/React.createElement("th", null, "Status"), /*#__PURE__*/React.createElement("th", null, "Evidence"))),
+    /*#__PURE__*/React.createElement("tbody", null, reconAll.map(({ s, r, rec }, i) => {
+      const delta = baseline ? r.totalTax - baseline.r.totalTax : 0;
+      return /*#__PURE__*/React.createElement("tr", { key: s.id },
+        /*#__PURE__*/React.createElement("td", null, s.name, i === 0 && /*#__PURE__*/React.createElement("span", { className: "tp-tag" }, "Base"), s.id === bestId && /*#__PURE__*/React.createElement("span", { className: "tp-tag green" }, "Lowest tax")),
+        /*#__PURE__*/React.createElement("td", { className: "num" }, usd$(r.totalTax)),
+        /*#__PURE__*/React.createElement("td", { className: "num" }, pct(r.effectiveRate)),
+        /*#__PURE__*/React.createElement("td", { className: "num" }, pct(r.marginal)),
+        /*#__PURE__*/React.createElement("td", { className: "num " + (delta < 0 ? "up" : delta > 0 ? "down" : "") }, i === 0 ? "base" : (delta > 0 ? "+" : "") + usd$(delta)),
+        /*#__PURE__*/React.createElement("td", null, rec.variances > 0 ? "Variance" : rec.review > 0 ? "Review required" : "Reconciled"),
+        /*#__PURE__*/React.createElement("td", null, rec.reconciled, "/", rec.total, " checks"));
+    }))));
+}
+function ReconciliationTable({ rec, scenarioName }) {
+  const tblRef = useRef(null);
+  return /*#__PURE__*/React.createElement(Card, {
+    title: "Current-year audit — " + scenarioName,
+    sub: rec.reconciled + " of " + (rec.total - rec.review) + " checks reconciled, " + rec.review + " flagged for human review",
+    right: /*#__PURE__*/React.createElement(CopyForExcel, { forRef: tblRef })
+  }, /*#__PURE__*/React.createElement("div", { className: "tp-tblwrap", ref: tblRef }, /*#__PURE__*/React.createElement("table", { className: "tp-tbl" },
+    /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
+      /*#__PURE__*/React.createElement("th", null, "Check"), /*#__PURE__*/React.createElement("th", null, "1040 section"),
+      /*#__PURE__*/React.createElement("th", { className: "num" }, "Expected"), /*#__PURE__*/React.createElement("th", { className: "num" }, "Actual"),
+      /*#__PURE__*/React.createElement("th", { className: "num" }, "Variance"), /*#__PURE__*/React.createElement("th", null, "Result"),
+      /*#__PURE__*/React.createElement("th", null, "Authority"), /*#__PURE__*/React.createElement("th", null, "Notes"))),
+    /*#__PURE__*/React.createElement("tbody", null, rec.rows.map(row => /*#__PURE__*/React.createElement("tr", { key: row.key, className: row.result === "Variance" ? "warn" : "" },
+      /*#__PURE__*/React.createElement("td", null, row.check),
+      /*#__PURE__*/React.createElement("td", null, row.section),
+      /*#__PURE__*/React.createElement("td", { className: "num" }, typeof row.expected === "number" ? usd$(row.expected) : row.expected == null ? "—" : row.expected),
+      /*#__PURE__*/React.createElement("td", { className: "num" }, typeof row.actual === "number" ? usd$(row.actual) : row.actual),
+      /*#__PURE__*/React.createElement("td", { className: "num" }, row.variance == null ? "—" : usd$(row.variance)),
+      /*#__PURE__*/React.createElement("td", null, row.result),
+      /*#__PURE__*/React.createElement("td", { className: "sm" }, row.authority),
+      /*#__PURE__*/React.createElement("td", { className: "sm" }, row.notes)))))));
+}
+function KnownAnswerPanel({ kat }) {
+  return /*#__PURE__*/React.createElement("div", { className: "tp-tblwrap" }, /*#__PURE__*/React.createElement("table", { className: "tp-tbl" },
+    /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Known-answer test"), /*#__PURE__*/React.createElement("th", { className: "num" }, "Expected"), /*#__PURE__*/React.createElement("th", { className: "num" }, "Actual"), /*#__PURE__*/React.createElement("th", null, "Result"), /*#__PURE__*/React.createElement("th", null, "Authority"))),
+    /*#__PURE__*/React.createElement("tbody", null, kat.map((t, i) => /*#__PURE__*/React.createElement("tr", { key: i, className: t.pass ? "" : "warn" },
+      /*#__PURE__*/React.createElement("td", null, t.label),
+      /*#__PURE__*/React.createElement("td", { className: "num" }, typeof t.expected === "number" ? usd$(t.expected) : String(t.expected)),
+      /*#__PURE__*/React.createElement("td", { className: "num" }, typeof t.actual === "number" ? usd$(t.actual) : String(t.actual)),
+      /*#__PURE__*/React.createElement("td", null, t.pass ? "Passed" : "Failed"),
+      /*#__PURE__*/React.createElement("td", { className: "sm" }, t.authority))))));
+}
 function AuditPage({
   auditLog,
   setAuditLog,
   scenarios,
   results,
   year,
-  status
+  status,
+  baseline,
+  bestId,
+  activeId
 }) {
+  const kat = useMemo(() => runKnownAnswerTests(), []);
+  const reconAll = useMemo(() => results.map(({ s, r }) => ({ s, r, rec: computeReconciliation(s, r, status, year) })), [results, status, year]);
+  const activeEntry = reconAll.find(x => x.s.id === activeId) || reconAll[0];
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
   const ql = q.trim().toLowerCase();
@@ -542,18 +701,20 @@ function AuditPage({
   const tblRef = useRef(null);
   return /*#__PURE__*/React.createElement("div", {
     className: "tp-stack"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "tp-kpis"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "tp-kpi"
-  }, /*#__PURE__*/React.createElement("span", null, "Changes recorded"), /*#__PURE__*/React.createElement("strong", null, auditLog.length), /*#__PURE__*/React.createElement("em", null, new Set(auditLog.map(e => e.scenarioId)).size, " scenario", new Set(auditLog.map(e => e.scenarioId)).size === 1 ? "" : "s", " touched")), /*#__PURE__*/React.createElement("div", {
-    className: "tp-kpi"
-  }, /*#__PURE__*/React.createElement("span", null, "Gross tax movement"), /*#__PURE__*/React.createElement("strong", null, usd$(totalMoved)), /*#__PURE__*/React.createElement("em", null, "sum of absolute impacts")), /*#__PURE__*/React.createElement("div", {
-    className: "tp-kpi " + (netMoved < 0 ? "good" : netMoved > 0 ? "warn" : "")
-  }, /*#__PURE__*/React.createElement("span", null, "Net tax movement"), /*#__PURE__*/React.createElement("strong", null, usd$(netMoved)), /*#__PURE__*/React.createElement("em", null, netMoved < 0 ? "reduction across the session" : netMoved > 0 ? "increase across the session" : "no net change")), /*#__PURE__*/React.createElement("div", {
-    className: "tp-kpi"
-  }, /*#__PURE__*/React.createElement("span", null, "Entries with a memo"), /*#__PURE__*/React.createElement("strong", null, auditLog.filter(e => e.memo).length), /*#__PURE__*/React.createElement("em", null, "documented for the workpaper file"))), /*#__PURE__*/React.createElement(Note, null, "Every input change is recorded with a timestamp, the value before and after, and the movement in total tax it caused. Rapid edits to the same field are coalesced into one entry so the trail reads as decisions rather than keystrokes. Add a memo to any line to record why the change was made — memos carry through to the Excel export."), /*#__PURE__*/React.createElement(Card, {
+  }, /*#__PURE__*/React.createElement(Card, {
+    title: "Calculation Audit & Benchmarks",
+    sub: "Evidence for the active client, tax year and scenario set — recomputed live, not cached"
+  }, /*#__PURE__*/React.createElement(AuditBenchmarksSummary, { reconAll, kat })),
+  /*#__PURE__*/React.createElement(Card, { title: "Scenario benchmarking" },
+    /*#__PURE__*/React.createElement(ScenarioBenchmarkTable, { reconAll, baseline, bestId })),
+  activeEntry && /*#__PURE__*/React.createElement(ReconciliationTable, { rec: activeEntry.rec, scenarioName: activeEntry.s.name }),
+  /*#__PURE__*/React.createElement(Card, {
+    title: "Known-answer tests",
+    sub: kat.filter(t => t.pass).length + " of " + kat.length + " passed — run live against this session's engine"
+  }, /*#__PURE__*/React.createElement(KnownAnswerPanel, { kat })),
+  /*#__PURE__*/React.createElement(Note, null, "Every input change is recorded with a timestamp, the value before and after, and the movement in total tax it caused. Rapid edits to the same field are coalesced into one entry so the trail reads as decisions rather than keystrokes. Add a memo to any line to record why the change was made — memos carry through to the Excel export."), /*#__PURE__*/React.createElement(Card, {
     title: "Change history",
+    sub: auditLog.length + " change" + (auditLog.length === 1 ? "" : "s") + " · " + usd$(totalMoved) + " gross movement · " + usd$(netMoved) + " net · " + auditLog.filter(e => e.memo).length + " with a memo",
     right: /*#__PURE__*/React.createElement("div", {
       className: "tp-inline"
     }, /*#__PURE__*/React.createElement("select", {
@@ -578,13 +739,11 @@ function AuditPage({
       onChange: e => setQ(e.target.value)
     }), /*#__PURE__*/React.createElement(CopyForExcel, {
       forRef: tblRef
-    }), /*#__PURE__*/React.createElement("button", {
+    }), (filter !== "all" || q) && /*#__PURE__*/React.createElement("button", {
       className: "tp-btn ghost sm",
-      disabled: !auditLog.length,
-      onClick: () => {
-        if (confirm("Clear the entire audit trail? This cannot be undone.")) setAuditLog([]);
-      }
-    }, "Clear"))
+      title: "Clears the filter and search box only — the durable audit trail is never deleted here",
+      onClick: () => { setFilter("all"); setQ(""); }
+    }, "Clear filters"))
   }, /*#__PURE__*/React.createElement("div", {
     className: "tp-tblwrap",
     ref: tblRef
