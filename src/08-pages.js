@@ -520,7 +520,9 @@ function ScenariosPage({
   reset,
   onAIOptimize,
   onAIReport,
-  onAskAI
+  onAskAI,
+  activeId,
+  onAddPlanningScenario
 }) {
   /* Ledger group collapse state persists per user; density is a preference. */
   const [open, setOpen] = useUIPref("ledger:groups", {
@@ -543,8 +545,22 @@ function ScenariosPage({
   const [drill, setDrill] = useState(null);
   const [aiPanel, setAiPanel] = useState(null); // scenario id with the AI panel expanded
   const n = scenarios.length;
+  const baseId = scenarios[0].id;
+  /* "Add Compare" narrows the ledger (the Planner) to a chosen subset of
+     scenarios without touching the underlying scenario list — null means no
+     filter is active and every scenario shows, which is the original,
+     unfiltered behavior and stays the default until the user opts in. */
+  const [compareIds, setCompareIds] = useUIPref("compareIds:" + client.id, null);
+  const [comparePicker, setComparePicker] = useState(false);
+  const ledgerScenarios = compareIds ? scenarios.filter(s => compareIds.includes(s.id)) : scenarios;
+  const ledgerResults = compareIds ? results.filter(x => compareIds.includes(x.s.id)) : results;
+  const ledgerN = ledgerScenarios.length;
+  const removeFromCompare = id => {
+    if (!compareIds || id === baseId) return;
+    setCompareIds(compareIds.filter(x => x !== id));
+  };
   const cols = {
-    gridTemplateColumns: `minmax(${Math.min(210, labW)}px,${labW}px) repeat(${n}, minmax(${Math.max(130, colW - 35)}px,${colW}px))`
+    gridTemplateColumns: `minmax(${Math.min(210, labW)}px,${labW}px) repeat(${ledgerN}, minmax(${Math.max(130, colW - 35)}px,${colW}px))`
   };
   const richestId = results.length > 1 ? results.reduce((a, b) => b.r.spendableAfterTaxCash > a.r.spendableAfterTaxCash ? b : a).s.id : null;
   const bestAlignedId = alignments && results.length > 1 && alignments.some(a => a && a.pct != null) ? results[alignments.reduce((bi, a, i) => a && a.pct != null && (alignments[bi] == null || alignments[bi].pct == null || a.pct > alignments[bi].pct) ? i : bi, 0)].s.id : null;
@@ -577,7 +593,14 @@ function ScenariosPage({
     className: "tp-btn ghost sm",
     type: "button",
     onClick: onAIReport
-  }, "AI Build Report"), /*#__PURE__*/React.createElement("em", null, "Proposals require approval; the engine computes every result.")), /*#__PURE__*/React.createElement("div", {
+  }, "AI Build Report"), onAddPlanningScenario && EL(PlanningScenariosMenu, {
+    onAddScenario: () => {
+      const id = onAddPlanningScenario(activeId);
+      setCompareIds(ids => ids ? Array.from(new Set([...ids, id])) : ids);
+      setDrill({ id, type: "overview" });
+    },
+    onOpenComparePicker: () => setComparePicker(true)
+  }), /*#__PURE__*/React.createElement("em", null, "Proposals require approval; the engine computes every result.")), /*#__PURE__*/React.createElement("div", {
     className: "tp-verdict"
   }, results.map(({
     s,
@@ -717,13 +740,19 @@ function ScenariosPage({
     }
   }, "⧉ Copy for Excel"), copyMsg && EL("em", {
     className: "tp-copyxl-msg"
-  }, copyMsg), EL("em", null, "Line-item column and scenario headers stay pinned while you scroll")), /*#__PURE__*/React.createElement("div", {
+  }, copyMsg), compareIds && EL("span", {
+    className: "tp-comparenote"
+  }, "Comparing ", ledgerN, " of ", n, " scenarios", EL("button", {
+    className: "tp-mini",
+    type: "button",
+    onClick: () => setCompareIds(null)
+  }, "Show all")), EL("em", null, "Line-item column and scenario headers stay pinned while you scroll")), /*#__PURE__*/React.createElement("div", {
     className: "tp-ledger",
     style: cols,
     ref: ledgerRef
   },/*#__PURE__*/React.createElement("div", {
     className: "tp-cell tp-corner"
-  }, "Line item"), scenarios.map(s => /*#__PURE__*/React.createElement("div", {
+  }, "Line item"), ledgerScenarios.map(s => /*#__PURE__*/React.createElement("div", {
     key: s.id,
     className: "tp-cell tp-schead " + (s.id === bestId ? "best" : "")
   }, /*#__PURE__*/React.createElement("input", {
@@ -732,7 +761,10 @@ function ScenariosPage({
     onChange: e => update(s.id, "name", e.target.value)
   }), /*#__PURE__*/React.createElement("div", {
     className: "tp-schead-a"
-  }, /*#__PURE__*/React.createElement("button", {
+  }, compareIds && s.id !== baseId && /*#__PURE__*/React.createElement("button", {
+    onClick: () => removeFromCompare(s.id),
+    title: "Remove from comparison (keeps the scenario)"
+  }, I.x), /*#__PURE__*/React.createElement("button", {
     onClick: () => duplicate(s.id),
     title: "Duplicate"
   }, I.copy), /*#__PURE__*/React.createElement("button", {
@@ -742,137 +774,137 @@ function ScenariosPage({
   }, I.trash)))), /*#__PURE__*/React.createElement(LedgerGroup, {
     label: "Income",
     k: "income",
-    n: n,
+    n: ledgerN,
     open: open,
     toggle: toggle
   }), open.income && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "w2Wages",
     label: "W-2 wages",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerDrillRow, {
     label: "S corporations",
     hint: "compensation, derived K-1 and §199A",
     get: r => r.scorpComp + r.scorpK1,
     type: "scorp",
-    results: results,
+    results: ledgerResults,
     setDrill: setDrill
   }), /*#__PURE__*/React.createElement(LedgerDrillRow, {
     label: "Schedule C — net profit",
     hint: "click to edit businesses",
     get: r => r.schedC,
     type: "schedC",
-    results: results,
+    results: ledgerResults,
     setDrill: setDrill
   }), /*#__PURE__*/React.createElement(LedgerDrillRow, {
     label: "Passthrough / K-1",
     hint: "Schedule E entities",
     get: r => r.passthrough,
     type: "passthrough",
-    results: results,
+    results: ledgerResults,
     setDrill: setDrill
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "taxableInterest",
     label: "Taxable interest",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "taxExemptInterest",
     label: "Tax-exempt interest",
     hint: "adds back for ACA and IRMAA MAGI",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "ordinaryDividends",
     label: "Ordinary dividends",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "qualifiedDividends",
     label: "— of which qualified",
     indent: true,
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "shortTermGains",
     label: "Short-term capital gains",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "longTermGains",
     label: "Long-term capital gains",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "iraDistributions",
     label: "IRA and pension distributions",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "rothConversion",
     label: "Roth conversion",
     hint: "excluded from Roth MAGI",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "socialSecurityTotal",
     label: "Social Security benefits received",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "socialSecurityTaxable",
     label: "— taxable portion",
     indent: true,
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "otherIncome",
     label: "Other income",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   })), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Total income",
     cls: "subtotal",
     get: r => r.grossIncome,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerGroup, {
     label: "Adjustments and deductions",
     k: "sched",
-    n: n,
+    n: ledgerN,
     open: open,
     toggle: toggle
   }), open.sched && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Deductible half of SE tax",
     get: r => r.seDeduction,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Self-employed retirement plan",
     get: r => r.retirementDeduction,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Self-employed health insurance",
     get: r => r.sehiDeduction,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Health savings account",
     get: r => r.hsa,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "IRA deduction",
     get: r => r.iraDeduction,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerDrillRow, {
     label: "Other Schedule 1 adjustments",
     hint: "student loan, educator, alimony",
     get: r => r.s1AdjOther,
     type: "schedule1",
-    results: results,
+    results: ledgerResults,
     setDrill: setDrill
   })), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Adjusted gross income",
     cls: "total",
     get: r => r.agi,
-    results: results
+    results: ledgerResults
   }), open.sched && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "tp-cell tp-lab"
   }, "Deduction method"), scenarios.map(s => /*#__PURE__*/React.createElement("div", {
@@ -893,152 +925,152 @@ function ScenariosPage({
     hint: "SALT, interest, charity, medical",
     get: r => r.itemized,
     type: "schedA",
-    results: results,
+    results: ledgerResults,
     setDrill: setDrill
   }), /*#__PURE__*/React.createElement(LedgerDrillRow, {
     label: "Schedule 1-A additional deductions",
     hint: "senior, tips, overtime, car loan",
     get: r => r.sched1ATotal,
     type: "sched1A",
-    results: results,
+    results: ledgerResults,
     setDrill: setDrill
   })), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Deduction applied",
     cls: "subtotal",
     get: r => r.deductionUsed,
     tags: r => r.deductionKind,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "QBI deduction — §199A",
     cls: "subtotal",
     get: r => r.qbi.deduction,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Taxable income",
     cls: "total",
     get: r => r.taxableIncome,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerGroup, {
     label: "Tax and credits",
     k: "other",
-    n: n,
+    n: ledgerN,
     open: open,
     toggle: toggle
   }), open.other && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "children",
     label: "Qualifying children under 17",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "otherCredits",
     label: "Other nonrefundable credits",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "withholding",
     label: "Federal withholding",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "estimatedPayments",
     label: "Estimated payments",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   }), /*#__PURE__*/React.createElement(LedgerInputRow, {
     field: "householdSize",
     label: "Household size",
     hint: "for ACA percentage of FPL",
-    scenarios: scenarios,
+    scenarios: ledgerScenarios,
     update: update
   })), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Federal income tax",
     get: r => r.fedIncomeTax,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Less credits",
     get: r => -r.creditsApplied,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Self-employment tax",
     get: r => r.seTax,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "S corporation payroll — employee half",
     get: r => r.employeeFICA,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "S corporation payroll — employer half",
     get: r => r.employerFICA,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Additional Medicare Tax",
     get: r => r.addlMedicare,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Net investment income tax",
     get: r => r.niit,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Total modeled federal tax",
     cls: "grand",
     get: r => r.totalTax,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Effective economic rate",
     cls: "rate",
     get: r => r.effectiveRate,
     isPct: true,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Ordinary marginal bracket",
     cls: "rate",
     get: r => r.marginal,
     isPct: true,
-    results: results
+    results: ledgerResults
   }), EL(LedgerGroup, {
     label: "Economic and cash-flow reconciliation",
     k: "econ",
-    n: n,
+    n: ledgerN,
     open: open,
     toggle: toggle
   }), open.econ && EL(React.Fragment, null, /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Economic income",
     get: r => r.economicIncome,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "After-tax economic income",
     cls: "aftertax",
     get: r => r.afterTaxCash,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Retirement and HSA funding",
     get: r => r.cashOutflows.retirement + r.cashOutflows.hsa,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Charitable cash outflow",
     get: r => r.cashOutflows.charitable,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerCalcRow, {
     label: "Spendable after-tax cash",
     cls: "aftertax",
     get: r => r.spendableAfterTaxCash,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerDeltaRow, {
     label: "Tax change vs base",
     get: r => r.totalTax,
     favorable: "down",
     guard: (r, b) => Math.abs(r.economicIncome - b.economicIncome) <= 1,
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerDeltaRow, {
     label: "Economic-income change vs base",
     get: r => r.economicIncome,
     favorable: "up",
-    results: results
+    results: ledgerResults
   }), /*#__PURE__*/React.createElement(LedgerDeltaRow, {
     label: "Spendable-cash change vs base",
     get: r => r.spendableAfterTaxCash,
     favorable: "up",
-    results: results
+    results: ledgerResults
   }))), /*#__PURE__*/React.createElement("div", {
     className: "tp-add-row"
   }, /*#__PURE__*/React.createElement("button", {
@@ -1054,7 +1086,18 @@ function ScenariosPage({
     status: status,
     year: year,
     onClose: () => setDrill(null),
-    update: (k, v) => update(drill.id, k, v)
+    update: (k, v) => update(drill.id, k, v),
+    onJump: t => setDrill({ id: drill.id, type: t })
+  }), comparePicker && EL(ComparePickerModal, {
+    scenarios: scenarios,
+    results: results,
+    baseId: baseId,
+    initial: compareIds || scenarios.map(s => s.id),
+    onApply: ids => {
+      setCompareIds(Array.from(new Set([baseId, ...ids])));
+      setComparePicker(false);
+    },
+    onClose: () => setComparePicker(false)
   }));
 }
 
@@ -1164,8 +1207,154 @@ function LedgerDrillRow({
   }, usd$(get(r)))));
 }
 
+/* ---------------------------------------------------------------------------
+   PLANNING SCENARIOS — "Add Scenario" clones the current scenario and opens
+   it for editing; "Add Compare" narrows the Planner ledger to a chosen set of
+   scenarios. Both work through the existing scenario list and calculation
+   pipeline — there is no second scenario store and no separate engine call.
+   ------------------------------------------------------------------------- */
+function PlanningScenariosMenu({ onAddScenario, onOpenComparePicker }) {
+  const [open, setOpen] = useState(false);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "tp-ai-cardmenu"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "tp-btn ghost sm",
+    type: "button",
+    "aria-expanded": open,
+    onClick: () => setOpen(v => !v)
+  }, I.layers, " Planning Scenarios"), open && /*#__PURE__*/React.createElement("div", {
+    className: "tp-ai-cardmenu-pop"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => { setOpen(false); onAddScenario(); }
+  }, "Add Scenario"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => { setOpen(false); onOpenComparePicker(); }
+  }, "Add Compare")));
+}
+
+/* Compact quick-edit panel for a newly added planning scenario. Reuses the
+   same modal chrome (tp-overlay/tp-modal) as the Schedule C / S-Corp / etc.
+   drill editors, and the same top-level fields the ledger's income rows
+   already edit — so nothing here can drift from what the ledger itself does. */
+function ScenarioOverviewEditor({ scenario, update, onJump }) {
+  const set = (k, v) => update(k, v);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "tp-stack"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "tp-hint"
+  }, "This is an independent planning scenario cloned from \u201c", scenario.name, "\u201d—editing it does not change any other scenario. The deterministic engine recalculates automatically."),
+  /*#__PURE__*/React.createElement("label", {
+    className: "tp-field"
+  }, /*#__PURE__*/React.createElement("span", null, "Scenario name"), /*#__PURE__*/React.createElement("input", {
+    className: "tp-txt",
+    value: scenario.name,
+    onChange: e => set("name", e.target.value)
+  })),
+  /*#__PURE__*/React.createElement("div", {
+    className: "tp-minihead"
+  }, "Income"),
+  /*#__PURE__*/React.createElement("div", {
+    className: "tp-grid3"
+  },
+    /*#__PURE__*/React.createElement(Field, { label: "W-2 wages", value: scenario.w2Wages, onChange: v => set("w2Wages", v) }),
+    /*#__PURE__*/React.createElement(Field, { label: "Taxable interest", value: scenario.taxableInterest, onChange: v => set("taxableInterest", v) }),
+    /*#__PURE__*/React.createElement(Field, { label: "Tax-exempt interest", value: scenario.taxExemptInterest, onChange: v => set("taxExemptInterest", v) }),
+    /*#__PURE__*/React.createElement(Field, { label: "Ordinary dividends", value: scenario.ordinaryDividends, onChange: v => set("ordinaryDividends", v) }),
+    /*#__PURE__*/React.createElement(Field, { label: "— of which qualified", value: scenario.qualifiedDividends, onChange: v => set("qualifiedDividends", v) }),
+    /*#__PURE__*/React.createElement(Field, { label: "Short-term capital gains", value: scenario.shortTermGains, onChange: v => set("shortTermGains", v) }),
+    /*#__PURE__*/React.createElement(Field, { label: "Long-term capital gains", value: scenario.longTermGains, onChange: v => set("longTermGains", v) }),
+    /*#__PURE__*/React.createElement(Field, { label: "IRA and pension distributions", value: scenario.iraDistributions, onChange: v => set("iraDistributions", v) }),
+    /*#__PURE__*/React.createElement(Field, { label: "Roth conversion", value: scenario.rothConversion, onChange: v => set("rothConversion", v) }),
+    /*#__PURE__*/React.createElement(Field, { label: "Other income", value: scenario.otherIncome, onChange: v => set("otherIncome", v) })
+  ),
+  /*#__PURE__*/React.createElement("div", {
+    className: "tp-minihead"
+  }, "Payments and credits"),
+  /*#__PURE__*/React.createElement("div", {
+    className: "tp-grid3"
+  },
+    /*#__PURE__*/React.createElement(Field, { label: "Federal withholding", value: scenario.withholding, onChange: v => set("withholding", v) }),
+    /*#__PURE__*/React.createElement(Field, { label: "Estimated payments", value: scenario.estimatedPayments, onChange: v => set("estimatedPayments", v) })
+  ),
+  onJump && /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", {
+      className: "tp-minihead"
+    }, "Edit in detail"),
+    /*#__PURE__*/React.createElement("div", {
+      className: "tp-rp-actions"
+    },
+      /*#__PURE__*/React.createElement("button", { className: "tp-btn ghost sm", type: "button", onClick: () => onJump("schedC") }, "Schedule C →"),
+      /*#__PURE__*/React.createElement("button", { className: "tp-btn ghost sm", type: "button", onClick: () => onJump("scorp") }, "S corporations →"),
+      /*#__PURE__*/React.createElement("button", { className: "tp-btn ghost sm", type: "button", onClick: () => onJump("schedule1") }, "Schedule 1 →"),
+      /*#__PURE__*/React.createElement("button", { className: "tp-btn ghost sm", type: "button", onClick: () => onJump("schedA") }, "Schedule A →")
+    )));
+}
+
+/* Scenario picker for "Add Compare" — selection only changes which scenarios
+   the Planner ledger displays as columns; it never creates, deletes or
+   modifies a scenario. The base scenario is always included. */
+function ComparePickerModal({ scenarios, results, baseId, initial, onApply, onClose }) {
+  const [sel, setSel] = useState(() => new Set(initial));
+  useEffect(() => {
+    const k = e => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [onClose]);
+  const toggle = id => {
+    if (id === baseId) return;
+    setSel(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "tp-overlay",
+    onMouseDown: e => e.target === e.currentTarget && onClose()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "tp-modal"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "tp-modal-head"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "tp-eyebrow"
+  }, "Add Compare"), /*#__PURE__*/React.createElement("h3", null, "Choose scenarios for the Planner")), /*#__PURE__*/React.createElement("button", {
+    className: "tp-modal-x",
+    onClick: onClose
+  }, I.x)), /*#__PURE__*/React.createElement("div", {
+    className: "tp-modal-body"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "tp-vcenter-list"
+  }, scenarios.map(s => {
+    const r = results.find(x => x.s.id === s.id);
+    const isBase = s.id === baseId;
+    return /*#__PURE__*/React.createElement("label", {
+      key: s.id,
+      className: "tp-comparerow"
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      checked: sel.has(s.id),
+      disabled: isBase,
+      onChange: () => toggle(s.id)
+    }), /*#__PURE__*/React.createElement("span", {
+      className: "tp-comparerow-name"
+    }, s.name, isBase && /*#__PURE__*/React.createElement("em", null, " · base")), r && /*#__PURE__*/React.createElement("span", {
+      className: "tp-comparerow-tax"
+    }, usd$(r.r.totalTax)));
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "tp-modal-foot"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "tp-btn ghost sm",
+    onClick: onClose
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    className: "tp-btn solid sm",
+    onClick: () => onApply(Array.from(sel))
+  }, "Add to comparison"))));
+}
+
 /* ---- Drill-down editors ---- */
 const DRILL_TITLES = {
+  overview: "Scenario overview — quick edit",
   schedC: "Schedule C — profit or loss from business",
   passthrough: "Passthrough and K-1 income — Schedule E",
   schedule1: "Schedule 1 — additional income and adjustments",
@@ -1180,7 +1369,8 @@ function DrillModal({
   status,
   year,
   onClose,
-  update
+  update,
+  onJump
 }) {
   useEffect(() => {
     const k = e => e.key === "Escape" && onClose();
@@ -1201,7 +1391,11 @@ function DrillModal({
     onClick: onClose
   }, I.x)), /*#__PURE__*/React.createElement("div", {
     className: "tp-modal-body"
-  }, type === "schedC" && /*#__PURE__*/React.createElement(SchedCEditor, {
+  }, type === "overview" && /*#__PURE__*/React.createElement(ScenarioOverviewEditor, {
+    scenario: scenario,
+    update: update,
+    onJump: onJump
+  }), type === "schedC" && /*#__PURE__*/React.createElement(SchedCEditor, {
     scenario: scenario,
     update: update
   }), type === "passthrough" && /*#__PURE__*/React.createElement(PassthroughEditor, {
