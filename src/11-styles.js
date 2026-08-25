@@ -299,8 +299,14 @@ button{cursor:pointer;border:none;background:none}
 .tp-lab.ind{padding-left:24px;color:var(--muted)}
 .tp-lab.calc{font-weight:600}
 .tp-in{padding:0}
-.tp-in .tp-money{border:none;border-radius:0;background:transparent;padding:6px 10px;height:100%}
+.tp-in .tp-money{border:none;border-radius:0;background:transparent;padding:6px 10px;height:100%;flex:1}
 .tp-in .tp-money:focus{background:var(--indigo-bg);box-shadow:none}
+.tp-drillchip{flex-shrink:0;display:grid;place-items:center;width:18px;height:18px;margin-right:4px;border-radius:4px;color:var(--muted2);background:transparent}
+.tp-drillchip:hover{background:var(--indigo-bg);color:var(--indigo)}
+.tp-modal-wide{max-width:1040px}
+.tp-strategy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:14px}
+.tp-strategy-card{padding:12px}
+.tp-strategy-cite{font-size:10.5px;color:var(--muted);font-weight:600;letter-spacing:.2px}
 .tp-calc{justify-content:flex-end;font-variant-numeric:tabular-nums;gap:6px}
 button.tp-calc.drill{width:100%;background:#fff;border-bottom:1px solid var(--line2);font-size:12px;color:var(--ink);font-weight:500}
 button.tp-calc.drill:hover{background:var(--indigo-bg);color:var(--indigo)}

@@ -40,7 +40,7 @@ const scenariosBefore = await p.evaluate(() => JSON.parse(localStorage.getItem('
 
 // Add Scenario
 await p.click(".tp-ai-bar button:has-text('Planning Scenarios')");
-await p.click(".tp-ai-cardmenu-pop button:has-text('Add Scenario')");
+await p.click(".tp-ai-cardmenu-pop button:has-text('Create from Active')");
 await p.waitForTimeout(400);
 ok(await p.locator(".tp-modal h3:has-text('Scenario overview')").isVisible(), "Add Scenario opens the overview edit panel");
 const scenariosAfterAdd = await p.evaluate(() => JSON.parse(localStorage.getItem('tp_clients_v1'))[0].scenarios.length);

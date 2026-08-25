@@ -997,6 +997,27 @@ function App() {
     setScenarios(sc => [...sc, c]);
     return c.id;
   };
+  /* Strategy Scenario Library "Model scenario": clone the active scenario,
+     apply the strategy's real input changes (STRATEGY_LIBRARY in
+     08-pages.js), and add the result to the scenario list. Same
+     deepClone + setScenarios + audit-log path as every other scenario —
+     the baseline scenario object is never touched. */
+  const modelStrategy = (strategyKey, amount) => {
+    const strategy = STRATEGY_LIBRARY.find(x => x.key === strategyKey);
+    if (!strategy) return null;
+    const src = active || scenarios[0];
+    const c = deepClone(src, src.name + " + " + strategy.title);
+    const modeled = strategy.apply(c, amount, { status, year });
+    logEvent({
+      label: "Strategy modeled: " + strategy.title,
+      kind: "structure",
+      scenarioName: modeled.name,
+      from: src.name,
+      to: modeled.name
+    });
+    setScenarios(sc => [...sc, modeled]);
+    return modeled.id;
+  };
   const duplicate = id => {
     const src = scenarios.find(s => s.id === id);
     const c = deepClone(src);
@@ -1011,6 +1032,7 @@ function App() {
   };
   const remove = id => {
     if (scenarios.length <= 1) return;
+    if (scenarios[0] && scenarios[0].id === id) return; // baseline is protected — never delete scenario 0
     const src = scenarios.find(s => s.id === id);
     logEvent({
       label: "Scenario deleted",
@@ -1411,7 +1433,8 @@ function App() {
           client: clientSafe, alignments,
           scenarios, results, bestId, baseline, status, year,
           update, addScenario, duplicate, remove, reset,
-          activeId: activeIdSafe, onAddPlanningScenario: addPlanningScenario
+          activeId: activeIdSafe, onAddPlanningScenario: addPlanningScenario,
+          onModelStrategy: modelStrategy
         }),
         tab === "se" && EL(SEModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
         tab === "magi" && EL(MAGIModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
