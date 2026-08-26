@@ -20,7 +20,7 @@ for (const f of files) {
 /* Top-level const/let live in the context's global lexical scope, not on the
    context object — pull the bindings out with one evaluated expression. */
 const E = vm.runInContext(
-  "({ TY, schedATotal, computeSchedule1A, computeStudentLoanInterest, computeSCorp, computeQBI, computeScenario, validateScenario, analyzeScenario, seed: seed() })",
+  "({ TY, schedATotal, computeSchedule1A, computeStudentLoanInterest, computeSCorp, computeQBI, computeScenario, validateScenario, analyzeScenario, computeEstimatedTax, seed: seed() })",
   ctx
 );
 
@@ -207,6 +207,38 @@ function check(name, actual, expected, tol = 0.51) {
   const r3 = E.computeScenario(s3, "mfj", 2025);
   check("NIIT: legacy nonpassive checkbox keeps rental in base (unchanged)", r3.niitDetail[0].included, 40000);
   check("NIIT: legacy treatment flagged for human review", r3.niitReview.length > 0, true);
+}
+
+/* -------------------------------------------------- 10b. Estimated tax / §6654 safe harbor */
+{
+  const C = E.TY[2026];
+  // No prior-year info: only the current-year 90% test applies
+  let r = E.computeEstimatedTax({ currentYearTax: 50000, priorYearTax: null, priorYearAGI: null, status: "mfj", C, withholding: 20000, paymentsMade: [], asOfDate: "2026-07-01" });
+  check("Estimated tax: current-year-only required payment = 90% of current tax", r.requiredAnnualPayment, 45000);
+  check("Estimated tax: remaining required after withholding", r.remainingRequired, 25000);
+  check("Estimated tax: safe harbor not met when underpaid", r.meetsSafeHarbor, false);
+  check("Estimated tax: warns that only the current-year test is available", r.warnings.some(w => /prior-year tax entered/.test(w)), true);
+
+  // Prior-year AGI at/below the $150k (MFJ) threshold -> 100% of prior tax controls if lower
+  r = E.computeEstimatedTax({ currentYearTax: 50000, priorYearTax: 40000, priorYearAGI: 100000, status: "mfj", C, withholding: 40000, paymentsMade: [], asOfDate: "2026-07-01" });
+  check("Estimated tax: prior-year safe harbor at 100% below the AGI threshold", r.priorYearSafeHarbor, 40000);
+  check("Estimated tax: lesser of the two safe harbors controls (prior year)", r.requiredAnnualPayment, 40000);
+  check("Estimated tax: safe harbor met when withholding covers the requirement", r.meetsSafeHarbor, true);
+
+  // Prior-year AGI over the threshold -> 110% of prior tax
+  r = E.computeEstimatedTax({ currentYearTax: 50000, priorYearTax: 40000, priorYearAGI: 200000, status: "mfj", C, withholding: 40000, paymentsMade: [], asOfDate: "2026-07-01" });
+  check("Estimated tax: prior-year safe harbor at 110% above the AGI threshold", r.priorYearSafeHarbor, 44000);
+  check("Estimated tax: lesser-of controls (110% prior beats 90% current here)", r.requiredAnnualPayment, 44000);
+
+  // Installments before asOfDate are evaluated as met/shortfall; those after are upcoming
+  r = E.computeEstimatedTax({ currentYearTax: 50000, priorYearTax: null, priorYearAGI: null, status: "mfj", C, withholding: 20000, paymentsMade: [], asOfDate: "2026-07-01" });
+  check("Estimated tax: past installments (Apr/Jun) are evaluated", r.installments[0].status !== "upcoming" && r.installments[1].status !== "upcoming", true);
+  check("Estimated tax: future installments (Sep/Jan) are upcoming", r.installments[2].status === "upcoming" && r.installments[3].status === "upcoming", true);
+  check("Estimated tax: annualized-income method flagged as unsupported", r.warnings.some(w => /annualized-income/.test(w)), true);
+
+  // Balance at filing is independent of the safe-harbor amount
+  r = E.computeEstimatedTax({ currentYearTax: 50000, priorYearTax: null, priorYearAGI: null, status: "mfj", C, withholding: 55000, paymentsMade: [], asOfDate: "2026-12-01" });
+  check("Estimated tax: projected balance is current tax minus total applied (refund)", r.projectedBalance, -5000);
 }
 
 /* -------------------------------------------------- 11. Golden totals */

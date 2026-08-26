@@ -398,7 +398,14 @@ function computeScenario(s, status, year) {
     total: retirementDeduction + hsa + charitableCashOutflow
   };
   const form1040Tax = clamp0(fedIncomeTax - creditsApplied) + SE.total + AM.total + niit;
-  const payments = num(s.withholding) + num(s.estimatedPayments);
+  /* When the Estimated Taxes calculator's dated payment schedule is in use,
+     it is the source of truth for estimated payments (the flat field is
+     derived from it, never written independently — a single field write
+     stays a single field write, with no second call racing the first). */
+  const estimatedPaymentsResolved = (s.estimatedPaymentSchedule || []).length
+    ? (s.estimatedPaymentSchedule || []).reduce((a, p) => a + num(p.amount), 0)
+    : num(s.estimatedPayments);
+  const payments = num(s.withholding) + estimatedPaymentsResolved;
   return {
     C,
     year,
@@ -459,6 +466,7 @@ function computeScenario(s, status, year) {
     totalTax,
     form1040Tax,
     payments,
+    estimatedPaymentsResolved,
     balanceDue: form1040Tax - payments,
     sCorpEmployerPlanCapacity,
     capLossCarryforward,
@@ -503,6 +511,118 @@ function computeScenario(s, status, year) {
       socialSecurityTaxable
     }
   };
+}
+
+/* ============================================================================
+   RECONCILIATION — Audit & Benchmarks tab, current-year check.
+   Ordered top-to-bottom exactly as the Form 1040 walk: income, adjustments,
+   AGI, deductions, QBI, taxable income, regular tax, capital-gain tax, AMT,
+   SE/payroll taxes, NIIT/Additional Medicare, credits, total tax,
+   withholding/payments, balance due. Every "Expected" is either an
+   independent recomputation (a pure engine function called a second time
+   from the reported inputs, e.g. ordinaryTax/capitalGainsTax/NIIT), a
+   component-sum tie-out (the reported subtotal's own parts re-added), or a
+   statutory bound check — never a copy of "Actual". AMT is honestly labeled
+   not modeled: this engine does not compute Form 6251. */
+function computeReconciliation(s, r, status, year) {
+  const C = TY[year];
+  const rows = [];
+  const push = (key, section, label, expected, actual, authority, notes, kind) => {
+    const numeric = typeof expected === "number" && typeof actual === "number";
+    const variance = numeric ? actual - expected : null;
+    const pass = kind === "bound" ? actual <= expected + 1
+      : kind === "info" ? true
+      : numeric ? Math.abs(variance) <= 1 : expected === actual;
+    rows.push({
+      key, section, check: label, expected, actual, variance,
+      result: kind === "info" ? "Human review required" : pass ? "Reconciled" : "Variance",
+      authority, notes: notes || "", kind: kind || "tie"
+    });
+  };
+
+  // 1. Income — component sum ties to the reported gross income
+  const ip = r.incomeParts;
+  const incomeSum = ip.wages + ip.sCorpComp + r.schedC + r.passthrough + ip.sCorpK1 + ip.interest + ip.ordDiv +
+    r.capitalIncluded + ip.s1Income + ip.other + ip.rothConversion + ip.iraDistributions + ip.socialSecurityTaxable;
+  push("income", "Income", "Component sum ties to gross income", incomeSum, r.grossIncome,
+    "Form 1040, lines 1–9", "Wages + S-corp comp + Schedule C + passthrough + S-corp K-1 + interest + dividends + net capital gain (loss-limited) + Schedule 1 income + other + Roth conversion + IRA distributions + taxable Social Security.");
+
+  // 2. Adjustments to income — component sum
+  const adjSum = r.seDeduction + r.retirementDeduction + r.sehiDeduction + r.hsa + r.s1AdjOther + r.iraDeduction + r.studentLoan.allowed;
+  push("adjustments", "Adjustments", "Component sum ties to total adjustments", adjSum, r.adjustments,
+    "Schedule 1, Part II", "Half of SE tax + retirement plan + SEHI + HSA + other Schedule 1 adjustments + IRA deduction + student loan interest.");
+
+  // 3. AGI — independent recomputation from the two reported totals above
+  push("agi", "AGI", "AGI = gross income − adjustments", r.grossIncome - r.adjustments, r.agi,
+    "Form 1040, line 11");
+
+  // 4. Deductions — recomputed from the scenario's own deduction-mode election
+  const stdOrNonItemizer = r.stdDed + r.nonItemizerCharity;
+  const expectedDeduction = s.deductionMode === "standard" ? stdOrNonItemizer
+    : s.deductionMode === "itemized" ? r.itemized
+    : Math.max(stdOrNonItemizer, r.itemized);
+  push("deductions", "Deductions", "Deduction taken matches the " + (s.deductionMode === "auto" ? "larger of standard/itemized (auto)" : s.deductionMode + " election"),
+    expectedDeduction, r.deductionUsed, "Form 1040, line 12");
+
+  // 5. QBI — statutory 20%-of-taxable-income-before-QBI ceiling (Sec. 199A(a))
+  push("qbi", "QBI", "QBI deduction within the 20%-of-taxable-income ceiling", 0.20 * r.tiBeforeQBI, r.qbi.deduction,
+    "IRC §199A(a)", "Bound check, not an exact tie-out — the wage/UBIA and SSTB limits can bind below this ceiling.", "bound");
+
+  // 6. Taxable income — independent recomputation
+  push("taxable", "Taxable income", "Taxable income = AGI − deduction − Sched. 1-A − QBI",
+    clamp0(r.agi - r.deductionUsed - r.sched1ATotal - r.qbi.deduction), r.taxableIncome, "Form 1040, line 15");
+
+  // 7. Regular tax — independently recomputed by calling the bracket function again
+  push("ordinary", "Tax", "Ordinary-rate tax independently recomputed from taxable income",
+    ordinaryTax(r.ordinaryTaxable, status, C), r.ordTax, "IRC §1(j)");
+
+  // 8. Capital-gain tax — independently recomputed
+  push("capgain", "Tax", "Preferential-rate tax independently recomputed",
+    capitalGainsTax(r.ordinaryTaxable, r.prefIncome, status, C), r.cgTax, "IRC §1(h)");
+
+  // 9. AMT — honestly not modeled
+  push("amt", "AMT", "Alternative minimum tax", null, "Not modeled", "Form 6251",
+    "This engine does not compute Form 6251. If the client has large AMT preference items (ISO exercises, private-activity bond interest, or historically large SALT add-backs), compute AMT separately before relying on total tax.", "info");
+
+  // 10. SE and payroll taxes — component breakdown (ties by construction)
+  push("se-payroll", "Other taxes", "Self-employment + S-corp payroll tax component sum",
+    r.SE.total + r.sCorpFICA, r.seTax + r.sCorpFICA, "Schedule SE; IRC §3121",
+    "Reported as a breakdown of the components already inside total tax; not an independent recomputation.");
+
+  // 11. NIIT + Additional Medicare Tax — independently recomputed
+  const niitRecomputed = 0.038 * Math.min(r.investmentIncome, clamp0(r.magi.niit - C.niitThreshold[status]));
+  const amRecomputed = computeAddlMedicare(ip.wages + ip.sCorpComp, r.SE.netSE, status, C).total;
+  push("niit-addl", "Other taxes", "NIIT + Additional Medicare Tax independently recomputed",
+    niitRecomputed + amRecomputed, r.niit + r.addlMedicare, "Form 8960 · Form 8959 · IRC §1411, §3101(b)(2)");
+
+  // 12. Credits — independently recomputed from raw scenario fields
+  const children = num(s.children);
+  const ctcGross = children * C.ctc.amount;
+  const ctcReduction = Math.ceil(clamp0(r.magi.general - C.ctc.threshold[status]) / 1000) * (C.ctc.rate * 1000);
+  const ctcAllowed = Math.min(clamp0(ctcGross - ctcReduction), r.fedIncomeTax);
+  const creditsRecomputed = Math.min(ctcAllowed + num(s.otherCredits), r.fedIncomeTax);
+  push("credits", "Credits", "Nonrefundable credits independently recomputed", creditsRecomputed, r.creditsApplied,
+    "IRC §24");
+
+  // 13. Total tax — reconstructed from the reported components (final cross-foot)
+  push("total-tax", "Total tax", "Total tax reconstructed from its own reported components",
+    clamp0(r.fedIncomeTax - r.creditsApplied) + r.seTax + r.sCorpFICA + r.addlMedicare + r.niit, r.totalTax,
+    "Form 1040, line 24");
+
+  // 14. Withholding and estimated payments — matches raw scenario entries,
+  // preferring the dated payment schedule over the flat field exactly as
+  // the engine itself resolves it (see estimatedPaymentsResolved above).
+  push("payments", "Payments", "Payments = withholding + estimated payments",
+    num(s.withholding) + r.estimatedPaymentsResolved, r.payments, "Form 1040, lines 25–26");
+
+  // 15. Balance due or refund
+  push("balance", "Balance", "Balance = Form 1040 tax − payments", r.form1040Tax - r.payments, r.balanceDue,
+    "Form 1040, lines 34–37");
+
+  const reconciled = rows.filter(x => x.kind !== "info" && x.result === "Reconciled").length;
+  const variances = rows.filter(x => x.result === "Variance").length;
+  const review = rows.filter(x => x.kind === "info").length;
+  return { rows, reconciled, variances, review, total: rows.length };
 }
 
 /* ============================================================================

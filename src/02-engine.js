@@ -689,3 +689,82 @@ function computeSchedule1A(s, magi, status, C) {
   out.total = out.senior + out.tips + out.overtime + out.autoLoan;
   return out;
 }
+
+/* ============================================================================
+   ESTIMATED TAX / UNDERPAYMENT SAFE HARBOR — IRC §6654; Form 1040-ES.
+   Standard (non-annualized) required-installment method only: the required
+   annual payment is spread in four EQUAL installments. The annualized-income
+   installment method (Form 2210, Schedule AI, for income that arrives
+   unevenly through the year) is NOT implemented — callers must say so rather
+   than silently assuming equal quarterly income. Every threshold, percentage
+   and due date comes from C.estimatedTax (versioned per tax year), never
+   hard-coded here or in the UI. */
+function computeEstimatedTax(opts) {
+  const {
+    currentYearTax, priorYearTax, priorYearAGI, status, C,
+    withholding, paymentsMade, asOfDate, annualizedIncomeSupported
+  } = opts;
+  const E = C.estimatedTax;
+  const currentYearSafeHarbor = Math.round(num(currentYearTax) * E.currentYearPct);
+  let priorYearSafeHarbor = null;
+  if (priorYearTax != null && priorYearTax !== "" ) {
+    const threshold = E.priorAGIThreshold[status] != null ? E.priorAGIThreshold[status] : E.priorAGIThreshold.single;
+    const overThreshold = num(priorYearAGI) > threshold;
+    priorYearSafeHarbor = Math.round(num(priorYearTax) * (overThreshold ? E.priorYearPctAboveThreshold : E.priorYearPctBelowThreshold));
+  }
+  const candidates = [{ method: "currentYear", amount: currentYearSafeHarbor, label: "90% of the current-year projected tax" }];
+  if (priorYearSafeHarbor != null) {
+    const overThreshold = num(priorYearAGI) > (E.priorAGIThreshold[status] != null ? E.priorAGIThreshold[status] : E.priorAGIThreshold.single);
+    candidates.push({
+      method: "priorYear", amount: priorYearSafeHarbor,
+      label: (overThreshold ? Math.round(E.priorYearPctAboveThreshold * 100) : Math.round(E.priorYearPctBelowThreshold * 100)) + "% of the prior-year tax" +
+        (overThreshold ? " (AGI exceeded the " + usd$(E.priorAGIThreshold[status] != null ? E.priorAGIThreshold[status] : E.priorAGIThreshold.single) + " threshold)" : "")
+    });
+  }
+  const controlling = candidates.reduce((a, b) => b.amount < a.amount ? b : a);
+  const requiredAnnualPayment = controlling.amount;
+
+  const withheld = num(withholding);
+  const paid = (paymentsMade || []).reduce((a, p) => a + num(p.amount), 0);
+  const totalApplied = withheld + paid;
+  const remainingRequired = clamp0(requiredAnnualPayment - totalApplied);
+
+  /* Withholding is deemed paid evenly through the year, so it always covers
+     every installment already due; only actual estimated payments are
+     matched against the installment schedule by due date. */
+  const asOf = asOfDate ? new Date(asOfDate + "T00:00:00") : null;
+  const dueDates = E.dueDates;
+  const perInstallmentRequired = requiredAnnualPayment / dueDates.length;
+  let paidRunning = 0;
+  const installments = dueDates.map((due, i) => {
+    const dueRequired = perInstallmentRequired; // equal installments — standard method only
+    const withheldShare = withheld / dueDates.length;
+    const paymentsForThis = (paymentsMade || []).filter(p => p.date === due).reduce((a, p) => a + num(p.amount), 0);
+    paidRunning += paymentsForThis;
+    const appliedByNow = withheldShare * (i + 1) + paidRunning;
+    const isPast = asOf ? new Date(due + "T00:00:00") < asOf : false;
+    return {
+      due, required: dueRequired, paidThisInstallment: paymentsForThis,
+      cumulativeRequired: dueRequired * (i + 1), cumulativeApplied: appliedByNow,
+      shortfall: isPast ? clamp0(dueRequired * (i + 1) - appliedByNow) : null,
+      status: !isPast ? "upcoming" : appliedByNow + 0.5 >= dueRequired * (i + 1) ? "met" : "shortfall"
+    };
+  });
+  const remainingInstallments = installments.filter(x => x.status === "upcoming");
+  const perRemainingInstallment = remainingInstallments.length ? remainingRequired / remainingInstallments.length : 0;
+
+  const meetsSafeHarbor = totalApplied + 0.5 >= requiredAnnualPayment;
+  const warnings = [];
+  if (priorYearSafeHarbor == null) warnings.push("No prior-year tax entered — only the current-year 90% test is available; the (often lower) prior-year safe harbor can't be checked.");
+  if (!annualizedIncomeSupported) warnings.push("Equal-quarterly-installment method only. If income arrived unevenly through the year, the annualized-income installment method (Form 2210, Schedule AI) may produce a lower required payment in an early quarter — not calculated here; human review required.");
+
+  return {
+    currentYearSafeHarbor, priorYearSafeHarbor, candidates, controllingMethod: controlling.method, controllingLabel: controlling.label,
+    requiredAnnualPayment, withholding: withheld, paymentsMade: paid, totalApplied, remainingRequired,
+    installments, perRemainingInstallment, meetsSafeHarbor,
+    // Balance at filing: actual current-year tax less everything actually applied
+    // (withholding + estimated payments made) — independent of the safe-harbor test.
+    projectedBalance: num(currentYearTax) - totalApplied,
+    warnings
+  };
+}

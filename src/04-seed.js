@@ -125,7 +125,15 @@ function blankScenario(name) {
       manualAmount: 0,
       priorNegativeCarryforward: 0,
       entities: []
-    }
+    },
+    /* Audit trail of Strategy Scenario Library strategies modeled into this
+       scenario (see 08-pages.js STRATEGY_LIBRARY). Display-only — every tax
+       effect lives in the ordinary fields above; this never feeds the engine. */
+    appliedStrategies: [],
+    // Estimated Taxes calculator (08-pages.js EstimatedTaxEditor) — IRC §6654
+    priorYearTax: 0,
+    priorYearAGI: 0,
+    estimatedPaymentSchedule: []
   };
 }
 function seed() {

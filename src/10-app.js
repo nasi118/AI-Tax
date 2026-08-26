@@ -980,6 +980,44 @@ function App() {
     });
     setScenarios(sc => [...sc, c]);
   };
+  /* "Add Scenario" (Planning Scenarios menu): clone the given source scenario
+     (defaults to the currently active one) into a new, independent planning
+     scenario. Reuses the same deepClone + setScenarios + audit-log path as
+     every other scenario-creating action — there is no separate store. */
+  const addPlanningScenario = sourceId => {
+    const src = scenarios.find(s => s.id === sourceId) || active || scenarios[0];
+    const c = deepClone(src, src.name + " — planning copy");
+    logEvent({
+      label: "Planning scenario added",
+      kind: "structure",
+      scenarioName: c.name,
+      from: src.name,
+      to: c.name
+    });
+    setScenarios(sc => [...sc, c]);
+    return c.id;
+  };
+  /* Strategy Scenario Library "Model scenario": clone the active scenario,
+     apply the strategy's real input changes (STRATEGY_LIBRARY in
+     08-pages.js), and add the result to the scenario list. Same
+     deepClone + setScenarios + audit-log path as every other scenario —
+     the baseline scenario object is never touched. */
+  const modelStrategy = (strategyKey, amount) => {
+    const strategy = STRATEGY_LIBRARY.find(x => x.key === strategyKey);
+    if (!strategy) return null;
+    const src = active || scenarios[0];
+    const c = deepClone(src, src.name + " + " + strategy.title);
+    const modeled = strategy.apply(c, amount, { status, year });
+    logEvent({
+      label: "Strategy modeled: " + strategy.title,
+      kind: "structure",
+      scenarioName: modeled.name,
+      from: src.name,
+      to: modeled.name
+    });
+    setScenarios(sc => [...sc, modeled]);
+    return modeled.id;
+  };
   const duplicate = id => {
     const src = scenarios.find(s => s.id === id);
     const c = deepClone(src);
@@ -994,6 +1032,7 @@ function App() {
   };
   const remove = id => {
     if (scenarios.length <= 1) return;
+    if (scenarios[0] && scenarios[0].id === id) return; // baseline is protected — never delete scenario 0
     const src = scenarios.find(s => s.id === id);
     logEvent({
       label: "Scenario deleted",
@@ -1393,7 +1432,9 @@ function App() {
           onAskAI: askWorkspace,
           client: clientSafe, alignments,
           scenarios, results, bestId, baseline, status, year,
-          update, addScenario, duplicate, remove, reset
+          update, addScenario, duplicate, remove, reset,
+          activeId: activeIdSafe, onAddPlanningScenario: addPlanningScenario,
+          onModelStrategy: modelStrategy
         }),
         tab === "se" && EL(SEModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
         tab === "magi" && EL(MAGIModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
@@ -1401,7 +1442,7 @@ function App() {
         tab === "health" && EL(HealthModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
         tab === "guide" && EL(PlanningGuide, { year, client: clientSafe, baseResult: baseline.r, onAskAI: askWorkspace, onAddNote: addQuickNote }),
         tab === "reference" && EL(ReferenceTables, { year, status }),
-        tab === "audit" && EL(AuditPage, { auditLog: clientAudit, setAuditLog: setClientAudit, scenarios, results, year, status }),
+        tab === "audit" && EL(AuditPage, { auditLog: clientAudit, setAuditLog: setClientAudit, scenarios, results, year, status, baseline, bestId, activeId: activeIdSafe }),
         tab === "data" && EL(DataPage, {
           scenarios, setScenarios: setScenariosLogged, results, status, year,
           auditLog: clientAudit, setAuditLog: setClientAudit, notes, setNotes, logEvent, setYear: setYearLogged, setStatus: setStatusLogged,
