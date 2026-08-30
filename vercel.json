@@ -3,5 +3,9 @@
   "framework": null,
   "installCommand": "",
   "buildCommand": "",
-  "outputDirectory": "."
+  "outputDirectory": ".",
+  "functions": {
+    "api/grok.js": { "maxDuration": 60 },
+    "api/ai/*.js": { "maxDuration": 60 }
+  }
 }

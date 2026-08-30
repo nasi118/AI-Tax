@@ -9,8 +9,9 @@
    stored as a tax number.
 
    Transport, in order of preference:
-     1. /api/grok — a secure server-side proxy (Vercel function). The xAI key
-        lives only in the deployment environment, never in browser code.
+     1. /api/ai/chat — a secure server-side proxy (Vercel function) onto the
+        Anthropic Claude API. The Anthropic key lives only in the deployment
+        environment, never in browser code.
      2. Bring-your-own-key fallback for offline/standalone use: the user's own
         Claude / OpenAI / Grok key, entered at runtime, stored in this
         browser's localStorage only, and sent only to that provider.
@@ -37,6 +38,11 @@ const AI_PROVIDERS = {
   }
 };
 
+/* The model the secure server-side endpoint runs. The proxy keeps its own
+   allowlist and default (api/_lib/claude-proxy.js); this is the value the
+   client asks for. */
+const AI_ENDPOINT_MODEL = "claude-opus-5";
+
 const AI_SETTINGS_KEY = "tp-ai-settings";
 function loadAISettings() {
   try {
@@ -48,7 +54,9 @@ function loadAISettings() {
     };
   } catch (e) {}
   return {
-    provider: "grok",
+    /* Claude by default: it is what the secure endpoint runs, so the
+       bring-your-own-key fallback stays on the same model family. */
+    provider: "claude",
     models: {},
     keys: {}
   };
@@ -179,10 +187,10 @@ function parseProposals(text) {
    key. Reset per route so one slow report cannot break chat. */
 const aiEndpointDown = {};
 function markEndpointDown(requestType) {
-  aiEndpointDown[requestType || "grok"] = true;
+  aiEndpointDown[requestType || "chat"] = true;
 }
 function isEndpointDown(requestType) {
-  return !!aiEndpointDown[requestType || "grok"];
+  return !!aiEndpointDown[requestType || "chat"];
 }
 async function callSecureEndpoint({
   system,
@@ -191,7 +199,7 @@ async function callSecureEndpoint({
 }) {
   let resp;
   try {
-    resp = await fetch("/api/grok", {
+    resp = await fetch("/api/ai/chat", {
       method: "POST",
       signal,
       headers: {
@@ -200,7 +208,7 @@ async function callSecureEndpoint({
       body: JSON.stringify({
         system,
         messages,
-        model: "grok-4.5"
+        model: AI_ENDPOINT_MODEL
       })
     });
   } catch (e) {
@@ -211,7 +219,7 @@ async function callSecureEndpoint({
     });
   }
   if (resp.status === 404 || resp.status === 405 || resp.status === 501) {
-    markEndpointDown("grok");
+    markEndpointDown("chat");
     throw Object.assign(new Error("endpoint-unavailable"), {
       endpointUnavailable: true
     });
@@ -384,7 +392,7 @@ function AIReviewer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [includeScenario, setIncludeScenario] = useState(true);
-  const [mode, setMode] = useState(isEndpointDown("grok") ? "own-key" : "endpoint");
+  const [mode, setMode] = useState(isEndpointDown("chat") ? "own-key" : "endpoint");
   const [decided, setDecided] = useState({});
   const abortRef = useRef(null);
   const bodyRef = useRef(null);
@@ -435,7 +443,7 @@ function AIReviewer({
       return out;
     });
     try {
-      if (mode === "endpoint" && !isEndpointDown("grok")) {
+      if (mode === "endpoint" && !isEndpointDown("chat")) {
         try {
           const reply = await callSecureEndpoint({
             system,
@@ -449,7 +457,7 @@ function AIReviewer({
             if (!apiKey) {
               setShowSetup(true);
               setMessages(history);
-              setError("The secure /api/grok endpoint is not available here (offline or standalone use). Add your own API key to continue — it stays in this browser.");
+              setError("The secure /api/ai/chat endpoint is not available here (offline or standalone use). Add your own API key to continue — it stays in this browser.");
               return;
             }
             let acc = "";
@@ -510,7 +518,7 @@ function AIReviewer({
     className: "tp-aidrawer"
   }, /*#__PURE__*/React.createElement("div", {
     className: "tp-aidrawer-head"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "AI Tax Reviewer"), /*#__PURE__*/React.createElement("em", null, TY[year].label, " · ", statusLabel, " · ", scenarioName), /*#__PURE__*/React.createElement("em", null, "Engine ", ENGINE_VERSION, " · Rules ", RULES_VERSION, " · ", mode === "endpoint" ? "via secure /api/grok" : P.label + " · " + model + " (your key)")), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "AI Tax Reviewer"), /*#__PURE__*/React.createElement("em", null, TY[year].label, " · ", statusLabel, " · ", scenarioName), /*#__PURE__*/React.createElement("em", null, "Engine ", ENGINE_VERSION, " · Rules ", RULES_VERSION, " · ", mode === "endpoint" ? "via secure /api/ai/chat" : P.label + " · " + model + " (your key)")), /*#__PURE__*/React.createElement("button", {
     className: "tp-win-x",
     onClick: onClose,
     title: "Close"
@@ -544,7 +552,7 @@ function AIReviewer({
     className: mode === "endpoint" ? "on" : "",
     onClick: () => setMode("endpoint"),
     type: "button",
-    disabled: isEndpointDown("grok")
+    disabled: isEndpointDown("chat")
   }, "Secure endpoint"), /*#__PURE__*/React.createElement("button", {
     className: mode === "own-key" ? "on" : "",
     onClick: () => setMode("own-key"),
@@ -586,7 +594,7 @@ function AIReviewer({
     })
   })), /*#__PURE__*/React.createElement("p", {
     className: "tp-chat-keynote"
-  }, "Your key stays in this browser (localStorage) and is sent only to " + P.label + ". The deployed app instead uses the server-side /api/grok endpoint, which keeps the key out of the browser entirely."))), /*#__PURE__*/React.createElement("div", {
+  }, "Your key stays in this browser (localStorage) and is sent only to " + P.label + ". The deployed app instead uses the server-side /api/ai/chat endpoint, which keeps the key out of the browser entirely."))), /*#__PURE__*/React.createElement("div", {
     className: "tp-aidrawer-quick"
   }, QUICK_REVIEWS.map(q => /*#__PURE__*/React.createElement("button", {
     key: q.l,
@@ -833,7 +841,7 @@ const AI_ENDPOINTS = {
   analyze: "/api/ai/analyze",
   optimize: "/api/ai/optimize",
   "build-report": "/api/ai/build-report",
-  grok: "/api/grok"
+  chat: "/api/ai/chat"
 };
 async function callAI(requestType, {
   system,
@@ -852,7 +860,7 @@ async function callAI(requestType, {
         body: JSON.stringify({
           system,
           messages,
-          model: "grok-4.5"
+          model: AI_ENDPOINT_MODEL
         })
       });
       if (resp.status === 404 || resp.status === 405 || resp.status === 501) {
@@ -876,7 +884,7 @@ async function callAI(requestType, {
   const provider = settings.provider;
   const key = settings.keys[provider];
   if (!key) {
-    const err = new Error("The secure AI endpoint is unavailable and no personal API key is saved. Open Ask AI → Settings to add one, or configure XAI_API_KEY on the deployment.");
+    const err = new Error("The secure AI endpoint is unavailable and no personal API key is saved. Open Ask AI → Settings to add one, or configure ANTHROPIC_API_KEY on the deployment.");
     err.needsKey = true;
     throw err;
   }

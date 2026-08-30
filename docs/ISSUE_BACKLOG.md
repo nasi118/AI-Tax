@@ -46,7 +46,24 @@ risk if deferred.
 - **Risk if deferred:** The audit posture claims review discipline the
   original releases never actually received.
 
-### P0-3 · Unify the AI proxy on the Anthropic port (key handling)
+### P0-3 · Unify the AI proxy on the Anthropic port (key handling) — ✅ RESOLVED
+
+**Resolved 2026-08-30.** `api/_lib/claude-proxy.js` is back-ported verbatim
+from AI-Tax-APP, so one implementation now serves both repositories.
+`api/_lib/grok-proxy.js` is gone; every route requires `ANTHROPIC_API_KEY`
+and defaults to `claude-opus-5`. The reviewer's route is `/api/ai/chat`, with
+`/api/grok` retained as a deprecated alias so an older cached client build
+still works. `src/15-ai-chat.js` sends `AI_ENDPOINT_MODEL` instead of a
+`grok-4.5` literal and defaults the BYO-key provider to Claude; the BYO-key
+surface itself is unchanged, so an xAI key still works if a user supplies one.
+`vercel.json` gained the `functions.maxDuration` block the proxy's 50s budget
+assumes — it was missing here, so long AI calls would have been killed by the
+platform before the proxy could return a readable error. Handler unit tests
+are in `tests/api-claude-proxy.test.mjs` (39 assertions, offline) and run in
+`npm test`. README documents the env var and routes.
+
+Original entry:
+
 - **Problem:** This repo's `api/` still targets xAI (`XAI_API_KEY`) while the
   deployed AI-Tax-APP copy was ported to the Claude API
   (`ANTHROPIC_API_KEY`). Two proxies with different providers and env vars is

@@ -306,7 +306,7 @@ function AIOptimizePanel({
         tsLabel: new Date().toLocaleString(),
         scopeLabel: c.name,
         question: "AI optimization strategy",
-        model: "grok-4.5",
+        model: AI_ENDPOINT_MODEL,
         engineVersion: ENGINE_VERSION,
         rulesVersion: RULES_VERSION,
         response: "Strategy " + c.name + ": inputs changed — " + c.changes.map(ch => ch.field + " → " + ch.proposedValue).join("; ") + ". Engine result: total modeled federal tax " + usd$(x.r.totalTax) + ", after-tax economic income " + usd$(x.r.afterTaxCash) + ", spendable cash " + usd$(x.r.spendableAfterTaxCash) + ".",

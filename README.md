@@ -60,7 +60,31 @@ npm test
 python -m pytest
 ```
 
-The JavaScript suite covers deterministic golden cases and client-identity/data-flow behavior. The Python suite covers calculation, lifecycle, isolation, reconciliation, import, persistence, and governance controls. CI also runs the cross-engine contract, UI acceptance, standalone-build, and audit-workbook checks described in [CI](docs/CI.md).
+The JavaScript suite covers deterministic golden cases, client-identity/data-flow behavior, and the Claude API proxy handler (offline — it stubs `fetch` and needs no key). The Python suite covers calculation, lifecycle, isolation, reconciliation, import, persistence, and governance controls. CI also runs the cross-engine contract, UI acceptance, standalone-build, and audit-workbook checks described in [CI](docs/CI.md).
+
+### AI backend
+
+The AI advisory features call the **Anthropic Claude API** through a
+server-side proxy, so the credential never reaches the browser.
+
+| | |
+|---|---|
+| Environment variable | `ANTHROPIC_API_KEY` (set it on the deployment, not in the repo) |
+| Default model | `claude-opus-5` |
+| Proxy | `api/_lib/claude-proxy.js` — POST-only, request-size ceiling, per-IP rate limit, sanitized history, upstream timeout, refusal handling |
+| Routes | `/api/ai/chat` (reviewer), `/api/ai/analyze`, `/api/ai/optimize`, `/api/ai/build-report` |
+
+`/api/grok` is a deprecated alias of `/api/ai/chat`, retained so an older
+cached client build keeps working; it runs the same Claude-backed handler.
+Each route sets its own token budget and effort level, and every one must
+finish inside the function duration in `vercel.json` (60s) — the proxy's own
+50s budget leaves margin so a slow request returns a readable error instead of
+a bare platform timeout.
+
+Without the key the routes answer `501` and the app falls back to its
+bring-your-own-key path, where a user's own Claude, OpenAI or Grok key is kept
+in that browser's `localStorage` and sent only to that provider. Send
+`GET /api/ai/chat` to check whether a deployment is configured.
 
 ### Data and deployment boundaries
 
