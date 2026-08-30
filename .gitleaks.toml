@@ -1,0 +1,33 @@
+title = "AI-Tax gitleaks configuration"
+
+# Extends the default rule set: every built-in rule still applies, unchanged.
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# One allowlisted false positive.
+#
+# The 1040 Planner defines each column of a tax worksheet as an object literal:
+#
+#   { key: 'section1250Gain', header: 'Unrecap. §1250', kind: 'currency', ... }
+#
+# The default `generic-api-key` rule reads `key:` followed by a value it scores
+# as high-entropy (3.64) and reports it as a leaked credential. It is the field
+# name for unrecaptured section 1250 gain — IRC §1250, taxed at a maximum 25%.
+# There is no secret here and never has been.
+#
+# The allowlist is a single exact string, anchored at both ends. It cannot
+# match anything else: not a longer value with that prefix, not a real key that
+# happens to appear nearby, not another file. Deliberately NOT scoped by path
+# either — a `paths` entry is OR'd with `regexes` in this gitleaks version and
+# would have exempted the whole file from scanning, which is far more than this
+# needs.
+#
+# Verified against gitleaks 8.24.3 (the version the workflow pins): this
+# finding is gone, and a planted credential in the same file is still reported.
+# ---------------------------------------------------------------------------
+[allowlist]
+description = "Worksheet column name 'section1250Gain', not a credential"
+regexes = [
+  '''^section1250Gain$''',
+]
