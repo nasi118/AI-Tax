@@ -44,6 +44,8 @@ jobs:
           node-version: "22"
       - run: node tests/golden.test.mjs
       - run: node tests/client-identity.test.mjs
+      # Claude proxy handler — offline: stubs fetch, needs no key.
+      - run: node tests/api-claude-proxy.test.mjs
 
   standalone-build:
     name: Standalone application build
@@ -78,11 +80,14 @@ jobs:
           CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
             node tests/ui-workbench.mjs
           CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
-            node tests/ui-planning-scenarios.mjs
-          CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
-            node tests/ui-strategy-library.mjs
-          CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
             node tests/ui-audit-estimated-tax.mjs
+          # Scenarios tab: the embedded 1040 Planner module. The suites that
+          # drove the ledger it replaced are retained, but not run, in
+          # tests/archive/ — see that directory's README.
+          CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
+            node tests/ui-scenarios-planner.mjs
+          CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
+            node tests/ui-settings.mjs
 
   excel-audit-smoke:
     name: Excel audit package generation + reconciliation
