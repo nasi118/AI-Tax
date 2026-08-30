@@ -1069,3 +1069,29 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
   .tp-planner-note{display:none}
   .tp-planner-frame{min-height:70vh}
 }
+
+/* ============================================================================
+   SETTINGS PANEL — behaviour preferences (src/28-settings.js)
+   Reuses the appearance panel's row rhythm (.tp-ap-row / .tp-ap-label /
+   .tp-ap-opts) so the two drawers read as one family.
+   ========================================================================== */
+.tp-set-head{font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.5px;color:var(--muted);margin:14px 0 2px;
+  padding-bottom:5px;border-bottom:1px solid var(--line2)}
+.tp-set-head:first-child{margin-top:0}
+.tp-set-row{align-items:flex-start}
+.tp-set-hint{display:block;font-style:normal;font-weight:400;font-size:11px;
+  color:var(--muted);margin-top:2px;line-height:1.4;max-width:230px}
+.tp-set-models{display:flex;gap:5px;flex-wrap:wrap}
+/* Destructive variant of tp-btn, used for the confirmed reset. */
+.tp-btn.danger{background:var(--red-bg);border-color:var(--red-line);color:var(--red)}
+.tp-btn.danger:hover:not(:disabled){background:var(--red);border-color:var(--red);color:#fff}
+.tp-set-counts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+  padding:10px;border:1px solid var(--line2);border-radius:8px;background:var(--hdr)}
+.tp-set-counts div{display:flex;flex-direction:column;gap:1px;text-align:center}
+.tp-set-counts strong{font-size:17px;font-variant-numeric:tabular-nums lining-nums;color:var(--ink)}
+.tp-set-counts span{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+@media (max-width:560px){
+  .tp-set-counts{grid-template-columns:repeat(2,1fr)}
+  .tp-set-hint{max-width:none}
+}

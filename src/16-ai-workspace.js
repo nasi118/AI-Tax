@@ -101,7 +101,7 @@ function AIAnalysisPage({
         tsLabel: new Date().toLocaleString(),
         scopeLabel: sc === "multiyear" ? "Multi-year, all scenarios" : ents.map(x => x.s.name).join(", "),
         question: text,
-        model: AI_ENDPOINT_MODEL,
+        model: aiRequestModel(),
         engineVersion: ENGINE_VERSION,
         rulesVersion: RULES_VERSION,
         response: reply,

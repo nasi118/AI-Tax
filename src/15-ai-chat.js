@@ -38,10 +38,17 @@ const AI_PROVIDERS = {
   }
 };
 
-/* The model the secure server-side endpoint runs. The proxy keeps its own
-   allowlist and default (api/_lib/claude-proxy.js); this is the value the
-   client asks for. */
-const AI_ENDPOINT_MODEL = "claude-opus-5";
+/* The model the secure server-side endpoint is asked for. Settings → AI
+   advisory layer chooses it (src/28-settings.js); the proxy keeps its own
+   allowlist and default (api/_lib/claude-proxy.js), so an unrecognised value
+   is ignored server-side rather than failing the request.
+
+   Read through a function, not a constant: the preference can change while
+   the page is open, and a constant captured at load would keep sending the
+   model the user just switched away from. */
+function aiRequestModel() {
+  return typeof aiEndpointModel === "function" ? aiEndpointModel() : "claude-opus-5";
+}
 
 const AI_SETTINGS_KEY = "tp-ai-settings";
 function loadAISettings() {
@@ -208,7 +215,7 @@ async function callSecureEndpoint({
       body: JSON.stringify({
         system,
         messages,
-        model: AI_ENDPOINT_MODEL
+        model: aiRequestModel()
       })
     });
   } catch (e) {
@@ -860,7 +867,7 @@ async function callAI(requestType, {
         body: JSON.stringify({
           system,
           messages,
-          model: AI_ENDPOINT_MODEL
+          model: aiRequestModel()
         })
       });
       if (resp.status === 404 || resp.status === 405 || resp.status === 501) {

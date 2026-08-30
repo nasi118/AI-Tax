@@ -32,6 +32,16 @@
    frame comes up blank. A trailing slash keeps the base correct. */
 const PLANNER_SRC = "planner/";
 
+/* The single-file standalone build (tools/build-standalone.mjs) inlines the
+   src/ scripts into one HTML document served from file://. The planner is a
+   separate document with its own vendored libraries and is deliberately NOT
+   inlined — doing so would add well over a megabyte to a file meant to be
+   emailed. So in that build the module is simply unavailable, and saying so
+   plainly beats rendering a frame that silently fails to load. */
+function plannerAvailable() {
+  return typeof location === "undefined" || location.protocol !== "file:";
+}
+
 function ScenariosPlannerPage() {
   /* A remount key: bumping it rebuilds the iframe, which is the only reliable
      way to reset a document we deliberately do not reach into. */
@@ -45,6 +55,13 @@ function ScenariosPlannerPage() {
     setLoaded(false);
     setNonce(n => n + 1);
   };
+
+  if (!plannerAvailable()) {
+    return EL("div", { className: "tp-stack tp-planner-missing" },
+      EL(Note, { kind: "bad" },
+        EL("strong", null, "The 1040 Planner module is not part of the single-file build."),
+        " It is a separate document with its own engine and libraries, so it is left out to keep this file small enough to share. Every other tab works exactly as it does in the hosted application. Open the hosted app, or serve the repository, to use the planner."));
+  }
 
   return EL("div", { className: "tp-planner-wrap" + (tall ? " tall" : "") },
     EL("div", { className: "tp-planner-bar" },
