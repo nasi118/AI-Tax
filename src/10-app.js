@@ -569,7 +569,12 @@ function App() {
      written back to the shared preferences on load. */
   const [tab, setTabRaw] = useState(() => {
     const v = wbInitialViewParams();
-    return v.tab && TABS.find(x => x.id === v.tab) ? v.tab : getUIPref("tab", "dashboard");
+    if (v.tab && TABS.find(x => x.id === v.tab)) return v.tab;
+    /* Settings → Startup → "Open on": a named tab wins over the last-visited
+       one; "last" (the default) keeps the original behaviour. */
+    const start = readSetting("startTab");
+    if (start !== "last" && TABS.find(x => x.id === start)) return start;
+    return getUIPref("tab", "dashboard");
   });
   const setTab = t => {
     setTabRaw(t);
@@ -592,6 +597,11 @@ function App() {
   const [openCalc, setOpenCalc] = useState(null);
   const [appearance, setAppearance] = useUIPref("appearance", {});
   const [showAppearance, setShowAppearance] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  /* Behaviour preferences (src/28-settings.js). Read through the hook so the
+     app re-renders when a setting changes in this or another view. */
+  const settings = useSettings();
+  const aiOn = settings.get("aiEnabled") !== false;
 
   /* ---- Tools and records ---- */
   const auditLog = clientSafe.auditLog || [];
@@ -980,44 +990,6 @@ function App() {
     });
     setScenarios(sc => [...sc, c]);
   };
-  /* "Add Scenario" (Planning Scenarios menu): clone the given source scenario
-     (defaults to the currently active one) into a new, independent planning
-     scenario. Reuses the same deepClone + setScenarios + audit-log path as
-     every other scenario-creating action — there is no separate store. */
-  const addPlanningScenario = sourceId => {
-    const src = scenarios.find(s => s.id === sourceId) || active || scenarios[0];
-    const c = deepClone(src, src.name + " — planning copy");
-    logEvent({
-      label: "Planning scenario added",
-      kind: "structure",
-      scenarioName: c.name,
-      from: src.name,
-      to: c.name
-    });
-    setScenarios(sc => [...sc, c]);
-    return c.id;
-  };
-  /* Strategy Scenario Library "Model scenario": clone the active scenario,
-     apply the strategy's real input changes (STRATEGY_LIBRARY in
-     08-pages.js), and add the result to the scenario list. Same
-     deepClone + setScenarios + audit-log path as every other scenario —
-     the baseline scenario object is never touched. */
-  const modelStrategy = (strategyKey, amount) => {
-    const strategy = STRATEGY_LIBRARY.find(x => x.key === strategyKey);
-    if (!strategy) return null;
-    const src = active || scenarios[0];
-    const c = deepClone(src, src.name + " + " + strategy.title);
-    const modeled = strategy.apply(c, amount, { status, year });
-    logEvent({
-      label: "Strategy modeled: " + strategy.title,
-      kind: "structure",
-      scenarioName: modeled.name,
-      from: src.name,
-      to: modeled.name
-    });
-    setScenarios(sc => [...sc, modeled]);
-    return modeled.id;
-  };
   const duplicate = id => {
     const src = scenarios.find(s => s.id === id);
     const c = deepClone(src);
@@ -1128,10 +1100,20 @@ function App() {
      concurrent runs are guarded; each run stages pending edits (blur),
      re-runs the engine, refreshes every dependent view via the shared
      results, logs one audit event, and reports success/warning/failure. */
-  const [recalcScope, setRecalcScope] = useState("affected");
+  /* Seeded from Settings → Calculation; changing it in the header is a
+     per-session override and does not rewrite the preference. */
+  const [recalcScope, setRecalcScope] = useState(() => readSetting("recalcScope"));
   const [recalcState, setRecalcState] = useState(null);
   const runRecalculate = scope => {
     if (recalcState && recalcState.running) return; // concurrency guard
+    /* Settings → Calculation: an all-client sweep re-runs the engine over
+       every scenario of every client, which on a large book is a long,
+       obviously-different action from recalculating the tab in front of you.
+       Confirm it unless the user has turned that off. */
+    if (scope === "all" && settings.get("confirmRecalcAll")) {
+      const n = clients.filter(c => !c.archived).length;
+      if (!window.confirm("Recalculate every scenario for all " + n + " client" + (n === 1 ? "" : "s") + "?\n\nThis re-runs the deterministic engine across the whole book. Nothing is changed or deleted.")) return;
+    }
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     let sweepFailures = [];
     if (scope === "all") {
@@ -1193,6 +1175,7 @@ function App() {
     { kind: "action", id: "export", label: "Export Excel workbook", hint: "Import / Export page", group: "Actions", run: () => pickTab("data") },
     { kind: "action", id: "report", label: "Build client report", group: "Actions", run: () => pickTab("report") },
     { kind: "action", id: "customize", label: "Customize appearance", group: "Actions", run: () => setShowAppearance(true) },
+    { kind: "action", id: "settings", label: "Open settings", hint: "startup, recalculation, AI", group: "Actions", run: () => setShowSettings(true) },
     { kind: "action", id: "newtab", label: "Open this view in a new tab", hint: "shared data, not duplicated", group: "Actions", run: () => wbOpenNewTab(tab, clientId) },
     { kind: "action", id: "undo", label: "Undo last input edit", group: "Actions", run: undoEdit },
     { kind: "action", id: "tools", label: toolsVisible ? "Hide tools panel" : "Show tools panel", group: "Actions", run: () => setToolsMode(toolsVisible ? "hidden" : "pinned") }
@@ -1285,7 +1268,9 @@ function App() {
             "\u00a9 2026 AI Tax Strategy Advisors. All Rights Reserved."))),
 
       /* ---------------- Main working area ---------------- */
-      EL("main", { className: "tp-main" },
+      /* The planner is a full-bleed embedded document, so the padded,
+         max-width content wrapper collapses for it. */
+      EL("main", { className: "tp-main" + (tab === "scenarios" ? " bleed" : "") },
         EL("div", { className: "tp-topbar" },
           EL("div", null, EL("h2", null, t.label), EL("p", null, t.blurb)),
           EL("div", { className: "tp-topbar-controls" },
@@ -1309,7 +1294,7 @@ function App() {
                 value: activeIdSafe,
                 onChange: e => setActiveId(e.target.value)
               }, scenarios.map(s => EL("option", { key: s.id, value: s.id }, s.name)))),
-            moduleTabs.includes(tab) && EL("button", {
+            aiOn && moduleTabs.includes(tab) && EL("button", {
               className: "tp-btn ghost sm tp-ai-ctx",
               type: "button",
               title: "Ask AI about this section",
@@ -1384,7 +1369,13 @@ function App() {
               type: "button",
               onClick: () => setShowAppearance(true),
               title: "Adjust theme, colors, fonts, borders and sizing — for this tab or the whole application"
-            }, "✎ Customize"))),
+            }, "✎ Customize"),
+            EL("button", {
+              className: "tp-btn ghost sm tp-settings-btn",
+              type: "button",
+              onClick: () => setShowSettings(true),
+              title: "Application settings — startup, recalculation, and the AI advisory layer"
+            }, "⚙ Settings"))),
         EL("div", { className: "tp-calcid", role: "status" },
           EL("span", null, "Calc ", lastCalc ? lastCalc.atLabel : "\u2014"),
           EL("span", null, "engine ", ENGINE_VERSION),
@@ -1408,7 +1399,7 @@ function App() {
           results, bestId, baseline, status, year,
           focusId: focusSafe, setFocusId, goto: setTab,
           setYear: setYearLogged, setStatus: setStatusLogged,
-          onAskAI: askWorkspace, onAIReport: () => setShowAIReport(true),
+          onAskAI: aiOn ? askWorkspace : null, onAIReport: aiOn ? () => setShowAIReport(true) : null,
           onTrace: (lineId, scenarioId) => setTraceReq({ lineId, scenarioId })
         }),
         tab === "clients" && EL(ClientProfilesPage, {
@@ -1422,25 +1413,20 @@ function App() {
             setActiveId(c2.id);
             setTab("scenarios");
           },
-          onAskAI: askWorkspace,
-          onBuildReport: () => setShowAIReport(true),
+          onAskAI: aiOn ? askWorkspace : null,
+          onBuildReport: aiOn ? () => setShowAIReport(true) : null,
           goto: setTab
         }),
-        tab === "scenarios" && EL(ScenariosPage, {
-          onAIOptimize: () => setShowOptimize(true),
-          onAIReport: () => setShowAIReport(true),
-          onAskAI: askWorkspace,
-          client: clientSafe, alignments,
-          scenarios, results, bestId, baseline, status, year,
-          update, addScenario, duplicate, remove, reset,
-          activeId: activeIdSafe, onAddPlanningScenario: addPlanningScenario,
-          onModelStrategy: modelStrategy
-        }),
+        /* The Scenarios tab hosts the 1040 Planner module and takes no props:
+           it is deliberately unlinked from the workbench's calculations. The
+           ledger that used to be here is archived at
+           src/archive/08a-scenarios-ledger.js. */
+        tab === "scenarios" && EL(ScenariosPlannerPage, null),
         tab === "se" && EL(SEModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
         tab === "magi" && EL(MAGIModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
         tab === "qbi" && EL(QBIModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
         tab === "health" && EL(HealthModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
-        tab === "guide" && EL(PlanningGuide, { year, client: clientSafe, baseResult: baseline.r, onAskAI: askWorkspace, onAddNote: addQuickNote }),
+        tab === "guide" && EL(PlanningGuide, { year, client: clientSafe, baseResult: baseline.r, onAskAI: aiOn ? askWorkspace : null, onAddNote: addQuickNote }),
         tab === "reference" && EL(ReferenceTables, { year, status }),
         tab === "audit" && EL(AuditPage, { auditLog: clientAudit, setAuditLog: setClientAudit, scenarios, results, year, status, baseline, bestId, activeId: activeIdSafe }),
         tab === "data" && EL(DataPage, {
@@ -1515,7 +1501,9 @@ function App() {
         onClick: () => { setShowNotes(v => !v); raise("notes"); },
         title: "Notes"
       }, I.note, EL("span", null, "Notes", notes.length ? " (" + notes.length + ")" : "")),
-      EL("button", {
+      /* Settings → AI advisory layer: with AI off, no AI affordance appears
+         anywhere in the interface. */
+      aiOn && EL("button", {
         className: "tp-dockbtn " + (showAI ? "on" : ""),
         onClick: () => { setShowAI(v => !v); raise("ai"); },
         title: "Ask AI"
@@ -1542,7 +1530,7 @@ function App() {
       onFocus: () => raise("notes"), z: zTop.notes,
       draft: noteDraft, setDraft: setNoteDraft
     }),
-    showOptimize && EL(AIOptimizePanel, {
+    aiOn && showOptimize && EL(AIOptimizePanel, {
       onClose: () => setShowOptimize(false),
       results, status, year,
       onCreateScenarios: createAIScenarios,
@@ -1552,16 +1540,27 @@ function App() {
       onAddToReport: addToReportInbox,
       onDecide: decideAIScenario
     }),
-    showAIReport && EL(AIReportPanel, {
+    aiOn && showAIReport && EL(AIReportPanel, {
       onClose: () => setShowAIReport(false),
       results, status, year, reportInbox, logEvent
     }),
-    showAI && EL(AIReviewer, {
+    aiOn && showAI && EL(AIReviewer, {
       onClose: () => setShowAI(false),
       result: activeResult, scenario: active, scenarioName: active.name,
       status, year, validation: results[activeIdx].v,
       onSendToNotes: text => { setNoteDraft(d => (d ? d + "\n\n" : "") + text); setShowNotes(true); raise("notes"); },
       onApplyChange: applyAIChange
+    }),
+    showSettings && EL(SettingsPanel, {
+      tab: tab,
+      onClose: () => setShowSettings(false),
+      onOpenAppearance: () => setShowAppearance(true),
+      counts: {
+        clients: clients.filter(c => !c.archived).length,
+        scenarios: scenarios.length,
+        notes: notes.length,
+        audit: clientAudit.length
+      }
     }),
     showAppearance && EL(AppearancePanel, {
       appearance: appearance,

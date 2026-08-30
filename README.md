@@ -60,7 +60,31 @@ npm test
 python -m pytest
 ```
 
-The JavaScript suite covers deterministic golden cases and client-identity/data-flow behavior. The Python suite covers calculation, lifecycle, isolation, reconciliation, import, persistence, and governance controls. CI also runs the cross-engine contract, UI acceptance, standalone-build, and audit-workbook checks described in [CI](docs/CI.md).
+The JavaScript suite covers deterministic golden cases, client-identity/data-flow behavior, and the Claude API proxy handler (offline — it stubs `fetch` and needs no key). The Python suite covers calculation, lifecycle, isolation, reconciliation, import, persistence, and governance controls. CI also runs the cross-engine contract, UI acceptance, standalone-build, and audit-workbook checks described in [CI](docs/CI.md).
+
+### AI backend
+
+The AI advisory features call the **Anthropic Claude API** through a
+server-side proxy, so the credential never reaches the browser.
+
+| | |
+|---|---|
+| Environment variable | `ANTHROPIC_API_KEY` (set it on the deployment, not in the repo) |
+| Default model | `claude-opus-5` |
+| Proxy | `api/_lib/claude-proxy.js` — POST-only, request-size ceiling, per-IP rate limit, sanitized history, upstream timeout, refusal handling |
+| Routes | `/api/ai/chat` (reviewer), `/api/ai/analyze`, `/api/ai/optimize`, `/api/ai/build-report` |
+
+`/api/grok` is a deprecated alias of `/api/ai/chat`, retained so an older
+cached client build keeps working; it runs the same Claude-backed handler.
+Each route sets its own token budget and effort level, and every one must
+finish inside the function duration in `vercel.json` (60s) — the proxy's own
+50s budget leaves margin so a slow request returns a readable error instead of
+a bare platform timeout.
+
+Without the key the routes answer `501` and the app falls back to its
+bring-your-own-key path, where a user's own Claude, OpenAI or Grok key is kept
+in that browser's `localStorage` and sent only to that provider. Send
+`GET /api/ai/chat` to check whether a deployment is configured.
 
 ### Data and deployment boundaries
 
@@ -78,6 +102,12 @@ To produce one self-contained HTML file that runs offline straight from
 ```sh
 npm run build:standalone       # writes dist/tax-advisory-pro.html
 ```
+
+The 1040 Planner module is **not** included in that file. It is a separate
+document with its own engine and vendored libraries, and inlining it would add
+well over a megabyte to a file meant to be emailed. Opened from `file://`, the
+Scenarios tab says so plainly instead of showing a frame that cannot load;
+every other tab behaves exactly as it does in the hosted app.
 
 ### Project layout
 
@@ -100,9 +130,27 @@ src/                Application code (plain JS, React.createElement — no JSX b
   07-analysis.js      Analysis views
   08-pages.js         Page components
   09-reference.js     Reference/guide pages
+  27-scenarios-planner.js  Scenarios tab — mounts the 1040 Planner module
+  28-settings.js      Application settings (behaviour, not presentation)
   10-app.js           App shell component + mount
+  archive/            Retained but NOT loaded — see below
+planner/            Self-contained 1040 Planner (TY2026) module: its own UI,
+                    engine and vendored libraries. Runs embedded in the
+                    Scenarios tab and standalone at /planner/
+api/                Vercel serverless AI routes (Anthropic Claude proxy)
 tools/              Build script for the standalone single-file version
 ```
+
+**`src/archive/`** holds code kept for reference and deliberately left out of
+the running app — `index.html` does not load it. It currently contains
+`08a-scenarios-ledger.js`, the line-by-line scenario comparison ledger that
+was the Scenarios tab before the 1040 Planner module replaced it, together
+with its editors, drill-downs and strategy library. The matching acceptance
+suites are in `tests/archive/`, with a README on re-linking them.
+
+The Scenarios tab is deliberately **unlinked** from the workbench's
+calculation pipeline: the planner computes with its own engine, the workbench
+engine drives every other tab, and the two never mix.
 
 The `src/` files were authored as one script and share the global scope —
 `index.html` loads them in their original order, which must be preserved.
