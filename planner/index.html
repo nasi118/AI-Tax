@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<!--
+  (c) 2026 AI Tax Strategy Advisors. All Rights Reserved.
+
+  Proprietary and Confidential. Unauthorized copying, distribution,
+  modification, reproduction, reverse engineering, disclosure, or commercial
+  use of this software, its workflows, methodologies, tax scenarios, database
+  structures, prompts, documentation, and related materials is prohibited
+  without prior written authorization from AI Tax Strategy Advisors.
+
+  Third-party libraries and public-domain government materials remain subject
+  to their respective ownership and license terms. See NOTICE.md.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tax Planner — Individual 1040 (TY2026)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2028%2028'%3E%3Crect%20x='1'%20y='1'%20width='26'%20height='26'%20rx='3'%20fill='%230a1628'/%3E%3Cpath%20d='M6%209h16M6%2014h9M6%2019h12'%20stroke='%232563eb'%20stroke-width='2'%20stroke-linecap='round'/%3E%3Cpath%20d='M18%2017.5l2.6%202.6L26%2014.7'%20stroke='%2334d399'%20stroke-width='2.4'%20fill='none'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
+<script src="vendor/tailwindcss.js"></script>
+<script src="vendor/decimal.js"></script>
+<script>
+/* Guarded because this page is also embedded in an iframe (the workbench's
+   Scenarios tab). Navigating away mid-load aborts the vendored Tailwind
+   script above while this one still runs, and an unguarded `tailwind.config`
+   would then throw a ReferenceError into the host page. The palette is a
+   refinement, so skipping it on an aborted load costs nothing. */
+if (typeof tailwind !== 'undefined') {
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 700: '#1c3660', 800: '#152a4a', 900: '#0f1f38', 950: '#0a1628' },
+          accent: { 500: '#2563eb', 600: '#1d4ed8' }
+        }
+      }
+    }
+  };
+}
+</script>
+<style>
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f1f5f9; color: #0f172a; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font-family: inherit; }
+.num { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+.field-label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .025em; color: #64748b; }
+.input-base, .input-num {
+  height: 30px; width: 100%; border-radius: 3px; border: 1px solid #cbd5e1; background: #fff;
+  padding: 0 .5rem; font-size: 13px; color: #0f172a; box-shadow: inset 0 2px 4px 0 rgb(0 0 0/0.05);
+  outline: 2px solid transparent; outline-offset: 2px; transition: border-color .15s, box-shadow .15s, background-color .15s;
+  box-sizing: border-box;
+}
+.input-base:focus, .input-num:focus { border-color: #2563eb; box-shadow: inset 0 0 0 1px #2563eb; }
+.input-base:disabled, .input-num:disabled { background: #f1f5f9; color: #94a3b8; }
+.input-num { text-align: right; font-variant-numeric: tabular-nums; }
+.btn, .btn-primary, .btn-ghost, .btn-light, .btn-danger {
+  display: inline-flex; height: 30px; user-select: none; align-items: center; gap: .375rem; border-radius: 3px;
+  border: 1px solid transparent; padding: 0 .625rem; font-size: 12.5px; font-weight: 500; cursor: pointer;
+  transition: color .15s, background-color .15s, border-color .15s; box-sizing: border-box;
+}
+.btn:disabled, .btn-primary:disabled, .btn-ghost:disabled, .btn-light:disabled, .btn-danger:disabled { cursor: not-allowed; opacity: .5; }
+.btn-primary { border-color: #1d4ed8; background: #1d4ed8; color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #2563eb; }
+.btn-ghost { border-color: rgb(255 255 255/.2); background: rgb(255 255 255/.05); color: #f1f5f9; }
+.btn-ghost:hover:not(:disabled) { background: rgb(255 255 255/.15); }
+.btn-light { border-color: #cbd5e1; background: #fff; color: #334155; }
+.btn-light:hover:not(:disabled) { background: #f8fafc; }
+.btn-danger { border-color: #fda4af; background: #fff; color: #be123c; }
+.btn-danger:hover:not(:disabled) { background: #fff1f2; }
+.panel { border: 1px solid #cbd5e1; background: #fff; box-shadow: 0 1px 2px 0 rgb(0 0 0/0.05); }
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #cbd5e1;
+  background: #f8fafc; padding: .375rem .75rem; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: #475569;
+}
+.thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+.thin-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border-width: 0; }
+@media print {
+  @page { size: letter portrait; margin: .6in .55in; }
+  html, body { background: #fff !important; height: auto !important; }
+  .no-print { display: none !important; }
+  .print-root { position: static !important; overflow: visible !important; max-height: none !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; margin: 0 !important; background: #fff !important; }
+  .print-break { break-before: page; page-break-before: always; }
+  .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+  .print-compact { font-size: 10px !important; line-height: 1.35 !important; }
+  table { border-collapse: collapse !important; }
+  thead { display: table-header-group; }
+}
+</style>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-900">
+<div id="app" class="min-h-screen bg-slate-100"></div>
+<script src="js/engine.js"></script>
+<script src="js/excel.js"></script>
+<script src="js/library.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
