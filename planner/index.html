@@ -31,7 +31,7 @@ if (typeof tailwind !== 'undefined') {
       extend: {
         colors: {
           navy: { 700: '#1c3660', 800: '#152a4a', 900: '#0f1f38', 950: '#0a1628' },
-          accent: { 500: '#2563eb', 600: '#1d4ed8' }
+          accent: { 300: '#93b4fb', 400: '#5b8def', 500: '#2563eb', 600: '#1d4ed8' }
         }
       }
     }
@@ -76,6 +76,27 @@ button, input, select, textarea { font-family: inherit; }
 .thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
 .thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 .thin-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ---- scenario comparison matrix ----------------------------------------
+   The table is the largest thing on the tab. Its line-description column is
+   frozen to the left and its scenario headers to the top, so a cell deep in
+   the schedules and several columns across can still be identified in both
+   directions. Extra scenarios extend it sideways and it scrolls; columns
+   keep a readable width rather than being compressed to fit. */
+.matrix-scroll { max-height: calc(100vh - 235px); }
+.matrix-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+/* A trailing spacer column soaks up any width left over when there are few
+   scenarios, so the last scenario column keeps its stated width instead of
+   stretching across the panel. */
+.matrix-table .matrix-spacer { width: 100%; min-width: 0; background: #f8fafc; border-left: 1px solid #cbd5e1; }
+.matrix-table th, .matrix-table td { vertical-align: middle; }
+/* An input whose value differs from the baseline's, marked on the cell so
+   what was actually changed in a scenario is visible at a glance. */
+.matrix-changed { box-shadow: inset 3px 0 0 0 #2563eb; }
+/* The declared baseline column, marked without ranking it: a rule, not a
+   colour that would read as "best". */
+.matrix-baseline-col { box-shadow: inset 0 3px 0 0 #94a3b8; }
+.matrix-group-toggle:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border-width: 0; }
 @media print {
   @page { size: letter portrait; margin: .6in .55in; }

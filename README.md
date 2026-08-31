@@ -134,9 +134,9 @@ src/                Application code (plain JS, React.createElement — no JSX b
   27-scenarios-planner.js  The 1040 Planner tab — mounts the embedded module
   28-settings.js      Application settings (behaviour, not presentation)
   10-app.js           App shell component + mount
-planner/            Self-contained 1040 Planner (TY2026) module: its own UI,
-                    engine and vendored libraries. Runs on its own tab and
-                    standalone at /planner/
+planner/            Self-contained 1040 Planner module (TY2024–TY2028): its
+                    own UI, engine and vendored libraries. Runs on its own tab
+                    and standalone at /planner/
 api/                Vercel serverless AI routes (Anthropic Claude proxy)
 tools/              Build script for the standalone single-file version
 ```
@@ -146,10 +146,19 @@ line-by-line comparison ledger, its row editors and the strategy library, all
 computed by the workbench engine (`src/02-engine.js` / `src/03-scenario.js`)
 that also drives the Dashboard, the SE / MAGI / QBI / SEHI modules, Report and
 Audit. The **1040 Planner (TY2026)** tab hosts a separate module with its own
-TY2026 engine and its own saved projects, and is deliberately **unlinked**
-from that pipeline — nothing passes workbench scenarios into it and nothing it
-computes flows back out. A figure on screen is never half from one engine and
-half from the other.
+multi-year engine (TY2024–TY2028) and its own saved projects, and is
+deliberately **unlinked** from that pipeline — nothing passes workbench
+scenarios into it and nothing it computes flows back out. A figure on screen
+is never half from one engine and half from the other.
+
+The planner is also **standalone in its own right**: it reads no client
+profile, and no client has to exist before it can be opened and used.
+Bringing a return in is an explicit action, never something that happens on
+load. Its Scenarios tab is a line-by-line comparison matrix — rows are Form
+1040 and schedule lines in return order, columns are the declared baseline
+and each scenario — and its tax year is selected per project, with any year
+that has no published inflation adjustment (2027, 2028) marked **Projected /
+Estimated** wherever its figures appear.
 
 The `src/` files were authored as one script and share the global scope —
 `index.html` loads them in their original order, which must be preserved.

@@ -2,9 +2,19 @@
 /* ============================================================================
    1040 PLANNER (TY2026) — its own tab
 
-   A self-contained module: its own UI, its own TY2026 engine
-   (planner/js/engine.js) and its own saved projects, running in an iframe
-   (planner/index.html) on the "1040 Planner (TY2026)" tab.
+   A self-contained module: its own UI, its own multi-year engine
+   (planner/js/engine.js — TY2024 through TY2028, opening on TY2026) and its
+   own saved projects, running in an iframe (planner/index.html) on the
+   "1040 Planner (TY2026)" tab. The tab keeps its TY2026 name because that is
+   the year the planner opens on; the year is selected inside the module.
+
+   STANDALONE
+   ----------
+   The module reads no client profile and needs no client to exist first: it
+   opens on its own project and computes with its own engine whether it is
+   loaded here or directly at /planner/. Bringing an outside return in is an
+   explicit action taken inside the module, never something that happens when
+   the tab is opened.
 
    DELIBERATELY UNLINKED
    ---------------------
@@ -57,7 +67,7 @@ function ScenariosPlannerPage() {
     EL("div", { className: "tp-planner-bar" },
       EL("span", { className: "tp-planner-title" }, I.layers, " 1040 Planner (TY2026)"),
       EL("span", { className: "tp-planner-note" },
-        "Self-contained module — it computes with its own engine and keeps its own saved projects."),
+        "Self-contained module — it computes with its own engine, keeps its own saved projects, and reads no client profile. The tax year is selected inside it."),
       EL("div", { className: "tp-planner-btns" },
         EL("button", {
           type: "button",

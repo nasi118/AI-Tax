@@ -1,9 +1,15 @@
 /* =========================================================================
-   Tax Planner — Individual 1040 (TY2026) · application UI
+   Tax Planner — Individual 1040 (TY2024–TY2028) · application UI
    Vanilla-JS rebuild of the reference planner: four tabs (Planner, Report,
    Scenarios, Coverage), per-module edit drawers, calculation-detail drawer,
-   scenario comparison, Excel/JSON import-export, and a deterministic
-   client-notes parser. State persists to localStorage when available.
+   the line-by-line scenario comparison matrix, Excel/JSON import-export, and
+   a deterministic client-notes parser. State persists to localStorage when
+   available.
+
+   The planner is STANDALONE — it reads no client profile and requires no
+   earlier step. The tax year belongs to the project; every figure on screen
+   is computed against that year's law, and a projected year is labelled as
+   one wherever it appears.
    ========================================================================= */
 (function () {
   'use strict';
@@ -113,10 +119,38 @@
   })();
 
   /* ---- store ------------------------------------------------------------- */
+
+  /* The tax year the project is being planned for. Every projection in the
+     app goes through here, so a figure on screen is always computed against
+     one year's law — the project's — and never against the engine's default
+     because a call site forgot to say which year it wanted. */
+  function projectYear() {
+    var y = state.project && state.project.taxYear;
+    return Engine.isSupportedYear(y) ? y : Engine.DEFAULT_YEAR;
+  }
+
+  function computeInputs(inputs, year) {
+    return Engine.computeProjection(inputs, { taxYear: year != null ? year : projectYear() });
+  }
+
+  /* Whether the year on screen is published law or a projection, and the
+     sentence that says so. Shown wherever a figure from a projected year
+     appears, so an estimate is never presented as authority. */
+  function yearMeta(year) {
+    var params = Engine.paramsFor(year != null ? year : projectYear());
+    return {
+      year: params.year,
+      projected: params.provenance === 'projected',
+      provenance: params.provenance,
+      basis: params.basis,
+      label: 'TY' + params.year + (params.provenance === 'projected' ? ' (Projected)' : '')
+    };
+  }
+
   function computeForProject(project) {
     var active = project.scenarios.find(function (s) { return s.id === project.activeScenarioId; }) || project.scenarios[0];
     if (!active) throw new Error('Project contains no scenarios');
-    return Engine.computeProjection(active.inputs);
+    return Engine.computeProjection(active.inputs, { taxYear: project.taxYear });
   }
 
   var state = {
@@ -130,7 +164,7 @@
     openModal: null,
     compareSelection: [],
     /* True until a saved project is hydrated or the user edits something —
-       it marks the untouched demo data, which a host import may replace. */
+       it marks the untouched demo data, which a deliberate import may replace. */
     bootedFromDemo: true
   };
 
@@ -141,7 +175,14 @@
     newScenarioName: '',
     importState: { dragOver: false, parsing: false, warnings: [], error: null, staged: null, jsonText: '' },
     notesText: '',
-    libraryAmounts: {}
+    libraryAmounts: {},
+    /* The strategy column most recently added, so the tab can say what it
+       did. Cleared on dismissal; never persisted. */
+    lastModelled: null,
+    /* Which scenario-matrix groups are open, by group id. Absent means open.
+       Kept here rather than in the project so it never travels in an export:
+       it is how the table is being looked at, not part of the plan. */
+    matrixOpen: {}
   };
 
   function hydrate() {
@@ -195,6 +236,22 @@
     var prev = state.project;
     state.project = Object.assign({}, prev, patch, { updatedAt: new Date().toISOString() });
     persist(state.project);
+    pushHistory(prev);
+    state.lastSavedAt = state.project.updatedAt;
+    render();
+  }
+
+  /* Change the tax year the project is planned against. The year belongs to
+     the project, not to one scenario: every column recomputes against the new
+     year's law together, so a comparison is never half one year and half
+     another. Inputs are untouched. */
+  function setTaxYear(year) {
+    if (!Engine.isSupportedYear(year)) return;
+    if (year === state.project.taxYear) return;
+    var prev = state.project;
+    state.project = Object.assign({}, prev, { taxYear: year, updatedAt: new Date().toISOString() });
+    persist(state.project);
+    state.result = computeForProject(state.project);
     pushHistory(prev);
     state.lastSavedAt = state.project.updatedAt;
     render();
@@ -268,6 +325,98 @@
     render();
   }
 
+  /* ---- mutators the scenario matrix needs ---------------------------------
+     The matrix edits any column, not only the active one, so these address a
+     scenario by id. Editing one scenario rewrites that scenario and nothing
+     else: the other columns keep the inputs they had, and each is recomputed
+     from its own inputs, so a change in Scenario 2 can never move Scenario 1.
+     -------------------------------------------------------------------- */
+
+  function updateScenarioInputs(id, updater) {
+    var prev = state.project;
+    var target = prev.scenarios.find(function (s) { return s.id === id; });
+    if (!target) return;
+    var next = updater(JSON.parse(JSON.stringify(target.inputs)));
+    if (!next) return;
+    var now = new Date().toISOString();
+    state.project = Object.assign({}, prev, {
+      updatedAt: now,
+      scenarios: prev.scenarios.map(function (s) {
+        return s.id === id ? Object.assign({}, s, { inputs: next, updatedAt: now }) : s;
+      })
+    });
+    persist(state.project);
+    state.result = computeForProject(state.project);
+    pushHistory(prev);
+    state.lastSavedAt = now;
+    render();
+  }
+
+  function duplicateScenarioById(id) {
+    var prev = state.project;
+    var source = prev.scenarios.find(function (s) { return s.id === id; });
+    if (!source) return;
+    var copy = Engine.duplicateScenario(source);
+    var at = prev.scenarios.indexOf(source) + 1;
+    var scenarios = prev.scenarios.slice();
+    scenarios.splice(at, 0, copy);
+    state.project = Object.assign({}, prev, {
+      scenarios: scenarios,
+      activeScenarioId: copy.id,
+      updatedAt: new Date().toISOString()
+    });
+    persist(state.project);
+    state.result = computeForProject(state.project);
+    pushHistory(prev);
+    render();
+  }
+
+  /* Mark one scenario as the baseline every other column is measured against.
+
+     Baseline is a DECLARED position, not a computed one: it is whichever
+     scenario the preparer is comparing from — usually the client's current
+     facts. It never moves on its own, and in particular it does not move
+     because some other scenario happens to produce a lower tax. Lowest tax
+     and baseline are different ideas, and the matrix keeps them apart. */
+  function setBaselineScenario(id) {
+    var prev = state.project;
+    if (!prev.scenarios.some(function (s) { return s.id === id; })) return;
+    var now = new Date().toISOString();
+    state.project = Object.assign({}, prev, {
+      scenarios: prev.scenarios.map(function (s) {
+        return Object.assign({}, s, { isBaseline: s.id === id });
+      }),
+      updatedAt: now
+    });
+    persist(state.project);
+    pushHistory(prev);
+    state.lastSavedAt = now;
+    render();
+  }
+
+  /* Move a column left or right. Order is presentation only — it changes no
+     figure, and the baseline stays whichever scenario was declared. */
+  function moveScenario(id, direction) {
+    var prev = state.project;
+    var from = prev.scenarios.findIndex(function (s) { return s.id === id; });
+    var to = from + direction;
+    if (from < 0 || to < 0 || to >= prev.scenarios.length) return;
+    var scenarios = prev.scenarios.slice();
+    var moved = scenarios.splice(from, 1)[0];
+    scenarios.splice(to, 0, moved);
+    state.project = Object.assign({}, prev, { scenarios: scenarios, updatedAt: new Date().toISOString() });
+    persist(state.project);
+    pushHistory(prev);
+    render();
+  }
+
+  /* The scenario every other column is measured against: the declared
+     baseline, or the first column when none has been declared yet. */
+  function baselineScenario() {
+    var scenarios = state.project.scenarios;
+    return scenarios.find(function (s) { return s.isBaseline; }) || scenarios[0];
+  }
+
   function undo() {
     var previous = state.history[0];
     if (!previous) return;
@@ -327,7 +476,7 @@
     try {
       var bytes = await window.TaxExcel.buildProjectWorkbook(state.project);
       var blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      downloadBlob(blob, 'tax-plan-2026-' + window.TaxExcel.safeClientFilename(state.project) + '.xlsx');
+      downloadBlob(blob, 'tax-plan-' + projectYear() + '-' + window.TaxExcel.safeClientFilename(state.project) + '.xlsx');
     } catch (e) {
       ui.exportError = e instanceof Error ? e.message : 'Export failed';
     } finally {
@@ -337,7 +486,7 @@
   }
 
   function exportJson() {
-    var filename = 'tax-plan-2026-' + (state.project.client.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'client') + '.json';
+    var filename = 'tax-plan-' + projectYear() + '-' + (state.project.client.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'client') + '.json';
     downloadBlob(new Blob([Engine.serializeProject(state.project)], { type: 'application/json' }), filename);
   }
 
@@ -407,11 +556,23 @@
           h('label', { for: 'taxyear', class: 'text-[10.5px] font-semibold uppercase tracking-wide text-slate-500' }, 'Year'),
           h('select', {
             id: 'taxyear',
-            class: 'h-[28px] rounded-[3px] border border-navy-700 bg-navy-900 px-1.5 text-[12.5px] text-slate-100 outline-none focus:border-accent-500'
-          },
-            h('option', { value: '2026', selected: true }, '2026'),
-            h('option', { value: '2025', disabled: true }, '2025 (unavailable)'),
-            h('option', { value: '2027', disabled: true }, '2027 (unavailable)'))),
+            title: 'The tax year the whole project is planned against. Every scenario recomputes on that year\u2019s law.',
+            class: 'h-[28px] rounded-[3px] border border-navy-700 bg-navy-900 px-1.5 text-[12.5px] text-slate-100 outline-none focus:border-accent-500',
+            onchange: function (e) { setTaxYear(Number(e.target.value)); }
+          }, Engine.SUPPORTED_YEARS.map(function (y) {
+            var meta = yearMeta(y);
+            return h('option', {
+              value: String(y), selected: y === project.taxYear,
+              title: meta.basis
+            }, meta.projected ? y + ' \u00b7 projected' : String(y));
+          })),
+          /* A projected year is never allowed to look like published law. */
+          yearMeta(project.taxYear).projected
+            ? h('span', {
+              class: 'rounded-[2px] border border-amber-500/60 bg-amber-500/10 px-1.5 py-[2px] text-[9.5px] font-bold uppercase tracking-wide text-amber-300',
+              title: yearMeta(project.taxYear).basis
+            }, 'Projected / Estimated')
+            : null),
         h('div', { class: 'flex min-w-0 items-center gap-1.5' },
           h('label', { for: 'scenario', class: 'text-[10.5px] font-semibold uppercase tracking-wide text-slate-500' }, 'Scenario'),
           h('select', {
@@ -650,7 +811,8 @@
       h('div', { class: 'panel overflow-hidden' },
         h('div', { class: 'border-b border-navy-800 bg-navy-950 px-3 py-2' },
           h('h2', { class: 'text-[11px] font-bold uppercase tracking-[0.12em] text-slate-300' }, 'Live Projection'),
-          h('p', { class: 'mt-0.5 text-[10.5px] text-slate-500' }, 'Tax year 2026 · recomputed on edit')),
+          h('p', { class: 'mt-0.5 text-[10.5px] ' + (yearMeta().projected ? 'text-amber-400' : 'text-slate-500') },
+            'Tax year ' + yearMeta().year + (yearMeta().projected ? ' (projected) ' : ' ') + '· recomputed on edit')),
         h('dl', { class: 'divide-y divide-slate-200' },
           [
             { label: 'Adjusted gross income', value: fmtUSD(result.agi) },
@@ -738,7 +900,7 @@
     var scenario = activeScenario();
     var result = state.result;
     var inputs = scenario.inputs;
-    var noStrategiesResult = Engine.computeProjection(Object.assign({}, inputs, {
+    var noStrategiesResult = computeInputs(Object.assign({}, inputs, {
       planningStrategies: inputs.planningStrategies.map(function (s) { return Object.assign({}, s, { enabled: false }); })
     }));
     var strategySavings = noStrategiesResult.totalTax - result.totalTax;
@@ -766,10 +928,10 @@
       ['Marginal tax rate', 'Top applicable bracket', fmtPct(result.marginalRate)]
     ];
     var assumptions = [
-      ['Tax year', '2026 (inflation-adjusted per Rev. Proc. 2025-32, post-OBBBA)'],
+      ['Tax year', yearMeta().year + ' — ' + yearMeta().basis],
       ['Filing status', FILING_STATUS_LABELS[inputs.profile.filingStatus] || inputs.profile.filingStatus],
-      ['Standard deduction available', fmtUSD(Engine.PARAMS.standardDeduction[inputs.profile.filingStatus])],
-      ['SALT cap before phase-down', fmtUSD(Engine.PARAMS.saltCap.base)],
+      ['Standard deduction available', fmtUSD(Engine.paramsFor(projectYear()).standardDeduction[inputs.profile.filingStatus])],
+      ['SALT cap before phase-down', fmtUSD(Engine.paramsFor(projectYear()).saltCap.base)],
       ['State modeling', 'None — federal only. State liability computed outside this tool.'],
       ['Carryforwards', 'Prior-year capital loss, passive loss and charitable carryovers not applied.'],
       ['Basis of figures', 'Client-supplied and practitioner-estimated amounts as of the report date.']
@@ -877,7 +1039,7 @@
                 h('dd', { class: 'text-[12px] text-slate-600' }, pair[1]));
             }))),
         h('section', { class: 'print-avoid-break mt-6' },
-          sectionHeading('Authority for 2026 Parameters'),
+          sectionHeading('Authority for ' + yearMeta().year + ' Parameters'),
           h('ul', { class: 'mt-2 grid grid-cols-2 gap-x-6' },
             Object.entries(Engine.PARAM_AUTHORITIES).map(function (entry) {
               return h('li', { class: 'break-inside-avoid border-b border-slate-100 py-[3px]' },
@@ -887,7 +1049,7 @@
         h('footer', { class: 'print-avoid-break mt-6 border-t-2 border-navy-950 pt-3' },
           h('p', { class: 'text-[10.5px] leading-relaxed text-slate-600' },
             h('strong', { class: 'text-navy-950' }, 'Disclaimer.'),
-            ' This document is a planning estimate prepared for discussion purposes only. It is not a filed tax return, is not a substitute for a completed Form 1040, and does not constitute tax, legal, or investment advice. Figures are based on information supplied by the client and on the practitioner’s assumptions as of ' + reportDate + ', and on tax-year 2026 parameters that remain subject to further IRS guidance. Items marked ',
+            ' This document is a planning estimate prepared for discussion purposes only. It is not a filed tax return, is not a substitute for a completed Form 1040, and does not constitute tax, legal, or investment advice. Figures are based on information supplied by the client and on the practitioner’s assumptions as of ' + reportDate + ', and on tax-year ' + yearMeta().year + ' parameters (' + yearMeta().provenance + ') that remain subject to further IRS guidance. Items marked ',
             h('em', {}, 'estimated'),
             ' use simplified methodology; state and local taxes, foreign reporting, trusts, and prior-year carryforwards are not modeled. Actual results will differ.'))));
   }
@@ -896,7 +1058,7 @@
   var COVERAGE_META = {
     implemented: {
       label: 'Implemented', chip: 'border-emerald-300 bg-emerald-50 text-emerald-800',
-      blurb: 'Computed end-to-end from entered inputs against the 2026 parameters.'
+      blurb: 'Computed end-to-end from entered inputs against the ' + yearMeta().label + ' parameters.'
     },
     partial: {
       label: 'Partial', chip: 'border-sky-300 bg-sky-50 text-sky-800',
@@ -954,7 +1116,7 @@
           h('div', { class: 'panel-header' },
             h('span', {}, 'Calculation Coverage Matrix'),
             h('span', { class: 'font-normal normal-case tracking-normal text-slate-500' },
-              Engine.COVERAGE.length + ' tracked items · tax year 2026')),
+              Engine.COVERAGE.length + ' tracked items · tax year ' + yearMeta().label)),
           h('div', { class: 'grid grid-cols-1 gap-px bg-slate-200 md:grid-cols-2 xl:grid-cols-4' },
             COVERAGE_LEVELS.map(function (level) {
               var meta = COVERAGE_META[level];
@@ -986,105 +1148,699 @@
                   h('p', { class: 'mt-0.5 text-[12px] leading-relaxed text-slate-600' }, item.detail)));
             })),
           h('p', { class: 'border-t border-slate-200 bg-amber-50 px-3 py-2 text-[11.5px] leading-snug text-amber-900' },
-            'This planner produces planning estimates for tax year 2026 only. It does not prepare, validate, or file a return, and it is not a substitute for professional judgement on any item marked estimated or not supported.'))));
+            'This planner produces planning estimates for the tax year selected in the header. It does not prepare, validate, or file a return, and it is not a substitute for professional judgement on any item marked estimated or not supported.'))));
   }
 
   /* ---- scenarios tab -------------------------------------------------------- */
+  /* ---- scenarios tab: the comparison matrix ---------------------------------
+     The Scenarios tab IS the planner's comparison surface, and its shape is
+     deliberate: ROWS are Form 1040 / schedule / planning line items in return
+     sequence, COLUMNS are the baseline and each scenario. It is a working
+     table, not a set of summary cards and not a difference report — a
+     preparer reads down a column the way they read a return, and across a row
+     to see what a change did.
+
+     Every scenario is computed from its OWN inputs. Editing a cell in one
+     column rewrites that scenario alone; the others are untouched and are
+     recomputed from what they already held, so nothing leaks sideways.
+     -------------------------------------------------------------------- */
+
+  /* Editable-cell accessors. Each knows how to read an aggregate out of a
+     scenario's inputs and how to write one back.
+
+     Where a line is backed by several records — three W-2s, four rentals —
+     the matrix will NOT invent a way to spread one number across them. It
+     shows the total, marks the cell as belonging to the drawer, and sends the
+     preparer to the per-record editor that can do it properly. */
+
+  function recordsOfKind(list, kind) {
+    return (list || []).filter(function (r) { return kind == null || r.kind === kind; });
+  }
+
+  /* An aggregate over records in one collection, optionally of one kind. */
+  function aggAccessor(collection, field, opts) {
+    opts = opts || {};
+    return {
+      read: function (inputs) {
+        return recordsOfKind(inputs[collection], opts.kind)
+          .reduce(function (a, r) { return a + (Number(r[field]) || 0); }, 0);
+      },
+      /* Editable only while a single record backs the line — or none, in
+         which case the first edit creates one. */
+      editable: function (inputs) {
+        return recordsOfKind(inputs[collection], opts.kind).length <= 1;
+      },
+      write: function (inputs, value) {
+        if (!Array.isArray(inputs[collection])) inputs[collection] = [];
+        var matching = recordsOfKind(inputs[collection], opts.kind);
+        if (matching.length > 1) return null;
+        if (matching.length === 0) {
+          if (value === 0) return inputs;
+          var made = opts.make(value);
+          made.id = 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+          inputs[collection].push(made);
+          return inputs;
+        }
+        matching[0][field] = value;
+        return inputs;
+      }
+    };
+  }
+
+  /* A plain scalar on an inputs sub-object. */
+  function scalarAccessor(group, field) {
+    return {
+      read: function (inputs) { return Number((inputs[group] || {})[field]) || 0; },
+      editable: function () { return true; },
+      write: function (inputs, value) {
+        if (!inputs[group]) inputs[group] = {};
+        inputs[group][field] = value;
+        return inputs;
+      }
+    };
+  }
+
+  /* The four estimated-tax instalments, edited as one annual total. Split
+     evenly only when the existing instalments are already even, so a
+     deliberately uneven schedule is never quietly flattened. */
+  var estimatedAccessor = {
+    read: function (inputs) {
+      return ((inputs.payments || {}).estimatedPayments || [])
+        .reduce(function (a, v) { return a + (Number(v) || 0); }, 0);
+    },
+    editable: function (inputs) {
+      var q = ((inputs.payments || {}).estimatedPayments || [0, 0, 0, 0]);
+      return q.every(function (v) { return v === q[0]; });
+    },
+    write: function (inputs, value) {
+      if (!inputs.payments) inputs.payments = {};
+      var each = Math.round(value / 4 * 100) / 100;
+      inputs.payments.estimatedPayments = [each, each, each, round2ish(value - each * 3)];
+      return inputs;
+    }
+  };
+
+  function round2ish(v) { return Math.round(v * 100) / 100; }
+
+  function w2(value) {
+    return { employer: 'Wages', wages: value, federalWithholding: 0, socialSecurityWages: value,
+      medicareWages: value, socialSecurityWithheld: 0, medicareWithheld: 0, retirementDeferral: 0, hsa: 0 };
+  }
+  function intDiv(kind) {
+    return function (value) { return { payer: '', kind: kind, amount: value, federalWithholding: 0 }; };
+  }
+  function otherInc(kind) {
+    return function (value) { return { description: '', kind: kind, amount: value }; };
+  }
+  function biz(value) {
+    return { name: 'Business', grossReceipts: value, expenses: 0, isSSTB: false,
+      w2Wages: 0, unadjustedBasis: 0, materialParticipation: true };
+  }
+  function rental(value) {
+    return { property: 'Rental', rents: value, expenses: 0, depreciation: 0,
+      activelyParticipates: true, isQualifiedTradeOrBusiness: true };
+  }
+  function gain(field) {
+    return function (value) {
+      var r = { description: 'Capital gains', shortTermGain: 0, longTermGain: 0,
+        section1250Gain: 0, collectiblesGain: 0 };
+      r[field] = value;
+      return r;
+    };
+  }
+
+  function fromLine(moduleKey, lineKey) {
+    return function (result) {
+      var mod = result.modules[moduleKey];
+      if (!mod) return 0;
+      var l = mod.lines.find(function (x) { return x.key === lineKey; });
+      return l ? l.amount : 0;
+    };
+  }
+
+  /* The row skeleton, in Form 1040 order. Groups are the drill-downs; the
+     spine rows between them are the return's own subtotals and are always
+     visible, because collapsing a group must never hide AGI or total tax. */
+  var MATRIX_GROUPS = [
+    {
+      id: 'income', title: 'Income', formRef: 'Form 1040, lines 1–8', drawer: 'wages',
+      rows: [
+        { key: 'w2wages', label: 'W-2 wages', ref: '1040 line 1a', edit: aggAccessor('wages', 'wages', { make: w2 }), drawer: 'wages' },
+        { key: 'w2deferral', label: 'Elective deferrals (401(k)/403(b))', ref: 'IRC §402(g)', edit: aggAccessor('wages', 'retirementDeferral', { make: w2 }), drawer: 'wages' },
+        { key: 'w2hsa', label: 'Employer/cafeteria HSA', ref: 'IRC §106(d)', edit: aggAccessor('wages', 'hsa', { make: w2 }), drawer: 'wages' }
+      ]
+    },
+    {
+      id: 'scheduleb', title: 'Schedule B — Investment Income', formRef: 'Form 1040, lines 2–3', drawer: 'interestdividends',
+      rows: [
+        { key: 'interest', label: 'Taxable interest', ref: '1040 line 2b', edit: aggAccessor('interestDividends', 'amount', { kind: 'interest', make: intDiv('interest') }), drawer: 'interestdividends' },
+        { key: 'taxexempt', label: 'Tax-exempt interest', ref: '1040 line 2a · IRC §103', edit: aggAccessor('interestDividends', 'amount', { kind: 'taxExemptInterest', make: intDiv('taxExemptInterest') }), drawer: 'interestdividends' },
+        { key: 'orddiv', label: 'Ordinary dividends', ref: '1040 line 3b', edit: aggAccessor('interestDividends', 'amount', { kind: 'ordinaryDividend', make: intDiv('ordinaryDividend') }), drawer: 'interestdividends' },
+        { key: 'qualdiv', label: 'Qualified dividends', ref: '1040 line 3a · IRC §1(h)(11)', edit: aggAccessor('interestDividends', 'amount', { kind: 'qualifiedDividend', make: intDiv('qualifiedDividend') }), drawer: 'interestdividends' }
+      ]
+    },
+    {
+      id: 'schedulec', title: 'Schedule C — Business Income', formRef: 'Form 1040, line 3 (Sch. 1)', drawer: 'schedulec',
+      rows: [
+        { key: 'cgross', label: 'Gross receipts', ref: 'Schedule C line 1', edit: aggAccessor('businesses', 'grossReceipts', { make: biz }), drawer: 'schedulec' },
+        { key: 'cexp', label: 'Total expenses', ref: 'Schedule C line 28', edit: aggAccessor('businesses', 'expenses', { make: biz }), drawer: 'schedulec' },
+        { key: 'cw2', label: 'W-2 wages paid (§199A limit)', ref: 'IRC §199A(b)(2)(B)', edit: aggAccessor('businesses', 'w2Wages', { make: biz }), drawer: 'schedulec' },
+        { key: 'cubia', label: 'Unadjusted basis of property (UBIA)', ref: 'IRC §199A(b)(6)', edit: aggAccessor('businesses', 'unadjustedBasis', { make: biz }), drawer: 'schedulec' },
+        { key: 'cnet', label: 'Net profit or (loss)', ref: 'Schedule C line 31', value: fromLine('businessIncome', 'business.netProfit'), subtotal: true }
+      ]
+    },
+    {
+      id: 'scheduled', title: 'Schedule D — Capital Gains & Losses', formRef: 'Form 1040, line 7', drawer: 'capitalgains',
+      rows: [
+        { key: 'stcg', label: 'Net short-term gain/(loss)', ref: 'Schedule D Part I', edit: aggAccessor('capitalGains', 'shortTermGain', { make: gain('shortTermGain') }), drawer: 'capitalgains' },
+        { key: 'ltcg', label: 'Net long-term gain/(loss)', ref: 'Schedule D Part II', edit: aggAccessor('capitalGains', 'longTermGain', { make: gain('longTermGain') }), drawer: 'capitalgains' },
+        { key: 'unrecap', label: 'Unrecaptured §1250 gain (25%)', ref: 'IRC §1(h)(1)(D)', edit: aggAccessor('capitalGains', 'section1250Gain', { make: gain('section1250Gain') }), drawer: 'capitalgains' },
+        { key: 'collectibles', label: 'Collectibles gain (28%)', ref: 'IRC §1(h)(4)', edit: aggAccessor('capitalGains', 'collectiblesGain', { make: gain('collectiblesGain') }), drawer: 'capitalgains' }
+      ]
+    },
+    {
+      id: 'schedulee', title: 'Schedule E — Rentals & K-1', formRef: 'Form 1040, line 5 (Sch. 1)', drawer: 'schedulee',
+      rows: [
+        { key: 'rents', label: 'Rents received', ref: 'Schedule E line 3', edit: aggAccessor('rentals', 'rents', { make: rental }), drawer: 'schedulee' },
+        { key: 'rexp', label: 'Rental operating expenses', ref: 'Schedule E lines 5–19', edit: aggAccessor('rentals', 'expenses', { make: rental }), drawer: 'schedulee' },
+        { key: 'rdep', label: 'Depreciation', ref: 'Schedule E line 18 · IRC §168', edit: aggAccessor('rentals', 'depreciation', { make: rental }), drawer: 'schedulee' },
+        { key: 'rallow', label: 'Net rental income allowed this year', ref: 'IRC §469', value: fromLine('rentalIncome', 'rental.netAllowed'), subtotal: true },
+        { key: 'rsusp', label: 'Suspended passive losses carried forward', ref: 'IRC §469(b)', value: fromLine('rentalIncome', 'rental.suspendedLosses') },
+        { key: 'k1', label: 'K-1 ordinary business income', ref: 'IRC §702 · Schedule E Part II', edit: aggAccessor('otherIncome', 'amount', { kind: 'k1Ordinary', make: otherInc('k1Ordinary') }), drawer: 'otherincome' }
+      ]
+    },
+    {
+      id: 'otherincome', title: 'Other Income', formRef: 'Schedule 1, Part I', drawer: 'otherincome',
+      rows: [
+        { key: 'retirement', label: 'Taxable retirement / pension distributions', ref: 'IRC §72', edit: aggAccessor('otherIncome', 'amount', { kind: 'retirement', make: otherInc('retirement') }), drawer: 'otherincome' },
+        { key: 'ssgross', label: 'Gross Social Security benefits', ref: 'IRC §86', edit: aggAccessor('otherIncome', 'amount', { kind: 'socialSecurity', make: otherInc('socialSecurity') }), drawer: 'otherincome' },
+        { key: 'sstax', label: 'Taxable Social Security benefits', ref: 'IRC §86(a)', value: fromLine('otherIncome', 'otherIncome.socialSecurityTaxable') },
+        { key: 'unemp', label: 'Unemployment compensation', ref: 'IRC §85', edit: aggAccessor('otherIncome', 'amount', { kind: 'unemployment', make: otherInc('unemployment') }), drawer: 'otherincome' },
+        { key: 'othinc', label: 'Other income', ref: 'Schedule 1 line 8z', edit: aggAccessor('otherIncome', 'amount', { kind: 'other', make: otherInc('other') }), drawer: 'otherincome' }
+      ]
+    },
+    {
+      id: 'adjustments', title: 'Adjustments to Income', formRef: 'Schedule 1, Part II', drawer: 'planning',
+      rows: [
+        { key: 'setaxded', label: 'Deductible half of self-employment tax', ref: 'IRC §164(f)', value: fromLine('planningDeductions', 'planning.seTaxDeduction') }
+      ]
+    },
+    {
+      id: 'retirement', title: 'Retirement & HSA', formRef: 'Schedule 1, Part II', drawer: 'planning',
+      rows: [
+        { key: 'tira', label: 'Traditional IRA deduction', ref: 'IRC §219', value: fromLine('planningDeductions', 'planning.traditionalIra'), drawer: 'planning' },
+        { key: 'sep', label: 'SEP-IRA contribution', ref: 'IRC §408(k)', value: fromLine('planningDeductions', 'planning.sepIra'), drawer: 'planning' },
+        { key: 'solo', label: 'Solo 401(k) contribution', ref: 'IRC §401(a); §415(c)', value: fromLine('planningDeductions', 'planning.solo401k'), drawer: 'planning' },
+        { key: 'hsa', label: 'HSA contribution', ref: 'IRC §223', value: fromLine('planningDeductions', 'planning.hsa'), drawer: 'planning' }
+      ]
+    },
+    {
+      id: 'itemized', title: 'Itemized Deductions', formRef: 'Schedule A', drawer: 'itemized',
+      rows: [
+        { key: 'medical', label: 'Medical & dental expenses', ref: 'Schedule A line 1 · IRC §213', edit: scalarAccessor('itemizedDeductions', 'medical'), drawer: 'itemized' },
+        { key: 'salt-income', label: 'State & local income tax', ref: 'Schedule A line 5a', edit: scalarAccessor('itemizedDeductions', 'stateLocalIncomeTax'), drawer: 'itemized' },
+        { key: 'salt-re', label: 'Real estate tax', ref: 'Schedule A line 5b', edit: scalarAccessor('itemizedDeductions', 'realEstateTax'), drawer: 'itemized' },
+        { key: 'salt-pp', label: 'Personal property tax', ref: 'Schedule A line 5c', edit: scalarAccessor('itemizedDeductions', 'personalPropertyTax'), drawer: 'itemized' },
+        { key: 'saltallowed', label: 'SALT allowed after cap', ref: 'IRC §164(b)(6) · OBBBA §70120', value: fromLine('deductions', 'deductions.salt') },
+        { key: 'mortgage', label: 'Home mortgage interest', ref: 'Schedule A line 8 · IRC §163(h)', edit: scalarAccessor('itemizedDeductions', 'mortgageInterest'), drawer: 'itemized' },
+        { key: 'investint', label: 'Investment interest expense', ref: 'Schedule A line 9 · IRC §163(d)', edit: scalarAccessor('itemizedDeductions', 'investmentInterest'), drawer: 'itemized' },
+        { key: 'charcash', label: 'Charitable — cash', ref: 'Schedule A line 11 · IRC §170', edit: scalarAccessor('itemizedDeductions', 'charitableCash'), drawer: 'itemized' },
+        { key: 'charnoncash', label: 'Charitable — non-cash', ref: 'Schedule A line 12', edit: scalarAccessor('itemizedDeductions', 'charitableNonCash'), drawer: 'itemized' },
+        { key: 'charallowed', label: 'Charitable allowed after floor & ceiling', ref: 'IRC §170(b)', value: fromLine('deductions', 'deductions.charitable') },
+        { key: 'othitem', label: 'Other itemized deductions', ref: 'Schedule A line 16', edit: scalarAccessor('itemizedDeductions', 'other'), drawer: 'itemized' },
+        { key: 'haircut', label: 'Itemized deduction haircut', ref: 'IRC §68 as amended (2/37)', value: fromLine('deductions', 'deductions.itemizedHaircut') },
+        { key: 'itemtotal', label: 'Total itemized deductions', ref: 'Schedule A line 17', value: fromLine('deductions', 'deductions.itemizedTotal'), subtotal: true },
+        { key: 'stdtotal', label: 'Standard deduction available', ref: 'IRC §63(c)', value: fromLine('deductions', 'deductions.standardTotal') }
+      ]
+    },
+    {
+      id: 'qbi', title: 'Qualified Business Income (§199A)', formRef: 'Form 1040, line 13 · Form 8995-A',
+      rows: [
+        { key: 'qbitotal', label: 'Total qualified business income', ref: 'IRC §199A(c)', value: fromLine('qbi', 'qbi.totalQbi') },
+        { key: 'qbitent', label: 'Tentative deduction after component limits', ref: 'IRC §199A(b)(2)', value: fromLine('qbi', 'qbi.tentativeDeduction') },
+        { key: 'qbilimit', label: 'Overall limit: 20% of (taxable income − net capital gain)', ref: 'IRC §199A(a)', value: fromLine('qbi', 'qbi.overallLimit') }
+      ]
+    },
+    {
+      id: 'othertaxes', title: 'Other Taxes', formRef: 'Schedule 2',
+      rows: [
+        { key: 'amti', label: 'Alternative minimum taxable income', ref: 'Form 6251 · IRC §55(b)(2)', value: fromLine('additionalTaxes', 'additionaltaxes.amti') },
+        { key: 'amtex', label: 'AMT exemption after phase-out', ref: 'IRC §55(d)', value: fromLine('additionalTaxes', 'additionaltaxes.amtExemption') },
+        { key: 'tmt', label: 'Tentative minimum tax', ref: 'IRC §55(b)(1)', value: fromLine('additionalTaxes', 'additionaltaxes.tentativeMinimumTax') },
+        { key: 'senet', label: 'Net earnings from self-employment', ref: 'Schedule SE · IRC §1402(a)', value: fromLine('selfEmploymentTax', 'se.netEarnings') }
+      ]
+    },
+    {
+      id: 'credits', title: 'Credits', formRef: 'Form 1040, lines 19–20 · Schedule 3',
+      rows: [
+        { key: 'ctc', label: 'Child tax credit / credit for other dependents', ref: 'IRC §24', value: fromLine('payments', 'payments.childTaxCredit') },
+        { key: 'refcred', label: 'Other refundable credits', ref: 'Schedule 3, Part II', edit: scalarAccessor('payments', 'refundableCredits'), drawer: 'payments' }
+      ]
+    },
+    {
+      id: 'payments', title: 'Payments & Estimated Tax', formRef: 'Form 1040, lines 25–33', drawer: 'payments',
+      rows: [
+        { key: 'withheld', label: 'Federal income tax withheld', ref: '1040 line 25', value: fromLine('payments', 'payments.withholding') },
+        { key: 'estpay', label: 'Estimated tax payments (annual)', ref: '1040 line 26 · IRC §6654', edit: estimatedAccessor, drawer: 'payments' },
+        { key: 'pyover', label: 'Prior-year overpayment applied', ref: 'IRC §6402(b)', edit: scalarAccessor('payments', 'priorYearOverpayment'), drawer: 'payments' },
+        { key: 'ext', label: 'Extension payment', ref: 'Form 4868', edit: scalarAccessor('payments', 'extensionPayment'), drawer: 'payments' },
+        { key: 'harbor', label: 'Safe-harbor requirement', ref: 'IRC §6654(d)', value: function (r) { return r.safeHarborRequired; } },
+        { key: 'under', label: 'Projected underpayment vs. safe harbor', ref: 'Form 2210', value: function (r) { return r.underpayment; } }
+      ]
+    }
+  ];
+
+  /* The return's own subtotals. Always visible, never inside a collapsible
+     group — a collapsed Income section must not be able to hide AGI. Each
+     carries the position in the return it belongs after. */
+  var MATRIX_SPINE = [
+    { after: 'otherincome', key: 'totalIncome', label: 'Total income', ref: '1040 line 9', value: function (r) { return r.totalIncome; } },
+    { after: 'adjustments', key: 'adjustments', label: 'Total adjustments to income', ref: '1040 line 10', value: function (r) { return r.adjustments; } },
+    { after: 'retirement', key: 'agi', label: 'Adjusted gross income', ref: '1040 line 11', value: function (r) { return r.agi; }, major: true },
+    { after: 'itemized', key: 'deductionUsed', label: 'Deduction taken', ref: '1040 line 12', value: function (r) { return r.deductionUsed; }, note: function (r) { return r.deductionType; } },
+    { after: 'qbi', key: 'qbiDeduction', label: 'QBI deduction', ref: '1040 line 13', value: function (r) { return r.qbiDeduction; } },
+    { after: 'qbi', key: 'taxableIncome', label: 'Taxable income', ref: '1040 line 15', value: function (r) { return r.taxableIncome; }, major: true },
+    { after: 'qbi', key: 'ordinaryTax', label: 'Tax on ordinary income', ref: 'IRC §1(j)', value: function (r) { return r.ordinaryTax; } },
+    { after: 'qbi', key: 'capitalGainsTax', label: 'Tax on qualified dividends & net LTCG', ref: 'IRC §1(h)', value: function (r) { return r.capitalGainsTax; } },
+    { after: 'othertaxes', key: 'amt', label: 'Alternative minimum tax', ref: 'Form 6251', value: function (r) { return r.amt; } },
+    { after: 'othertaxes', key: 'seTax', label: 'Self-employment tax', ref: 'Schedule SE', value: function (r) { return r.seTax; } },
+    { after: 'othertaxes', key: 'niit', label: 'Net investment income tax (3.8%)', ref: 'Form 8960 · IRC §1411', value: function (r) { return r.niit; } },
+    { after: 'othertaxes', key: 'additionalMedicare', label: 'Additional Medicare tax (0.9%)', ref: 'Form 8959 · IRC §3101(b)(2)', value: function (r) { return r.additionalMedicare; } },
+    { after: 'credits', key: 'totalTax', label: 'Total tax', ref: '1040 line 24', value: function (r) { return r.totalTax; }, major: true },
+    { after: 'payments', key: 'totalPayments', label: 'Total payments & refundable credits', ref: '1040 line 33', value: function (r) { return r.totalPayments; } },
+    { after: 'payments', key: 'balance', label: 'Balance due / (refund)', ref: '1040 lines 34–37', value: function (r) { return r.balanceDue > 0 ? r.balanceDue : -r.refund; } },
+    { after: 'payments', key: 'effectiveRate', label: 'Effective rate', ref: 'Tax before credits ÷ taxable income', value: function (r) { return r.effectiveRate; }, percent: true },
+    { after: 'payments', key: 'marginalRate', label: 'Marginal rate', ref: 'Rate on the next dollar of ordinary income', value: function (r) { return r.marginalRate; }, percent: true }
+  ];
+
+  /* Which groups are open. Held in `ui`, so it survives every re-render for
+     as long as the tab is being worked in — a recalculation must not throw
+     the preparer back to the top of a collapsed table. */
+  function groupOpen(id) {
+    return ui.matrixOpen[id] !== false;
+  }
+  function toggleGroup(id) {
+    ui.matrixOpen[id] = !groupOpen(id);
+    render();
+  }
+  /* The two global controls. They drive EVERY group, not the visible ones. */
+  function setAllGroups(open) {
+    for (var g of MATRIX_GROUPS) ui.matrixOpen[g.id] = open;
+    render();
+  }
+  function openGroupCount() {
+    return MATRIX_GROUPS.filter(function (g) { return groupOpen(g.id); }).length;
+  }
+
+  var MATRIX_COL_W = 186;
+
+  /* One scenario column's computed projection, plus the inputs behind it. */
+  function matrixColumns() {
+    var project = state.project;
+    var baseline = baselineScenario();
+    return project.scenarios.map(function (scenario, index) {
+      return {
+        scenario: scenario,
+        index: index,
+        isBaseline: baseline && scenario.id === baseline.id,
+        isActive: scenario.id === project.activeScenarioId,
+        inputs: scenario.inputs,
+        result: computeInputs(scenario.inputs)
+      };
+    });
+  }
+
+  /* Savings or cost against the baseline.
+
+     Presented as a direction and a magnitude, never as a verdict. The lowest
+     total tax is not marked "best" and gets no winner styling: a scenario's
+     tax cost is one input to a decision, and risk, feasibility, substantiation
+     and the client's own preferences are others this table knows nothing
+     about. Naming a winner here would be the table overstepping. */
+  function deltaCell(delta, isBaseline) {
+    if (isBaseline) {
+      return h('span', {
+        class: 'text-[11px] text-slate-400',
+        title: 'Every other column is measured against this one.'
+      }, 'the baseline');
+    }
+    if (Math.abs(delta) < 0.005) {
+      return h('span', {
+        class: 'text-[11px] text-slate-400',
+        title: 'This scenario produces the same total tax as the baseline.'
+      }, 'no change vs. base');
+    }
+    var lower = delta < 0;
+    return h('span', {
+      class: 'inline-flex items-baseline gap-1 text-[11.5px] font-semibold text-slate-200',
+      title: lower
+        ? 'Total tax is ' + fmtUSD(Math.abs(delta)) + ' lower than the baseline scenario.'
+        : 'Total tax is ' + fmtUSD(delta) + ' higher than the baseline scenario.'
+    },
+      h('span', { class: 'num' }, (lower ? '−' : '+') + fmtUSD(Math.abs(delta)).replace(/^\$/, '$')),
+      h('span', { class: 'text-[10px] font-normal uppercase tracking-wide text-slate-400' },
+        lower ? 'lower tax' : 'higher tax'));
+  }
+
+  function scenarioHeaderCell(col, baselineResult, count) {
+    var scenario = col.scenario;
+    var delta = col.result.totalTax - baselineResult.totalTax;
+    return h('th', {
+      scope: 'col',
+      class: 'matrix-col-head sticky top-0 z-20 border-l border-navy-800 bg-navy-900 px-2 py-2 text-left align-top' +
+        (col.isBaseline ? ' matrix-baseline-col' : ''),
+      style: { width: MATRIX_COL_W + 'px', minWidth: MATRIX_COL_W + 'px' }
+    },
+      h('div', { class: 'flex items-center gap-1' },
+        h('input', {
+          type: 'text', value: scenario.name,
+          'aria-label': 'Name of scenario ' + scenario.name,
+          class: 'min-w-0 flex-1 rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[12.5px] font-semibold text-white hover:border-navy-700 focus:border-accent-500 focus:bg-navy-950 focus:outline-none',
+          onchange: function (e) { renameScenario(scenario.id, e.target.value.trim() || scenario.name); },
+          onkeydown: function (e) { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }
+        }),
+        col.isBaseline
+          ? h('span', {
+            class: 'shrink-0 rounded-[2px] border border-slate-400 bg-slate-200 px-1 text-[9px] font-bold uppercase tracking-wide text-navy-950',
+            title: 'Every other column is measured against this one. Baseline is declared, not computed — it does not move to whichever scenario has the lowest tax.'
+          }, 'Base')
+          : h('button', {
+            type: 'button', class: 'shrink-0 rounded-[2px] border border-navy-700 px-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400 hover:border-accent-500 hover:text-accent-400',
+            title: 'Measure every other column against this scenario instead',
+            onclick: function () { setBaselineScenario(scenario.id); }
+          }, 'Set base')),
+      h('div', { class: 'matrix-col-total mt-1 num text-[15px] font-bold leading-none text-white', title: 'Total tax (Form 1040 line 24)' },
+        fmtUSD(col.result.totalTax)),
+      h('div', { class: 'mt-[3px] h-[16px]' }, deltaCell(delta, col.isBaseline)),
+      h('div', { class: 'mt-1 flex items-center gap-[3px]' },
+        h('button', {
+          type: 'button', class: matrixIconBtn, title: 'Move this column left',
+          disabled: col.index === 0, onclick: function () { moveScenario(scenario.id, -1); }
+        }, '←'),
+        h('button', {
+          type: 'button', class: matrixIconBtn, title: 'Move this column right',
+          disabled: col.index === count - 1, onclick: function () { moveScenario(scenario.id, 1); }
+        }, '→'),
+        h('button', {
+          type: 'button', class: matrixIconBtn, title: 'Duplicate this scenario into a new column',
+          onclick: function () { duplicateScenarioById(scenario.id); }
+        }, 'Copy'),
+        h('button', {
+          type: 'button', class: matrixIconBtn + ' hover:border-rose-500 hover:text-rose-300',
+          title: count <= 1 ? 'A project keeps at least one scenario' : 'Delete this scenario',
+          disabled: count <= 1,
+          onclick: function () { deleteScenario(scenario.id); }
+        }, 'Del'),
+        h('button', {
+          type: 'button',
+          class: matrixIconBtn + (col.isActive ? ' border-accent-500 text-accent-300' : ''),
+          title: 'Open this scenario in the Planner tab and its editors',
+          'aria-pressed': col.isActive ? 'true' : 'false',
+          onclick: function () { setActiveScenario(scenario.id); }
+        }, 'Open')));
+  }
+
+  var matrixIconBtn = 'h-[18px] rounded-[2px] border border-navy-700 px-1 text-[9.5px] font-semibold uppercase tracking-wide text-slate-400 transition hover:border-accent-500 hover:text-accent-300 disabled:cursor-not-allowed disabled:opacity-35';
+
+  /* A cell a preparer can type into. Inputs and calculated figures are
+     deliberately not interchangeable on screen: an input is a field, on white,
+     with a border; a calculated figure sits on a tint and cannot be focused.
+     An input that differs from the baseline's carries a left rule, so what
+     was actually changed in a scenario is visible without reading across. */
+  function matrixInputCell(row, col, baselineCol) {
+    var value = row.edit.read(col.inputs);
+    var editable = row.edit.editable(col.inputs);
+    var baseValue = baselineCol ? row.edit.read(baselineCol.inputs) : value;
+    var changed = !col.isBaseline && Math.abs(value - baseValue) >= 0.005;
+    if (!editable) {
+      /* Several records back this line. The matrix will not guess how to
+         split one figure across them — the drawer edits them properly. */
+      return h('td', {
+        class: 'border-l border-slate-200 bg-white px-1 py-[3px] text-right' + (changed ? ' matrix-changed' : '')
+      },
+        h('button', {
+          type: 'button',
+          class: 'num w-full rounded-[3px] border border-dashed border-slate-300 px-1.5 py-[2px] text-right text-[12.5px] text-slate-700 hover:border-accent-500 hover:text-accent-600',
+          title: 'Several records make up this line. Open the detail editor to change them.',
+          onclick: function () { setActiveScenario(col.scenario.id); if (row.drawer) setDrawer(row.drawer); }
+        }, fmtUSD(value)));
+    }
+    return h('td', {
+      class: 'border-l border-slate-200 bg-white px-1 py-[3px]' + (changed ? ' matrix-changed' : '')
+    },
+      h('input', {
+        type: 'text', inputmode: 'decimal',
+        'aria-label': row.label + ' for ' + col.scenario.name,
+        title: changed ? 'Differs from the baseline (' + fmtUSD(baseValue) + ')' : row.label,
+        class: 'num h-[22px] w-full rounded-[3px] border border-slate-300 bg-white px-1.5 text-right text-[12.5px] text-navy-900 outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500/40',
+        value: value === 0 ? '' : fmtUSD(value),
+        placeholder: '0',
+        onfocus: function (e) { e.currentTarget.select(); },
+        onchange: function (e) {
+          var next = parseAmount(e.target.value);
+          if (Math.abs(next - value) < 0.005) { e.target.value = value === 0 ? '' : fmtUSD(value); return; }
+          updateScenarioInputs(col.scenario.id, function (inputs) { return row.edit.write(inputs, next); });
+        },
+        onkeydown: function (e) { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }
+      }));
+  }
+
+  function matrixValueCell(row, col, baselineCol, opts) {
+    opts = opts || {};
+    var value = row.value(col.result);
+    var baseValue = baselineCol ? row.value(baselineCol.result) : value;
+    var moved = !col.isBaseline && Math.abs(value - baseValue) >= 0.005;
+    var text = row.percent ? fmtPct(value) : fmtUSD(value);
+    return h('td', {
+      class: 'border-l border-slate-200 px-2 py-[3px] text-right num ' +
+        (opts.major ? 'bg-navy-950/[0.06] text-[13.5px] font-bold text-navy-950'
+          : opts.spine ? 'bg-slate-100/70 text-[12.5px] font-semibold text-navy-900'
+            : row.subtotal ? 'bg-slate-50 text-[12.5px] font-semibold text-navy-900'
+              : 'bg-slate-50/60 text-[12.5px] text-slate-700'),
+      title: moved
+        ? (row.percent ? fmtPct(baseValue) : fmtUSD(baseValue)) + ' in the baseline'
+        : undefined
+    }, text);
+  }
+
+  function matrixLabelCell(label, ref, opts) {
+    opts = opts || {};
+    return h('th', {
+      scope: 'row',
+      class: 'sticky left-0 z-10 border-r border-slate-300 px-3 py-[3px] text-left font-normal ' +
+        (opts.major ? 'bg-navy-950/[0.08]' : opts.spine ? 'bg-slate-100' : 'bg-white')
+    },
+      h('span', {
+        class: 'block truncate ' + (opts.indent ? 'pl-4 ' : '') +
+          (opts.major ? 'text-[13px] font-bold uppercase tracking-wide text-navy-950'
+            : opts.spine ? 'text-[12.5px] font-semibold text-navy-900'
+              : 'text-[12.5px] text-slate-700'),
+        title: label
+      }, label),
+      ref ? h('span', { class: 'block truncate text-[10px] text-slate-400', title: ref }, ref) : null);
+  }
+
+  function matrixGroupRow(group, columns) {
+    var open = groupOpen(group.id);
+    return h('tr', { class: 'border-y border-slate-300 bg-slate-200/70' },
+      h('th', {
+        scope: 'row',
+        class: 'sticky left-0 z-10 border-r border-slate-300 bg-slate-200/95 px-2 py-[4px] text-left'
+      },
+        h('button', {
+          type: 'button',
+          'aria-expanded': open ? 'true' : 'false',
+          'aria-controls': 'matrix-group-' + group.id,
+          class: 'matrix-group-toggle flex w-full items-center gap-1.5 text-left',
+          onclick: function () { toggleGroup(group.id); }
+        },
+          h('span', {
+            'aria-hidden': 'true',
+            class: 'inline-block text-[9px] text-slate-500 transition-transform' + (open ? ' rotate-90' : '')
+          }, '▶'),
+          h('span', { class: 'min-w-0 flex-1' },
+            h('span', { class: 'block truncate text-[12px] font-bold uppercase tracking-wide text-navy-900', title: group.title }, group.title),
+            h('span', { class: 'block truncate text-[10px] font-normal normal-case tracking-normal text-slate-500', title: group.formRef }, group.formRef)))),
+      columns.map(function () {
+        return h('td', { class: 'border-l border-slate-300 bg-slate-200/70' });
+      }),
+      h('td', { class: 'matrix-spacer bg-slate-200/70', 'aria-hidden': 'true' }));
+  }
+
+  function matrixSpineRow(row, columns, baselineCol) {
+    return h('tr', { class: row.major ? 'border-y-2 border-navy-800/25' : 'border-b border-slate-200' },
+      matrixLabelCell(row.label, row.ref, { major: row.major, spine: true }),
+      columns.map(function (col) {
+        return matrixValueCell(row, col, baselineCol, { major: row.major, spine: true });
+      }),
+      h('td', { class: 'matrix-spacer ' + (row.major ? 'bg-navy-950/[0.06]' : 'bg-slate-100/70'), 'aria-hidden': 'true' }));
+  }
+
   function renderScenarios() {
     var project = state.project;
-    var rows = project.scenarios.map(function (scenario) {
-      return { scenario: scenario, result: Engine.computeProjection(scenario.inputs) };
-    });
-    var baselineTax = rows[0] ? rows[0].result.totalTax : 0;
+    var columns = matrixColumns();
+    var baselineCol = columns.find(function (c) { return c.isBaseline; }) || columns[0];
+    var meta = yearMeta();
+    var allOpen = openGroupCount() === MATRIX_GROUPS.length;
+    var noneOpen = openGroupCount() === 0;
+
+    var body = [];
+    for (var group of MATRIX_GROUPS) {
+      body.push(matrixGroupRow(group, columns));
+      if (groupOpen(group.id)) {
+        for (var row of group.rows) {
+          body.push(h('tr', { class: 'border-b border-slate-100 hover:bg-sky-50/60' },
+            matrixLabelCell(row.label, row.ref, { indent: true }),
+            columns.map(function (col) {
+              return row.edit
+                ? matrixInputCell(row, col, baselineCol)
+                : matrixValueCell(row, col, baselineCol, {});
+            }),
+            h('td', { class: 'matrix-spacer', 'aria-hidden': 'true' })));
+        }
+      }
+      /* Subtotals belonging after this group sit outside it, so collapsing
+         the group never hides the return's own running totals. */
+      for (var spine of MATRIX_SPINE) {
+        if (spine.after === group.id) body.push(matrixSpineRow(spine, columns, baselineCol));
+      }
+    }
+
     return h('div', { class: 'space-y-3 px-4 py-4' },
-      h('section', { class: 'panel' },
+      h('section', { class: 'panel overflow-hidden' },
         h('div', { class: 'panel-header' },
-          h('span', {}, 'Scenarios'),
+          h('span', {}, 'Scenario Comparison'),
           h('span', { class: 'font-normal normal-case tracking-normal text-slate-500' },
-            project.scenarios.length + ' in project · deltas vs. ' + (rows[0] ? rows[0].scenario.name : '—'))),
-        h('div', { class: 'thin-scroll overflow-x-auto' },
-          h('table', { class: 'w-full border-collapse text-[13px]' },
+            project.scenarios.length + (project.scenarios.length === 1 ? ' scenario' : ' scenarios') +
+            ' · ' + meta.label + ' · measured against ' + (baselineCol ? baselineCol.scenario.name : '—'))),
+
+        /* ---- the controls that sit above the table ---- */
+        h('div', { class: 'flex flex-wrap items-center gap-2 border-b border-slate-300 bg-slate-50 px-3 py-1.5' },
+          h('div', { class: 'flex items-center gap-1' },
+            h('span', { class: 'text-[10.5px] font-semibold uppercase tracking-wide text-slate-500' }, 'Rows'),
+            h('button', {
+              type: 'button', class: 'btn-light h-[24px] px-2 text-[11.5px]',
+              disabled: allOpen,
+              title: 'Open every group in the table',
+              onclick: function () { setAllGroups(true); }
+            }, 'Expand all'),
+            h('button', {
+              type: 'button', class: 'btn-light h-[24px] px-2 text-[11.5px]',
+              disabled: noneOpen,
+              title: 'Close every group in the table. Subtotals stay visible.',
+              onclick: function () { setAllGroups(false); }
+            }, 'Collapse all'),
+            h('span', { class: 'text-[10.5px] text-slate-500' },
+              openGroupCount() + ' of ' + MATRIX_GROUPS.length + ' groups open')),
+          h('div', { class: 'ml-auto flex flex-wrap items-center gap-2' },
+            h('input', {
+              type: 'text', value: ui.newScenarioName,
+              placeholder: 'New scenario name',
+              'aria-label': 'Name for a new scenario',
+              class: 'input-base h-[24px] w-[190px] text-[12px]',
+              oninput: function (e) { ui.newScenarioName = e.target.value; }
+            }),
+            h('button', {
+              type: 'button', class: 'btn-primary h-[24px] px-2 text-[11.5px]',
+              title: 'Add a column, copied from the baseline scenario',
+              onclick: function () {
+                var name = ui.newScenarioName.trim() || 'Scenario ' + (project.scenarios.length + 1);
+                ui.newScenarioName = '';
+                addScenarioFrom(baselineCol ? baselineCol.scenario : null, name);
+              }
+            }, '+ Add scenario'),
+            h('button', {
+              type: 'button', class: 'btn-light h-[24px] px-2 text-[11.5px]',
+              onclick: function () { setModal('compare'); }
+            }, 'Comparison report →'))),
+
+        /* ---- what the cells mean ---- */
+        h('div', { class: 'flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-200 bg-white px-3 py-1 text-[10.5px] text-slate-500' },
+          h('span', { class: 'inline-flex items-center gap-1' },
+            h('span', { class: 'inline-block h-[11px] w-[16px] rounded-[2px] border border-slate-300 bg-white' }), 'entered — type to change this scenario'),
+          h('span', { class: 'inline-flex items-center gap-1' },
+            h('span', { class: 'inline-block h-[11px] w-[16px] rounded-[2px] border border-slate-200 bg-slate-100' }), 'calculated by the engine'),
+          h('span', { class: 'inline-flex items-center gap-1' },
+            h('span', { class: 'inline-block h-[11px] w-[3px] bg-accent-500' }), 'differs from the baseline'),
+          h('span', { class: 'ml-auto' },
+            'Lowest tax is not marked as best: tax cost is one factor, and risk, feasibility and substantiation are others.')),
+
+        meta.projected
+          ? h('p', { class: 'border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11.5px] leading-snug text-amber-900' },
+            h('strong', {}, 'TY' + meta.year + ' is projected, not published. '),
+            meta.basis + ' Treat every figure in this table as a planning estimate for that year.')
+          : null,
+
+        /* ---- the table ----
+           The line-description column is frozen so a row is still readable
+           after scrolling right past several scenarios, and the scenario
+           headers are frozen so a column is still identifiable after
+           scrolling down into the schedules. Extra scenarios extend the
+           table sideways and it scrolls: columns keep a readable width
+           rather than being squeezed to fit. */
+        h('div', { class: 'thin-scroll matrix-scroll overflow-auto' },
+          h('table', { class: 'matrix-table w-full border-collapse text-[13px]' },
             h('thead', {},
-              h('tr', { class: 'bg-navy-900 text-[10.5px] uppercase tracking-wide text-slate-300' },
-                h('th', { scope: 'col', class: 'px-3 py-1.5 text-left font-semibold' }, 'Scenario'),
-                ['AGI', 'Taxable income', 'Total tax', 'Δ vs. baseline', 'Eff. rate', 'Marg. rate', 'Balance', 'Actions'].map(function (label) {
-                  return h('th', { scope: 'col', class: 'px-2 py-1.5 text-right font-semibold' }, label);
-                }))),
-            h('tbody', {},
-              rows.map(function (row) {
-                var scenario = row.scenario;
-                var result = row.result;
-                var isActive = scenario.id === project.activeScenarioId;
-                var delta = result.totalTax - baselineTax;
-                return h('tr', { class: 'border-b border-slate-200 ' + (isActive ? 'bg-sky-50' : 'odd:bg-white even:bg-slate-50/60') },
-                  h('td', { class: 'px-3 py-1.5' },
-                    h('div', { class: 'flex items-center gap-2' },
-                      h('input', {
-                        type: 'radio', name: 'active-scenario', checked: isActive,
-                        onchange: function () { setActiveScenario(scenario.id); },
-                        'aria-label': 'Make ' + scenario.name + ' the active scenario',
-                        class: 'h-3.5 w-3.5 accent-accent-600'
-                      }),
-                      h('input', {
-                        type: 'text', value: scenario.name,
-                        'aria-label': 'Scenario name for ' + scenario.name,
-                        onchange: function (e) { renameScenario(scenario.id, e.target.value); },
-                        onkeydown: function (e) { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } },
-                        class: 'h-[26px] w-[220px] rounded-[3px] border border-transparent bg-transparent px-1.5 text-[13px] font-semibold text-navy-900 hover:border-slate-300 focus:border-accent-500 focus:bg-white focus:outline-none'
-                      }),
-                      scenario.isBaseline
-                        ? h('span', { class: 'rounded-[2px] border border-slate-300 bg-white px-1 text-[9.5px] font-bold uppercase tracking-wide text-slate-500' }, 'baseline')
-                        : null),
-                    scenario.description ? h('p', { class: 'mt-0.5 pl-6 text-[11px] text-slate-500' }, scenario.description) : null),
-                  h('td', { class: 'num px-2 py-1.5' }, fmtUSD(result.agi)),
-                  h('td', { class: 'num px-2 py-1.5' }, fmtUSD(result.taxableIncome)),
-                  h('td', { class: 'num px-2 py-1.5 font-semibold text-navy-950' }, fmtUSD(result.totalTax)),
-                  h('td', { class: 'num px-2 py-1.5 ' + (delta === 0 ? 'text-slate-400' : delta < 0 ? 'text-emerald-700' : 'text-rose-700') },
-                    delta === 0 ? '—' : fmtSigned(delta)),
-                  h('td', { class: 'num px-2 py-1.5' }, fmtPct(result.effectiveRate)),
-                  h('td', { class: 'num px-2 py-1.5' }, fmtPct(result.marginalRate)),
-                  h('td', { class: 'num px-2 py-1.5 ' + (result.balanceDue > 0 ? 'text-rose-700' : 'text-emerald-700') },
-                    fmtUSD(result.balanceDue > 0 ? result.balanceDue : result.refund)),
-                  h('td', { class: 'px-2 py-1.5 text-right' },
-                    h('button', {
-                      type: 'button', class: 'btn-danger h-[24px] px-1.5 text-[11px]',
-                      disabled: project.scenarios.length <= 1,
-                      onclick: function () { deleteScenario(scenario.id); }
-                    }, 'Delete')));
-              })))),
-        h('div', { class: 'flex flex-wrap items-center gap-2 border-t border-slate-300 bg-white px-3 py-2' },
-          h('label', { for: 'new-scenario', class: 'field-label' }, 'New scenario'),
-          h('input', {
-            id: 'new-scenario', type: 'text', value: ui.newScenarioName,
-            placeholder: 'e.g. Roth conversion $250k',
-            oninput: function (e) { ui.newScenarioName = e.target.value; },
-            class: 'input-base w-[280px]'
-          }),
-          h('button', {
-            type: 'button', class: 'btn-primary',
-            onclick: function () {
-              var name = ui.newScenarioName.trim();
-              if (name === '') return;
-              ui.newScenarioName = '';
-              addScenario(name);
-            }
-          }, 'Create from active'),
-          h('button', { type: 'button', class: 'btn-light', onclick: duplicateActiveScenario }, 'Duplicate active'),
-          h('button', { type: 'button', class: 'btn-light ml-auto', onclick: function () { setModal('compare'); } }, 'Open comparison →'))),
-      strategyLibraryPanel());
+              h('tr', {},
+                h('th', {
+                  scope: 'col',
+                  class: 'sticky left-0 top-0 z-30 border-r border-navy-800 bg-navy-950 px-3 py-2 text-left align-bottom',
+                  style: { width: '340px', minWidth: '340px' }
+                },
+                  h('span', { class: 'block text-[11px] font-bold uppercase tracking-[0.1em] text-slate-300' }, 'Form 1040 line'),
+                  h('span', { class: 'block text-[10px] font-normal text-slate-500' }, 'in return order · ' + meta.label)),
+                columns.map(function (col) { return scenarioHeaderCell(col, baselineCol.result, columns.length); }),
+                h('th', { class: 'matrix-spacer sticky top-0 z-20 bg-navy-950', 'aria-hidden': 'true' }))),
+            h('tbody', {}, body)))),
+
+      strategyLibraryPanel(baselineCol));
+  }
+
+  /* Add a column. Copies the scenario it is created from — usually the
+     baseline — so a new column starts as the client's current facts and is
+     changed from there, which is how a preparer actually builds one. */
+  function addScenarioFrom(source, name) {
+    var prev = state.project;
+    var from = source || activeScenario();
+    var scenario = Engine.createScenario(name, JSON.parse(JSON.stringify(from.inputs)));
+    state.project = Object.assign({}, prev, {
+      scenarios: prev.scenarios.concat([scenario]),
+      activeScenarioId: scenario.id,
+      updatedAt: new Date().toISOString()
+    });
+    persist(state.project);
+    state.result = computeForProject(state.project);
+    pushHistory(prev);
+    render();
   }
 
   /* ---- strategy scenario library --------------------------------------------- */
-  function modelLibraryScenario(entry) {
+  /* Applying a strategy adds a COLUMN to the matrix.
+
+     It clones the scenario it is modelled from — the baseline unless the
+     preparer picked another — applies the strategy's assumptions to that
+     copy, and drops the result in beside it. Nothing is overwritten, so the
+     facts the strategy was measured against are still on screen next to it,
+     and the lines the strategy moved are marked in the new column the same
+     way any other edit would be.
+
+     The saving or cost it produced is reported against the baseline in the
+     column header. It is not a recommendation: the entry's own authority,
+     eligibility and substantiation still have to be checked. */
+  function modelLibraryScenario(entry, sourceScenario) {
     var raw = ui.libraryAmounts[entry.key];
     var amount = raw !== undefined ? parseAmount(raw) : entry.defaultAmount;
     if (!(amount > 0)) amount = entry.defaultAmount;
     ui.libraryAmounts[entry.key] = fmtUSD(amount);
-    var inputs = window.TaxLibrary.cloneInputs(activeScenario().inputs);
-    var applied = entry.apply(inputs, amount);
+    var from = sourceScenario || baselineScenario() || activeScenario();
+    var inputs = window.TaxLibrary.cloneInputs(from.inputs);
+    var applied = entry.apply(inputs, amount, { taxYear: projectYear() });
     var prev = state.project;
+    var before = computeInputs(from.inputs);
+    var after = computeInputs(applied);
     var scenario = Engine.createScenario(entry.title + ' — ' + fmtUSD(amount), applied, {
-      description: entry.summary + ' [Source: ' + entry.source + ' · ' + entry.authority + ']'
+      description: entry.summary + ' [Modelled from ' + from.name + ' · Source: ' +
+        entry.source + ' · ' + entry.authority + ']'
     });
     state.project = Object.assign({}, prev, {
       scenarios: prev.scenarios.concat([scenario]),
@@ -1094,12 +1850,21 @@
     persist(state.project);
     state.result = computeForProject(state.project);
     pushHistory(prev);
-    var baseline = prev.scenarios[0];
+    var baseline = baselineScenario();
     if (baseline) state.compareSelection = [baseline.id, scenario.id];
-    render();
+    /* Report what the new column did, so the effect is visible without
+       hunting for it — and open every group, since the changed lines are
+       what the preparer has just asked to see. */
+    ui.lastModelled = {
+      scenarioId: scenario.id,
+      title: entry.title,
+      from: from.name,
+      delta: round2ish(after.totalTax - before.totalTax)
+    };
+    setAllGroups(true);
   }
 
-  function strategyLibraryPanel() {
+  function strategyLibraryPanel(baselineCol) {
     var library = window.TaxLibrary;
     if (!library) return null;
     var byCategory = new Map();
@@ -1114,7 +1879,20 @@
         h('span', { class: 'font-normal normal-case tracking-normal text-slate-500' },
           library.STRATEGY_LIBRARY.length + ' strategies from the uploaded planning guides')),
       h('p', { class: 'border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-[11.5px] leading-snug text-slate-600' },
-        'Each strategy clones the active scenario, applies the modeled input changes, and selects it for comparison against the baseline. Sources: Roth IRA client letter · HNWI Tax Planning & Strategies Guide · CCH Capital Gains & Casualty Losses · Entity Classification (CCH) · Essential Tax & Wealth Planning Guide 2025.'),
+        'Each strategy clones ' + (baselineCol ? 'the baseline scenario (' + baselineCol.scenario.name + ')' : 'the baseline scenario') + ', applies the modeled input changes, and adds the result as a new column in the table above — the lines it moved are marked there, and its saving or cost against the baseline is shown in its column header. Sources: Roth IRA client letter · HNWI Tax Planning & Strategies Guide · CCH Capital Gains & Casualty Losses · Entity Classification (CCH) · Essential Tax & Wealth Planning Guide 2025.'),
+      ui.lastModelled
+        ? h('p', { class: 'flex flex-wrap items-baseline gap-x-2 border-b border-slate-200 bg-white px-3 py-1.5 text-[11.5px] text-slate-700' },
+          h('strong', {}, 'Added: ' + ui.lastModelled.title),
+          h('span', { class: 'text-slate-500' }, 'modelled from ' + ui.lastModelled.from + ' ·'),
+          h('span', { class: 'num font-semibold' },
+            (ui.lastModelled.delta <= 0 ? '−' : '+') + fmtUSD(Math.abs(ui.lastModelled.delta))),
+          h('span', { class: 'text-slate-500' },
+            ui.lastModelled.delta <= 0 ? 'total tax against that scenario' : 'total tax against that scenario'),
+          h('button', {
+            type: 'button', class: 'ml-auto text-[11px] font-semibold text-accent-600 hover:underline',
+            onclick: function () { ui.lastModelled = null; render(); }
+          }, 'Dismiss'))
+        : null,
       library.CATEGORIES.map(function (cat) {
         var entries = byCategory.get(cat) || [];
         if (entries.length === 0) return null;
@@ -1147,8 +1925,9 @@
                   }),
                   h('button', {
                     type: 'button', class: 'btn-primary',
-                    onclick: function () { modelLibraryScenario(entry); }
-                  }, 'Model scenario')));
+                    title: 'Add this strategy as a new column, cloned from the baseline',
+                    onclick: function () { modelLibraryScenario(entry, baselineCol ? baselineCol.scenario : null); }
+                  }, '+ Add as column')));
             })));
       }),
       h('p', { class: 'border-t border-slate-200 bg-amber-50 px-3 py-1.5 text-[11px] leading-snug text-amber-900' },
@@ -1283,10 +2062,14 @@
   }
 
   function fieldRow(config) {
+    /* A hint may be a function when its wording depends on the tax year in
+       force — the SALT cap and the charitable floor differ by year, and a
+       hint quoting last year's figure is worse than none. */
+    var hint = typeof config.hint === 'function' ? config.hint() : config.hint;
     return h('label', { class: 'flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-[5px] last:border-b-0 hover:bg-sky-50/60' },
       h('span', { class: 'min-w-0 flex-1' },
         h('span', { class: 'block truncate text-[12.5px] text-slate-700' }, config.label),
-        config.hint ? h('span', { class: 'block truncate text-[10.5px] text-slate-400' }, config.hint) : null),
+        hint ? h('span', { class: 'block truncate text-[10.5px] text-slate-400', title: hint }, hint) : null),
       h('input', {
         type: 'text', inputmode: 'decimal',
         class: 'input-num w-[140px] shrink-0', style: { width: '140px' },
@@ -1707,7 +2490,7 @@
     {
       title: 'Taxes you paid', citation: 'IRC §164; OBBBA §70120',
       fields: [
-        { key: 'stateLocalIncomeTax', label: 'State & local income tax', hint: 'Subject to the 2026 SALT cap of $40,400, phased down over $505,000 MAGI' },
+        { key: 'stateLocalIncomeTax', label: 'State & local income tax', hint: function () { var p = Engine.paramsFor(projectYear()); return 'Subject to the ' + p.year + ' SALT cap of ' + fmtUSD(p.saltCap.base) + (Number.isFinite(p.saltCap.magiPhaseDownThreshold) ? ', phased down over ' + fmtUSD(p.saltCap.magiPhaseDownThreshold) + ' MAGI' : ' (no phase-down)'); } },
         { key: 'realEstateTax', label: 'Real estate tax', hint: 'Included in the SALT cap' },
         { key: 'personalPropertyTax', label: 'Personal property tax', hint: 'Included in the SALT cap' }
       ]
@@ -1722,7 +2505,7 @@
     {
       title: 'Gifts to charity', citation: 'IRC §170(b); OBBBA 0.5% AGI floor',
       fields: [
-        { key: 'charitableCash', label: 'Cash contributions', hint: '60% of AGI ceiling; 0.5% of AGI floor applies from 2026' },
+        { key: 'charitableCash', label: 'Cash contributions', hint: function () { var p = Engine.paramsFor(projectYear()); return '60% of AGI ceiling' + (p.charitableFloor.agiFloorRate > 0 ? '; ' + (p.charitableFloor.agiFloorRate * 100).toFixed(1) + '% of AGI floor applies for ' + p.year : '; no AGI floor for ' + p.year); } },
         { key: 'charitableNonCash', label: 'Non-cash / appreciated property', hint: '30% of AGI ceiling for appreciated capital gain property' }
       ]
     },
@@ -1789,7 +2572,7 @@
 
   var PAYMENT_FIELDS = [
     { key: 'federalWithholdingOther', label: 'Other federal withholding', hint: 'Withholding not reported on a W-2, 1099-INT/DIV or 1099-R already entered' },
-    { key: 'priorYearOverpayment', label: 'Prior-year overpayment applied', hint: '2025 refund credited forward to 2026' },
+    { key: 'priorYearOverpayment', label: 'Prior-year overpayment applied', hint: function () { return (projectYear() - 1) + ' refund credited forward to ' + projectYear(); } },
     { key: 'extensionPayment', label: 'Extension payment', hint: 'Amount paid with Form 4868' },
     { key: 'refundableCredits', label: 'Other refundable credits', hint: 'Beyond the additional child tax credit computed by the engine' },
     { key: 'priorYearTax', label: 'Prior-year total tax', hint: '2025 Form 1040 line 24 — drives the §6654 safe harbor' },
@@ -1928,7 +2711,7 @@
             }))),
           h('details', { class: 'panel mt-3' },
             h('summary', { class: 'panel-header cursor-pointer list-none' },
-              h('span', {}, '2026 parameter authorities'),
+              h('span', {}, yearMeta().year + ' parameter authorities'),
               h('span', { class: 'font-normal normal-case tracking-normal text-slate-500' }, 'show all')),
             h('ul', { class: 'divide-y divide-slate-100' }, authorities.map(function (entry) {
               return h('li', { class: 'flex items-baseline justify-between gap-3 px-3 py-[4px]' },
@@ -1974,7 +2757,7 @@
       .filter(function (s) { return s !== undefined; })
       .slice(0, 4);
     var comparison = selected.length >= 2 ? Engine.compareScenarios.apply(null, selected) : null;
-    var statuses = selected.map(function (s) { return Engine.computeProjection(s.inputs).status; });
+    var statuses = selected.map(function (s) { return computeInputs(s.inputs).status; });
     var diffs = [];
     if (selected.length >= 2) {
       var summaries = selected.map(function (s) { return inputSummary(s.inputs); });
@@ -2610,7 +3393,8 @@
         state.activeTab === 'coverage' ? renderCoverage() : null),
       renderOverlays(),
       h('footer', { class: 'no-print border-t border-slate-300 bg-white px-4 py-2 text-[11px] text-slate-500' },
-        'Tax year 2026 planning estimates · parameters per Rev. Proc. 2025-32 and P.L. 119-21 (OBBBA) · not a filed return and not tax advice.')
+        'Tax year ' + yearMeta().year + ' planning estimates · ' + yearMeta().basis +
+        ' · not a filed return and not tax advice.')
     ]);
 
     var newDrawerBody = root.querySelector('.drawer-body');
@@ -2632,20 +3416,28 @@
     if (state.openDrawer) setDrawer(null);
   });
 
-  /* ---- host bridge ---------------------------------------------------------
-     The planner is embedded by the Scenarios tab of the main application. The
-     host pushes scenarios in (mapped from its scenario library) and reads the
-     engine-computed results back out; the engine here stays the single source
-     of truth for every number, exactly as it is standalone.
+  /* ---- explicit scenario import --------------------------------------------
+     THE PLANNER IS STANDALONE. It is not driven by, and does not read from,
+     any client profile or host application. It opens on its own project,
+     computes with its own engine, and saves to its own storage, whether it is
+     loaded at /planner/ directly or shown on a tab of a larger application.
+     There is no automatic bridge: nothing pulls a client's return in when the
+     planner opens, and no earlier step is required before it can be used.
 
-     Scenarios the host pushes carry `hostId`. A re-import replaces only those,
-     so anything the user built inside the planner survives untouched.
+     What follows is the OPT-IN path for the one case where an outside
+     scenario should reach the planner — a preparer deliberately choosing to
+     import a return as a starting point. It runs only when something calls
+     `window.TaxPlanner.importScenarios(...)` from this same document; there
+     is no listener, no message channel, and nothing invokes it on load.
+
+     Imported scenarios are tagged with `importedId`. A later import replaces
+     only those, so anything built inside the planner survives untouched.
      ------------------------------------------------------------------------ */
   function scenarioSummary(scenario) {
-    var result = Engine.computeProjection(scenario.inputs);
+    var result = computeInputs(scenario.inputs);
     return {
       id: scenario.id,
-      hostId: scenario.hostId || null,
+      importedId: scenario.hostId || null,
       name: scenario.name,
       description: scenario.description || '',
       isBaseline: !!scenario.isBaseline,
@@ -2668,16 +3460,19 @@
     return state.project.scenarios.map(scenarioSummary);
   }
 
-  /* Replace every previously host-imported scenario with `list`, keeping the
-     planner's own scenarios in place. Returns the resulting summaries. */
-  function importHostScenarios(list, opts) {
+  /* Replace every previously imported scenario with `list`, keeping the
+     planner's own scenarios in place. Returns the resulting summaries.
+
+     Only a deliberate call reaches here — importing a return as a starting
+     point. Nothing invokes it when the planner loads. */
+  function importScenarios(list, opts) {
     opts = opts || {};
-    if (!Array.isArray(list)) throw new Error('importHostScenarios expects an array.');
+    if (!Array.isArray(list)) throw new Error('importScenarios expects an array.');
     var prev = state.project;
     /* On a first import into untouched demo data, the demo scenarios step
-       aside so the tab opens on the host's own scenarios. Once the user has
-       saved or edited anything in the planner, their scenarios are kept and
-       only previously imported ones are refreshed. */
+       aside so the tab opens on what was imported. Once the user has saved or
+       edited anything in the planner, their scenarios are kept and only
+       previously imported ones are refreshed. */
     var native = state.bootedFromDemo
       ? []
       : prev.scenarios.filter(function (s) { return !s.hostId; });
@@ -2699,7 +3494,7 @@
     if (!scenarios.length) return projectSummaries();
 
     /* Keep the active scenario if it survived; otherwise prefer the first
-       import so the planner opens on what the host just sent. */
+       import, so the planner opens on what was just brought in. */
     var activeId = scenarios.some(function (s) { return s.id === prev.activeScenarioId; })
       ? prev.activeScenarioId
       : (imported[0] || scenarios[0]).id;
@@ -2721,49 +3516,28 @@
     return projectSummaries();
   }
 
-  function postToHost(type, payload) {
-    if (window.parent === window) return;
-    try {
-      window.parent.postMessage(Object.assign({ source: 'tax-planner-1040', type: type }, payload || {}), '*');
-    } catch (e) { /* the host may be cross-origin; the direct API still works */ }
-  }
+  /* The planner's own API, for a deliberate import and for tests.
 
-  window.TaxPlannerHost = {
-    version: 1,
-    importScenarios: function (list, opts) {
-      var summaries = importHostScenarios(list, opts);
-      postToHost('summaries', { summaries: summaries });
-      return summaries;
-    },
+     There is deliberately NO postMessage listener here. An earlier version
+     accepted scenarios from any frame that sent a message naming the bridge,
+     which nothing in this application ever did — an unauthenticated way in
+     for a surface with no users. Importing a return is a decision a preparer
+     makes inside the planner, so it is a call made from this document, not a
+     message accepted from another one. */
+  window.TaxPlanner = {
+    version: 2,
+    /* Explicitly import scenarios as a starting point. Never called on load. */
+    importScenarios: importScenarios,
     summaries: projectSummaries,
     setTab: function (tab) {
       if (['planner', 'report', 'scenarios', 'coverage'].indexOf(tab) === -1) return;
       setTab(tab);
     },
     activeTab: function () { return state.activeTab; },
-    scenarioCount: function () { return state.project.scenarios.length; }
+    scenarioCount: function () { return state.project.scenarios.length; },
+    taxYear: function () { return projectYear(); }
   };
-
-  /* Same-origin hosts call window.TaxPlannerHost directly; postMessage is the
-     fallback path and keeps the contract usable if the frame ever moves to a
-     different origin. Only messages that name this bridge are acted on. */
-  window.addEventListener('message', function (e) {
-    var msg = e.data;
-    if (!msg || typeof msg !== 'object' || msg.source !== 'tax-planner-host') return;
-    try {
-      if (msg.type === 'import-scenarios') {
-        postToHost('summaries', { summaries: importHostScenarios(msg.scenarios, msg.options) });
-      } else if (msg.type === 'request-summaries') {
-        postToHost('summaries', { summaries: projectSummaries() });
-      } else if (msg.type === 'set-tab') {
-        window.TaxPlannerHost.setTab(msg.tab);
-      }
-    } catch (err) {
-      postToHost('error', { message: String(err && err.message ? err.message : err) });
-    }
-  });
 
   hydrate();
   render();
-  postToHost('ready', { summaries: projectSummaries() });
 })();

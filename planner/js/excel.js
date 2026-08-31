@@ -102,7 +102,7 @@
     var engine = window.TaxEngine;
     var scenario = project.scenarios.find(function (s) { return s.id === project.activeScenarioId; }) || project.scenarios[0];
     if (!scenario) throw new Error('Project contains no scenarios');
-    var result = engine.computeProjection(scenario.inputs);
+    var result = engine.computeProjection(scenario.inputs, { taxYear: project.taxYear });
     var mods = function (key) {
       var m = result.modules[key];
       return m ? [m] : [];

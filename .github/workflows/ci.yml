@@ -88,6 +88,9 @@ jobs:
           # The 1040 Planner tab (embedded module) and the Settings panel.
           CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
             node tests/ui-scenarios-planner.mjs
+          # The planner's scenario matrix and its multi-year engine.
+          CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
+            node tests/ui-planner-matrix.mjs
           CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
             node tests/ui-settings.mjs
 

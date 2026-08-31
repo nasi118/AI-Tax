@@ -1,8 +1,13 @@
 /* =========================================================================
-   Tax Planner — Individual 1040 (TY2026) · calculation engine
+   Tax Planner — Individual 1040 (TY2024–TY2028) · calculation engine
    Faithful port of the reference planner engine: all math runs on
    decimal.js (precision 40, ROUND_HALF_UP) and every computed line carries
    its controlling authority and a completeness status.
+
+   Parameters are versioned by tax year (see PARAM_SETS below). A projection
+   is computed wholly within one year's law, and a year with no published
+   inflation adjustment is derived and flagged 'projected', never copied
+   from another year and presented as authority.
    Exposed as window.TaxEngine.
    ========================================================================= */
 (function () {
@@ -22,10 +27,205 @@
     return obj;
   }
 
+  /* =======================================================================
+     TAX-YEAR PARAMETER SETS
+
+     Every rate, bracket, threshold and limit the engine uses is versioned by
+     tax year. A projection computes against the set for its project's tax
+     year and nothing else — no figure is ever carried silently from one year
+     into another.
+
+     Each set declares its own provenance:
+
+       'authoritative' — the amounts are published law for that year
+                         (a Revenue Procedure, the statute, or an SSA
+                         determination), and are cited in `basis`.
+       'projected'     — the year has no published inflation adjustment yet.
+                         The set is DERIVED, by indexing the last
+                         authoritative year at a stated assumption, and every
+                         surface that shows it must say so. These are
+                         planning estimates, not law.
+
+     A year is never approximated by reusing another year's numbers: a
+     projected set is built by `projectParams`, which indexes each
+     inflation-adjusted amount, leaves statutory (non-indexed) amounts alone,
+     and records the assumption it used.
+     ======================================================================= */
+
   var NIIT_THRESHOLD = { single: 200000, mfj: 250000, mfs: 125000, hoh: 200000, qss: 250000 };
 
-  var PARAMS = deepFreeze({
+  /* Rates and statutory amounts that do not change from year to year. Held
+     once so a new year cannot accidentally disagree with the others. */
+  var FIXED_RATES = {
+    niitThreshold: NIIT_THRESHOLD,
+    additionalMedicare: { threshold: Object.assign({}, NIIT_THRESHOLD), rate: 0.009 },
+    ssRateSE: 0.124,
+    ssRateEmployee: 0.062,
+    medicareRateSE: 0.029,
+    medicareRateEmployee: 0.0145,
+    seNetEarningsFactor: 0.9235,
+    seTaxDeductionRate: 0.5,
+    niitRate: 0.038,
+    capitalLossLimit: { single: 3000, mfj: 3000, mfs: 1500, hoh: 3000, qss: 3000 },
+    socialSecurityTaxability: {
+      baseAmount: { single: 25000, mfj: 32000, mfs: 0, hoh: 25000, qss: 32000 },
+      secondTier: { single: 34000, mfj: 44000, mfs: 0, hoh: 34000, qss: 44000 },
+      firstTierRate: 0.5,
+      secondTierRate: 0.85
+    },
+    estimatedTaxSafeHarbor: {
+      currentYearRate: 0.9,
+      priorYearRate: 0.1,
+      priorYearRateHighIncome: 1.1,
+      highIncomeAgiThreshold: { single: 150000, mfj: 150000, mfs: 75000, hoh: 150000, qss: 150000 }
+    }
+  };
+
+  /* ---- TY2024 — published, pre-OBBBA ------------------------------------ */
+  var PARAMS_2024 = deepFreeze(Object.assign({}, FIXED_RATES, {
+    year: 2024,
+    provenance: 'authoritative',
+    basis: 'Rev. Proc. 2023-34; SSA 2024 wage base; IRC as in effect for 2024 (pre-OBBBA)',
+    ordinaryBrackets: {
+      single: [
+        { rate: 0.10, upTo: 11600 }, { rate: 0.12, upTo: 47150 }, { rate: 0.22, upTo: 100525 },
+        { rate: 0.24, upTo: 191950 }, { rate: 0.32, upTo: 243725 }, { rate: 0.35, upTo: 609350 },
+        { rate: 0.37, upTo: Infinity }],
+      mfj: [
+        { rate: 0.10, upTo: 23200 }, { rate: 0.12, upTo: 94300 }, { rate: 0.22, upTo: 201050 },
+        { rate: 0.24, upTo: 383900 }, { rate: 0.32, upTo: 487450 }, { rate: 0.35, upTo: 731200 },
+        { rate: 0.37, upTo: Infinity }],
+      mfs: [
+        { rate: 0.10, upTo: 11600 }, { rate: 0.12, upTo: 47150 }, { rate: 0.22, upTo: 100525 },
+        { rate: 0.24, upTo: 191950 }, { rate: 0.32, upTo: 243725 }, { rate: 0.35, upTo: 365600 },
+        { rate: 0.37, upTo: Infinity }],
+      hoh: [
+        { rate: 0.10, upTo: 16550 }, { rate: 0.12, upTo: 63100 }, { rate: 0.22, upTo: 100500 },
+        { rate: 0.24, upTo: 191950 }, { rate: 0.32, upTo: 243700 }, { rate: 0.35, upTo: 609350 },
+        { rate: 0.37, upTo: Infinity }],
+      qss: [
+        { rate: 0.10, upTo: 23200 }, { rate: 0.12, upTo: 94300 }, { rate: 0.22, upTo: 201050 },
+        { rate: 0.24, upTo: 383900 }, { rate: 0.32, upTo: 487450 }, { rate: 0.35, upTo: 731200 },
+        { rate: 0.37, upTo: Infinity }]
+    },
+    standardDeduction: { single: 14600, mfj: 29200, mfs: 14600, hoh: 21900, qss: 29200 },
+    additionalStandardDeductionAged: { single: 1950, mfj: 1550, mfs: 1550, hoh: 1950, qss: 1550 },
+    /* The §70103 senior deduction did not exist before 2025. */
+    seniorBonusDeduction: {
+      amount: 0, phaseoutRate: 0,
+      magiThreshold: { single: 0, mfj: 0, mfs: 0, hoh: 0, qss: 0 }
+    },
+    capitalGainsBrackets: {
+      single: { zeroUpTo: 47025, fifteenUpTo: 518900 },
+      mfj: { zeroUpTo: 94050, fifteenUpTo: 583750 },
+      mfs: { zeroUpTo: 47025, fifteenUpTo: 291850 },
+      hoh: { zeroUpTo: 63000, fifteenUpTo: 551350 },
+      qss: { zeroUpTo: 94050, fifteenUpTo: 583750 }
+    },
+    socialSecurityWageBase: 168600,
+    qbi: {
+      deductionRate: 0.2,
+      threshold: { single: 191950, mfj: 383900, mfs: 191950, hoh: 191950, qss: 383900 },
+      /* Pre-OBBBA phase-in range: $50,000 / $100,000. */
+      phaseInRange: { single: 50000, mfj: 100000, mfs: 50000, hoh: 50000, qss: 100000 },
+      minimumDeduction: 0,
+      minimumDeductionQbiFloor: Infinity
+    },
+    /* TCJA flat cap, no phase-down. */
+    saltCap: { base: 10000, magiPhaseDownThreshold: Infinity, phaseDownRate: 0, floor: 10000 },
+    amt: {
+      exemption: { single: 85700, mfj: 133300, mfs: 66650, hoh: 85700, qss: 133300 },
+      phaseoutThreshold: { single: 609350, mfj: 1218700, mfs: 609350, hoh: 609350, qss: 1218700 },
+      phaseoutRate: 0.25, rateLow: 0.26, rateHigh: 0.28, rateBreakpoint: 232600
+    },
+    /* No 0.5% AGI floor before 2026. */
+    charitableFloor: { agiFloorRate: 0, cashCeilingRate: 0.6, nonCashCeilingRate: 0.3 },
+    /* Pease was suspended through 2025; the OBBBA 2/37 haircut starts in 2026. */
+    itemizedDeductionLimitation: { haircutNumerator: 0, haircutDenominator: 1 },
+    childTaxCredit: {
+      perChildUnder17: 2000,
+      refundablePerChild: 1700,
+      otherDependentCredit: 500,
+      phaseoutThreshold: { single: 200000, mfj: 400000, mfs: 200000, hoh: 200000, qss: 400000 },
+      phaseoutRatePer1000: 50
+    },
+    contributionLimits: { traditionalIra: 7000, sepIra: 69000, solo401k: 69000, hsaFamily: 8300 }
+  }));
+
+  /* ---- TY2025 — published, first OBBBA year ----------------------------- */
+  var PARAMS_2025 = deepFreeze(Object.assign({}, FIXED_RATES, {
+    year: 2025,
+    provenance: 'authoritative',
+    basis: 'Rev. Proc. 2024-40 as amended by OBBBA P.L. 119-21; SSA 2025 wage base',
+    ordinaryBrackets: {
+      single: [
+        { rate: 0.10, upTo: 11925 }, { rate: 0.12, upTo: 48475 }, { rate: 0.22, upTo: 103350 },
+        { rate: 0.24, upTo: 197300 }, { rate: 0.32, upTo: 250525 }, { rate: 0.35, upTo: 626350 },
+        { rate: 0.37, upTo: Infinity }],
+      mfj: [
+        { rate: 0.10, upTo: 23850 }, { rate: 0.12, upTo: 96950 }, { rate: 0.22, upTo: 206700 },
+        { rate: 0.24, upTo: 394600 }, { rate: 0.32, upTo: 501050 }, { rate: 0.35, upTo: 751600 },
+        { rate: 0.37, upTo: Infinity }],
+      mfs: [
+        { rate: 0.10, upTo: 11925 }, { rate: 0.12, upTo: 48475 }, { rate: 0.22, upTo: 103350 },
+        { rate: 0.24, upTo: 197300 }, { rate: 0.32, upTo: 250525 }, { rate: 0.35, upTo: 375800 },
+        { rate: 0.37, upTo: Infinity }],
+      hoh: [
+        { rate: 0.10, upTo: 17000 }, { rate: 0.12, upTo: 64850 }, { rate: 0.22, upTo: 103350 },
+        { rate: 0.24, upTo: 197300 }, { rate: 0.32, upTo: 250500 }, { rate: 0.35, upTo: 626350 },
+        { rate: 0.37, upTo: Infinity }],
+      qss: [
+        { rate: 0.10, upTo: 23850 }, { rate: 0.12, upTo: 96950 }, { rate: 0.22, upTo: 206700 },
+        { rate: 0.24, upTo: 394600 }, { rate: 0.32, upTo: 501050 }, { rate: 0.35, upTo: 751600 },
+        { rate: 0.37, upTo: Infinity }]
+    },
+    /* Raised by OBBBA §70102 above the Rev. Proc. 2024-40 amounts. */
+    standardDeduction: { single: 15750, mfj: 31500, mfs: 15750, hoh: 23625, qss: 31500 },
+    additionalStandardDeductionAged: { single: 2000, mfj: 1600, mfs: 1600, hoh: 2000, qss: 1600 },
+    seniorBonusDeduction: {
+      amount: 6000,
+      phaseoutRate: 0.06,
+      magiThreshold: { single: 75000, mfj: 150000, mfs: 75000, hoh: 75000, qss: 150000 }
+    },
+    capitalGainsBrackets: {
+      single: { zeroUpTo: 48350, fifteenUpTo: 533400 },
+      mfj: { zeroUpTo: 96700, fifteenUpTo: 600050 },
+      mfs: { zeroUpTo: 48350, fifteenUpTo: 300000 },
+      hoh: { zeroUpTo: 64750, fifteenUpTo: 566700 },
+      qss: { zeroUpTo: 96700, fifteenUpTo: 600050 }
+    },
+    socialSecurityWageBase: 176100,
+    qbi: {
+      deductionRate: 0.2,
+      threshold: { single: 197300, mfj: 394600, mfs: 197300, hoh: 197300, qss: 394600 },
+      /* The widened §70105 phase-in range applies to years after 2025. */
+      phaseInRange: { single: 50000, mfj: 100000, mfs: 50000, hoh: 50000, qss: 100000 },
+      minimumDeduction: 0,
+      minimumDeductionQbiFloor: Infinity
+    },
+    saltCap: { base: 40000, magiPhaseDownThreshold: 500000, phaseDownRate: 0.3, floor: 10000 },
+    amt: {
+      exemption: { single: 88100, mfj: 137000, mfs: 68500, hoh: 88100, qss: 137000 },
+      phaseoutThreshold: { single: 626350, mfj: 1252700, mfs: 626350, hoh: 626350, qss: 1252700 },
+      phaseoutRate: 0.25, rateLow: 0.26, rateHigh: 0.28, rateBreakpoint: 239100
+    },
+    charitableFloor: { agiFloorRate: 0, cashCeilingRate: 0.6, nonCashCeilingRate: 0.3 },
+    itemizedDeductionLimitation: { haircutNumerator: 0, haircutDenominator: 1 },
+    childTaxCredit: {
+      perChildUnder17: 2200,
+      refundablePerChild: 1700,
+      otherDependentCredit: 500,
+      phaseoutThreshold: { single: 200000, mfj: 400000, mfs: 200000, hoh: 200000, qss: 400000 },
+      phaseoutRatePer1000: 50
+    },
+    contributionLimits: { traditionalIra: 7000, sepIra: 70000, solo401k: 70000, hsaFamily: 8550 }
+  }));
+
+  /* ---- TY2026 — published, current planning year ------------------------ */
+  var PARAMS_2026 = deepFreeze(Object.assign({}, FIXED_RATES, {
     year: 2026,
+    provenance: 'authoritative',
+    basis: 'Rev. Proc. 2025-32; OBBBA P.L. 119-21; SSA 2026 wage base determination',
     ordinaryBrackets: {
       single: [
         { rate: 0.10, upTo: 12400 }, { rate: 0.12, upTo: 50400 }, { rate: 0.22, upTo: 105700 },
@@ -62,15 +262,7 @@
       hoh: { zeroUpTo: 66200, fifteenUpTo: 579600 },
       qss: { zeroUpTo: 98900, fifteenUpTo: 613700 }
     },
-    niitThreshold: NIIT_THRESHOLD,
-    additionalMedicare: { threshold: Object.assign({}, NIIT_THRESHOLD), rate: 0.009 },
     socialSecurityWageBase: 184500,
-    ssRateSE: 0.124,
-    ssRateEmployee: 0.062,
-    medicareRateSE: 0.029,
-    medicareRateEmployee: 0.0145,
-    seNetEarningsFactor: 0.9235,
-    seTaxDeductionRate: 0.5,
     qbi: {
       deductionRate: 0.2,
       threshold: { single: 201775, mfj: 403550, mfs: 201775, hoh: 201775, qss: 403550 },
@@ -89,28 +281,157 @@
     },
     charitableFloor: { agiFloorRate: 0.005, cashCeilingRate: 0.6, nonCashCeilingRate: 0.3 },
     itemizedDeductionLimitation: { haircutNumerator: 2, haircutDenominator: 37 },
-    estimatedTaxSafeHarbor: {
-      currentYearRate: 0.9,
-      priorYearRate: 0.1,
-      priorYearRateHighIncome: 1.1,
-      highIncomeAgiThreshold: { single: 150000, mfj: 150000, mfs: 75000, hoh: 150000, qss: 150000 }
-    },
-    niitRate: 0.038,
-    capitalLossLimit: { single: 3000, mfj: 3000, mfs: 1500, hoh: 3000, qss: 3000 },
-    socialSecurityTaxability: {
-      baseAmount: { single: 25000, mfj: 32000, mfs: 0, hoh: 25000, qss: 32000 },
-      secondTier: { single: 34000, mfj: 44000, mfs: 0, hoh: 34000, qss: 44000 },
-      firstTierRate: 0.5,
-      secondTierRate: 0.85
-    },
     childTaxCredit: {
       perChildUnder17: 2200,
       refundablePerChild: 1700,
       otherDependentCredit: 500,
       phaseoutThreshold: { single: 200000, mfj: 400000, mfs: 200000, hoh: 200000, qss: 400000 },
       phaseoutRatePer1000: 50
+    },
+    contributionLimits: { traditionalIra: 8000, sepIra: 72000, solo401k: 78000, hsaFamily: 8750 }
+  }));
+
+  /* ---- projected years ---------------------------------------------------
+     TY2027 and TY2028 have no published inflation adjustment. Their sets are
+     DERIVED from the last authoritative year rather than copied from it:
+     every amount §1(f) indexes is raised by the assumed chained-CPI factor
+     and rounded on its own statutory increment; every amount fixed by statute
+     is carried across unchanged; and amounts Congress has already legislated
+     for those years (the §70120 SALT cap, which steps 1% a year) are set from
+     the statute, not from the index.
+
+     The result is a planning estimate. `provenance: 'projected'` travels with
+     the set, and the interface labels every figure computed from it. -------- */
+  var PROJECTION_ASSUMPTION = {
+    /* Chained CPI-U assumption used to index 2027 and 2028 off the published
+       2026 amounts. Deliberately conservative and stated openly: the actual
+       adjustment is published each autumn in a Revenue Procedure. */
+    annualIndexRate: 0.022
+  };
+
+  function roundTo(value, step) {
+    if (!Number.isFinite(value)) return value;
+    if (value === 0) return 0;
+    return Math.round(value / step) * step;
+  }
+
+  function indexByStatus(table, factor, step) {
+    var out = {};
+    for (var k of Object.keys(table)) out[k] = roundTo(table[k] * factor, step);
+    return out;
+  }
+
+  function indexBrackets(brackets, factor, step) {
+    var out = {};
+    for (var fs of Object.keys(brackets)) {
+      out[fs] = brackets[fs].map(function (b) {
+        return { rate: b.rate, upTo: Number.isFinite(b.upTo) ? roundTo(b.upTo * factor, step) : b.upTo };
+      });
     }
+    return out;
+  }
+
+  /* Build the parameter set for a year with no published adjustment.
+     `years` is how many years of indexing separate it from `base`. */
+  function projectParams(base, year, years, statutory) {
+    var factor = Math.pow(1 + PROJECTION_ASSUMPTION.annualIndexRate, years);
+    var cgb = {};
+    for (var fs of Object.keys(base.capitalGainsBrackets)) {
+      cgb[fs] = {
+        zeroUpTo: roundTo(base.capitalGainsBrackets[fs].zeroUpTo * factor, 50),
+        fifteenUpTo: roundTo(base.capitalGainsBrackets[fs].fifteenUpTo * factor, 50)
+      };
+    }
+    return deepFreeze(Object.assign({}, base, {
+      year: year,
+      provenance: 'projected',
+      basis: 'Projected — ' + base.year + ' published amounts indexed ' + years + ' year' +
+        (years === 1 ? '' : 's') + ' at an assumed ' +
+        (PROJECTION_ASSUMPTION.annualIndexRate * 100).toFixed(1) +
+        '% chained CPI-U. Statutory amounts and the §70120 SALT schedule are applied as enacted. ' +
+        'Not an IRS-published inflation adjustment.',
+      projectedFrom: base.year,
+      indexRate: PROJECTION_ASSUMPTION.annualIndexRate,
+
+      /* §1(f) indexed */
+      ordinaryBrackets: indexBrackets(base.ordinaryBrackets, factor, 50),
+      standardDeduction: indexByStatus(base.standardDeduction, factor, 50),
+      additionalStandardDeductionAged: indexByStatus(base.additionalStandardDeductionAged, factor, 50),
+      capitalGainsBrackets: cgb,
+      /* SSA rounds the wage base to the next lower multiple of $300. */
+      socialSecurityWageBase: Math.floor(base.socialSecurityWageBase * factor / 300) * 300,
+      qbi: Object.assign({}, base.qbi, {
+        /* §199A(e)(2) indexes the threshold; the phase-in range above it is
+           fixed by §70105 and is not indexed. */
+        threshold: indexByStatus(base.qbi.threshold, factor, 50)
+      }),
+      amt: Object.assign({}, base.amt, {
+        exemption: indexByStatus(base.amt.exemption, factor, 100),
+        phaseoutThreshold: indexByStatus(base.amt.phaseoutThreshold, factor, 100),
+        rateBreakpoint: roundTo(base.amt.rateBreakpoint * factor, 100)
+      }),
+      childTaxCredit: Object.assign({}, base.childTaxCredit, {
+        /* §24(h)(7) indexes the credit and its refundable portion; the
+           phase-out thresholds are fixed in statute and are not indexed. */
+        perChildUnder17: roundTo(base.childTaxCredit.perChildUnder17 * factor, 50),
+        refundablePerChild: roundTo(base.childTaxCredit.refundablePerChild * factor, 100)
+      }),
+      contributionLimits: {
+        traditionalIra: roundTo(base.contributionLimits.traditionalIra * factor, 500),
+        sepIra: roundTo(base.contributionLimits.sepIra * factor, 1000),
+        solo401k: roundTo(base.contributionLimits.solo401k * factor, 1000),
+        hsaFamily: roundTo(base.contributionLimits.hsaFamily * factor, 50)
+      }
+    }, statutory || {}));
+  }
+
+  /* OBBBA §70120 raises the SALT cap and its phase-down threshold by 1% a
+     year through 2029. That is enacted law for 2027 and 2028, so it is set
+     from the statute rather than indexed with everything else. */
+  function saltSchedule(base, years) {
+    var step = Math.pow(1.01, years);
+    return {
+      saltCap: {
+        base: Math.round(base.saltCap.base * step),
+        magiPhaseDownThreshold: Math.round(base.saltCap.magiPhaseDownThreshold * step),
+        phaseDownRate: base.saltCap.phaseDownRate,
+        floor: base.saltCap.floor
+      }
+    };
+  }
+
+  var PARAMS_2027 = projectParams(PARAMS_2026, 2027, 1, saltSchedule(PARAMS_2026, 1));
+  var PARAMS_2028 = projectParams(PARAMS_2026, 2028, 2, saltSchedule(PARAMS_2026, 2));
+
+  var PARAM_SETS = deepFreeze({
+    2024: PARAMS_2024,
+    2025: PARAMS_2025,
+    2026: PARAMS_2026,
+    2027: PARAMS_2027,
+    2028: PARAMS_2028
   });
+
+  var SUPPORTED_YEARS = deepFreeze([2024, 2025, 2026, 2027, 2028]);
+  var DEFAULT_YEAR = 2026;
+
+  function isSupportedYear(year) {
+    return Object.prototype.hasOwnProperty.call(PARAM_SETS, String(year));
+  }
+
+  /* The parameter set for a year. An unsupported year falls back to the
+     default rather than computing against nothing — but it never silently
+     borrows another year's label: the set returned always carries its own
+     `year`, so a caller can see which year actually drove the figures. */
+  function paramsFor(year) {
+    return PARAM_SETS[year] || PARAM_SETS[DEFAULT_YEAR];
+  }
+
+  /* The active parameter set. Module computations read `PARAMS` and
+     `CONTRIBUTION_LIMITS` directly; computeProjection swaps both to the set
+     for the projection's tax year and restores them when it returns, so a
+     projection is always computed wholly within one year's law. */
+  var PARAMS = PARAMS_2026;
+  var CONTRIBUTION_LIMITS = PARAMS_2026.contributionLimits;
 
   var PARAM_AUTHORITIES = deepFreeze({
     ordinaryBrackets: 'Rev. Proc. 2025-32 §2.01 (IRC §1(j))',
@@ -224,7 +545,6 @@
   var MODULE_ORDER = [MOD_WAGES, MOD_INTDIV, MOD_BUSINESS, MOD_RENTAL, MOD_OTHER, MOD_SE,
     MOD_PLANNING, MOD_DEDUCTIONS, 'qbi', MOD_TAXCOMP, MOD_ADDL, MOD_PAYMENTS];
 
-  var CONTRIBUTION_LIMITS = { traditionalIra: 8000, sepIra: 72000, solo401k: 78000, hsaFamily: 8750 };
 
   function errorModule(moduleKey, label, err) {
     var text = err instanceof Error ? err.message : String(err);
@@ -919,7 +1239,9 @@
   }
 
   /* ---- top-level projection --------------------------------------------- */
-  function computeProjection(inputs) {
+  /* The body of a projection. Runs entirely against whatever parameter set
+     is active — computeProjection below is what decides which year that is. */
+  function computeWithActiveParams(inputs) {
     var modules = {};
     var fs = inputs.profile.filingStatus;
     var allMessages = [];
@@ -1101,6 +1423,12 @@
     }));
 
     return {
+      /* The year whose law actually produced these figures, and whether that
+         year's parameters are published or projected. Every surface that
+         shows a number from this result can say which it is. */
+      taxYear: PARAMS.year,
+      paramProvenance: PARAMS.provenance,
+      paramBasis: PARAMS.basis,
       modules: modules,
       moduleOrder: MODULE_ORDER,
       totalIncome: totalIncome,
@@ -1130,6 +1458,31 @@
     };
   }
 
+  /* Compute a projection for one tax year.
+
+     The year comes from `inputs.taxYear` when the caller set one, otherwise
+     from `opts.taxYear` (how the project's year reaches a scenario), and
+     falls back to the default planning year. The matching parameter set is
+     made active for the duration of the call and restored afterwards, so a
+     projection is computed wholly within one year's law and never mixes two.
+     The computation is synchronous, so the swap cannot interleave. */
+  function computeProjection(inputs, opts) {
+    opts = opts || {};
+    var year = inputs && inputs.taxYear != null ? inputs.taxYear
+      : (opts.taxYear != null ? opts.taxYear : DEFAULT_YEAR);
+    var active = paramsFor(year);
+    var prevParams = PARAMS;
+    var prevLimits = CONTRIBUTION_LIMITS;
+    PARAMS = active;
+    CONTRIBUTION_LIMITS = active.contributionLimits;
+    try {
+      return computeWithActiveParams(inputs);
+    } finally {
+      PARAMS = prevParams;
+      CONTRIBUTION_LIMITS = prevLimits;
+    }
+  }
+
   /* ---- scenarios --------------------------------------------------------- */
   function makeId(prefix) {
     return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -1146,9 +1499,10 @@
       createdAt: now,
       updatedAt: now,
       isBaseline: opts.isBaseline != null && opts.isBaseline,
-      /* Set when the host application (the Scenarios tab) pushed this scenario
-         in from its library. Scenarios created inside the planner leave it
-         null, which is what keeps a host re-import from touching them. */
+      /* Set only when a scenario was deliberately imported into the planner
+         from outside it. Scenarios created inside the planner leave it null,
+         which is what keeps a later import from touching them. Nothing sets
+         this automatically: the planner does not read any client profile. */
       hostId: opts.hostId != null ? String(opts.hostId) : null
     };
   }
@@ -1164,7 +1518,8 @@
       createdAt: now,
       updatedAt: now,
       isBaseline: false,
-      /* A duplicate is the user's own working copy, never a host mirror. */
+      /* A duplicate is the user's own working copy, never a mirror of
+         anything imported. */
       hostId: null
     };
   }
@@ -1360,17 +1715,27 @@
     });
   }
 
+  /* A project opens with three columns: the client's current facts, and two
+     scenarios to plan against them. All three start from the same facts —
+     a comparison is only meaningful once every column shares a starting
+     point — and the first is the declared baseline the others are measured
+     against. Two empty columns waiting to be changed is the working state a
+     preparer actually starts from; one column is not a comparison. */
   function createDemoProject() {
     var now = new Date().toISOString();
-    var scenario = demoScenario();
+    var base = demoScenario();
+    base.name = 'Current / Base';
+    base.isBaseline = true;
+    var one = duplicateScenario(base, { name: 'Scenario 1', description: '' });
+    var two = duplicateScenario(base, { name: 'Scenario 2', description: '' });
     return {
       version: 2,
       name: 'Demo HNW Tax Plan',
       client: 'Demo Client',
       preparedBy: 'Demo Preparer',
-      taxYear: 2026,
-      scenarios: [scenario],
-      activeScenarioId: scenario.id,
+      taxYear: DEFAULT_YEAR,
+      scenarios: [base, one, two],
+      activeScenarioId: base.id,
       notes: 'Illustrative demo data for the tax planning engine.',
       createdAt: now,
       updatedAt: now
@@ -1507,9 +1872,16 @@
     var activeId = typeof migrated.activeScenarioId === 'string' &&
       scenarios.some(function (s) { return s.id === migrated.activeScenarioId; })
       ? migrated.activeScenarioId : first.id;
-    var taxYear = migrated.taxYear != null ? migrated.taxYear : 2026;
+    var taxYear = migrated.taxYear != null ? migrated.taxYear : DEFAULT_YEAR;
     if (typeof taxYear !== 'number' || Number.isNaN(taxYear)) {
       throw ProjectValidationError('Expected numeric field "taxYear".');
+    }
+    /* A year the engine has no parameter set for cannot be computed, and
+       quietly falling back to another year's law would misstate every figure
+       in the project. Reject it and say which years are supported. */
+    if (!isSupportedYear(taxYear)) {
+      throw ProjectValidationError('Tax year ' + taxYear + ' is not supported. Supported years: ' +
+        SUPPORTED_YEARS.join(', ') + '.');
     }
     return {
       version: 2,
@@ -1526,10 +1898,20 @@
   }
 
   window.TaxEngine = {
-    PARAMS: PARAMS,
+    /* The default planning year's parameters. Prefer paramsFor(year) — this
+       stays exported so callers written against the single-year engine keep
+       working, and it is always the DEFAULT_YEAR set, never whichever year a
+       projection last ran. */
+    PARAMS: PARAMS_2026,
+    PARAM_SETS: PARAM_SETS,
     PARAM_AUTHORITIES: PARAM_AUTHORITIES,
+    PROJECTION_ASSUMPTION: PROJECTION_ASSUMPTION,
+    SUPPORTED_YEARS: SUPPORTED_YEARS,
+    DEFAULT_YEAR: DEFAULT_YEAR,
+    isSupportedYear: isSupportedYear,
+    paramsFor: paramsFor,
     COVERAGE: COVERAGE,
-    CONTRIBUTION_LIMITS: CONTRIBUTION_LIMITS,
+    CONTRIBUTION_LIMITS: PARAMS_2026.contributionLimits,
     computeProjection: computeProjection,
     createScenario: createScenario,
     duplicateScenario: duplicateScenario,
@@ -1537,7 +1919,7 @@
     createDemoProject: createDemoProject,
     emptyInputs: emptyInputs,
     /* Validate/normalize a raw inputs object (fills defaults, rejects junk).
-       Used by the host bridge to accept scenarios pushed in from outside. */
+       Used when a scenario is deliberately imported from outside. */
     parseInputs: normalizeInputs,
     serializeProject: serializeProject,
     parseProject: parseProject,

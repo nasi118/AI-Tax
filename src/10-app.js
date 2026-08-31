@@ -457,7 +457,7 @@ const TABS = [{
   id: "planner",
   label: "1040 Planner (TY2026)",
   icon: I.file,
-  blurb: "The self-contained 1040 Planner module — its own Form 1040 build-up, its own TY2026 engine, its own saved projects. Independent of the workbench engine that drives every other tab."
+  blurb: "The self-contained 1040 Planner module — its own Form 1040 build-up, its own multi-year engine (TY2024–TY2028, default TY2026) and its own saved projects. Standalone: it reads no client profile, and it is independent of the workbench engine that drives every other tab."
 }, {
   id: "se",
   label: "SE & Retirement",
