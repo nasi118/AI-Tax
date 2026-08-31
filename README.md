@@ -106,8 +106,9 @@ npm run build:standalone       # writes dist/tax-advisory-pro.html
 The 1040 Planner module is **not** included in that file. It is a separate
 document with its own engine and vendored libraries, and inlining it would add
 well over a megabyte to a file meant to be emailed. Opened from `file://`, the
-Scenarios tab says so plainly instead of showing a frame that cannot load;
-every other tab behaves exactly as it does in the hosted app.
+1040 Planner tab says so plainly instead of showing a frame that cannot load;
+every other tab — the Scenarios ledger included — behaves exactly as it does
+in the hosted app.
 
 ### Project layout
 
@@ -130,27 +131,25 @@ src/                Application code (plain JS, React.createElement — no JSX b
   07-analysis.js      Analysis views
   08-pages.js         Page components
   09-reference.js     Reference/guide pages
-  27-scenarios-planner.js  Scenarios tab — mounts the 1040 Planner module
+  27-scenarios-planner.js  The 1040 Planner tab — mounts the embedded module
   28-settings.js      Application settings (behaviour, not presentation)
   10-app.js           App shell component + mount
-  archive/            Retained but NOT loaded — see below
 planner/            Self-contained 1040 Planner (TY2026) module: its own UI,
-                    engine and vendored libraries. Runs embedded in the
-                    Scenarios tab and standalone at /planner/
+                    engine and vendored libraries. Runs on its own tab and
+                    standalone at /planner/
 api/                Vercel serverless AI routes (Anthropic Claude proxy)
 tools/              Build script for the standalone single-file version
 ```
 
-**`src/archive/`** holds code kept for reference and deliberately left out of
-the running app — `index.html` does not load it. It currently contains
-`08a-scenarios-ledger.js`, the line-by-line scenario comparison ledger that
-was the Scenarios tab before the 1040 Planner module replaced it, together
-with its editors, drill-downs and strategy library. The matching acceptance
-suites are in `tests/archive/`, with a README on re-linking them.
-
-The Scenarios tab is deliberately **unlinked** from the workbench's
-calculation pipeline: the planner computes with its own engine, the workbench
-engine drives every other tab, and the two never mix.
+**Two independent engines, never mixed.** The **Scenarios** tab keeps the
+line-by-line comparison ledger, its row editors and the strategy library, all
+computed by the workbench engine (`src/02-engine.js` / `src/03-scenario.js`)
+that also drives the Dashboard, the SE / MAGI / QBI / SEHI modules, Report and
+Audit. The **1040 Planner (TY2026)** tab hosts a separate module with its own
+TY2026 engine and its own saved projects, and is deliberately **unlinked**
+from that pipeline — nothing passes workbench scenarios into it and nothing it
+computes flows back out. A figure on screen is never half from one engine and
+half from the other.
 
 The `src/` files were authored as one script and share the global scope —
 `index.html` loads them in their original order, which must be preserved.

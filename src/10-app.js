@@ -454,6 +454,11 @@ const TABS = [{
   icon: I.layers,
   blurb: "Build and compare scenarios line by line. Click a highlighted row to open that schedule."
 }, {
+  id: "planner",
+  label: "1040 Planner (TY2026)",
+  icon: I.file,
+  blurb: "The self-contained 1040 Planner module — its own Form 1040 build-up, its own TY2026 engine, its own saved projects. Independent of the workbench engine that drives every other tab."
+}, {
   id: "se",
   label: "SE & Retirement",
   icon: I.briefcase,
@@ -510,7 +515,7 @@ const TABS = [{
 const NAV_GROUPS = [{
   key: "planning",
   label: "Planning",
-  ids: ["dashboard", "clients", "scenarios", "ai", "guide", "report"]
+  ids: ["dashboard", "clients", "scenarios", "planner", "ai", "guide", "report"]
 }, {
   key: "calc",
   label: "Calculations",
@@ -990,6 +995,44 @@ function App() {
     });
     setScenarios(sc => [...sc, c]);
   };
+  /* "Add Scenario" (Planning Scenarios menu): clone the given source scenario
+     (defaults to the currently active one) into a new, independent planning
+     scenario. Reuses the same deepClone + setScenarios + audit-log path as
+     every other scenario-creating action — there is no separate store. */
+  const addPlanningScenario = sourceId => {
+    const src = scenarios.find(s => s.id === sourceId) || active || scenarios[0];
+    const c = deepClone(src, src.name + " — planning copy");
+    logEvent({
+      label: "Planning scenario added",
+      kind: "structure",
+      scenarioName: c.name,
+      from: src.name,
+      to: c.name
+    });
+    setScenarios(sc => [...sc, c]);
+    return c.id;
+  };
+  /* Strategy Scenario Library "Model scenario": clone the active scenario,
+     apply the strategy's real input changes (STRATEGY_LIBRARY in
+     08-pages.js), and add the result to the scenario list. Same
+     deepClone + setScenarios + audit-log path as every other scenario —
+     the baseline scenario object is never touched. */
+  const modelStrategy = (strategyKey, amount) => {
+    const strategy = STRATEGY_LIBRARY.find(x => x.key === strategyKey);
+    if (!strategy) return null;
+    const src = active || scenarios[0];
+    const c = deepClone(src, src.name + " + " + strategy.title);
+    const modeled = strategy.apply(c, amount, { status, year });
+    logEvent({
+      label: "Strategy modeled: " + strategy.title,
+      kind: "structure",
+      scenarioName: modeled.name,
+      from: src.name,
+      to: modeled.name
+    });
+    setScenarios(sc => [...sc, modeled]);
+    return modeled.id;
+  };
   const duplicate = id => {
     const src = scenarios.find(s => s.id === id);
     const c = deepClone(src);
@@ -1270,7 +1313,7 @@ function App() {
       /* ---------------- Main working area ---------------- */
       /* The planner is a full-bleed embedded document, so the padded,
          max-width content wrapper collapses for it. */
-      EL("main", { className: "tp-main" + (tab === "scenarios" ? " bleed" : "") },
+      EL("main", { className: "tp-main" + (tab === "planner" ? " bleed" : "") },
         EL("div", { className: "tp-topbar" },
           EL("div", null, EL("h2", null, t.label), EL("p", null, t.blurb)),
           EL("div", { className: "tp-topbar-controls" },
@@ -1417,11 +1460,22 @@ function App() {
           onBuildReport: aiOn ? () => setShowAIReport(true) : null,
           goto: setTab
         }),
-        /* The Scenarios tab hosts the 1040 Planner module and takes no props:
-           it is deliberately unlinked from the workbench's calculations. The
-           ledger that used to be here is archived at
-           src/archive/08a-scenarios-ledger.js. */
-        tab === "scenarios" && EL(ScenariosPlannerPage, null),
+        tab === "scenarios" && EL(ScenariosPage, {
+          onAIOptimize: aiOn ? () => setShowOptimize(true) : null,
+          onAIReport: aiOn ? () => setShowAIReport(true) : null,
+          onAskAI: aiOn ? askWorkspace : null,
+          client: clientSafe, alignments,
+          scenarios, results, bestId, baseline, status, year,
+          update, addScenario, duplicate, remove, reset,
+          activeId: activeIdSafe, onAddPlanningScenario: addPlanningScenario,
+          onModelStrategy: modelStrategy
+        }),
+        /* The 1040 Planner is its own tab and takes no props: it is
+           deliberately unlinked from the workbench's calculation pipeline.
+           Its engine is the only thing that computes a number on this tab;
+           the workbench engine is the only thing that computes a number on
+           every other tab, the Scenarios ledger included. */
+        tab === "planner" && EL(ScenariosPlannerPage, null),
         tab === "se" && EL(SEModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
         tab === "magi" && EL(MAGIModule, { scenario: active, result: activeResult, status, year, update: updateActive }),
         tab === "qbi" && EL(QBIModule, { scenario: active, result: activeResult, status, year, update: updateActive }),

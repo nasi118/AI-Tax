@@ -84,24 +84,15 @@ const browser = await chromium.launch({
   await page.click(".tp-calc-pad .tp-calcbtn.eq");
   const tapeTxt = await page.locator(".tp-win .tp-tape").textContent();
   ok(tapeTxt.includes("= 10"), "calculator computes 7+3=10 on tape");
-  /* Navigate to Scenarios — now the embedded 1040 Planner module, not the
-     archived ledger — and confirm the floating calculator's tape survives. */
   await page.evaluate(() => { document.querySelectorAll(".tp-navitem").forEach(b => { if (b.textContent.includes("Scenarios")) b.click(); }); });
-  await page.waitForSelector("iframe.tp-planner-frame");
+  await page.waitForSelector(".tp-ledger");
   ok((await page.locator(".tp-win .tp-tape").textContent()).includes("= 10"), "tape survives page navigation");
 
-  /* Copy-for-Excel moved with the ledger; the Dashboard still carries it, so
-     the control itself is verified there. */
-  await page.evaluate(() => { document.querySelectorAll(".tp-navitem").forEach(b => { if (b.textContent.includes("Dashboard")) b.click(); }); });
-  await page.waitForSelector(".tp-main");
-  ok(await page.locator(".tp-copyxl").count() >= 1, "copy-for-Excel control present");
+  // ledger copy button
+  ok(await page.locator(".tp-ledger-toolbar .tp-copyxl").count() === 1, "copy-for-Excel on scenarios ledger");
 
-  /* Undo/redo needs an engine-bound money input. The ledger's inputs are
-     archived, so this drives the SE & Retirement module instead — the same
-     undo stack, a different page. */
-  await page.evaluate(() => { document.querySelectorAll(".tp-navitem").forEach(b => { if (b.textContent.includes("SE & Retirement")) b.click(); }); });
-  await page.waitForSelector("input.tp-money");
-  const firstMoney = page.locator("input.tp-money").first();
+  // undo/redo: edit a money input on the ledger then undo
+  const firstMoney = page.locator(".tp-ledger input.tp-money").first();
   const before = await firstMoney.inputValue();
   await firstMoney.fill("123456");
   await firstMoney.blur();
