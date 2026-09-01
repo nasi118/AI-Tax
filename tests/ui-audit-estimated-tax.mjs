@@ -30,28 +30,94 @@ const gotoTab = async name => {
   await p.waitForTimeout(500);
 };
 
-/* NOTE — the ledger-driven half of this suite is archived.
-   Sections that reached the Retirement/HSA/SEHI/IRA editor and the Estimated
-   Taxes calculator did so through the Scenarios ledger's drill rows. That
-   ledger is archived (src/archive/08a-scenarios-ledger.js) and the Scenarios
-   tab now hosts the 1040 Planner module, so those drill rows no longer exist
-   and that coverage moved to tests/archive/ui-audit-estimated-tax-ledger.mjs.
-   What remains below — Audit & Benchmarks, Change History and persistence —
-   is independent of the ledger and still runs. */
+/* ---- Retirement / HSA / SEHI / IRA row editor ---- */
+await gotoTab("Scenarios");
+await p.click(".tp-mini:has-text('Expand all groups')");
+await p.waitForTimeout(300);
+const openDrill = async labelText => p.evaluate(t => {
+  const row = Array.from(document.querySelectorAll(".tp-lab.drill")).find(l => l.textContent.includes(t));
+  row.nextElementSibling.click();
+}, labelText);
+await openDrill("Self-employed retirement plan");
+await p.waitForTimeout(300);
+ok(await p.locator(".tp-modal h3:has-text('Retirement plan')").isVisible(), "clicking the retirement-plan row opens the combined Retirement/HSA/SEHI/IRA editor");
+ok(await p.locator(".tp-modal .tp-minihead:has-text('Health savings account')").isVisible(), "editor includes an HSA section");
+ok(await p.locator(".tp-modal .tp-minihead:has-text('Self-employed health insurance')").isVisible(), "editor includes a SEHI section");
+ok(await p.locator(".tp-modal .tp-minihead:has-text('Traditional IRA')").isVisible(), "editor includes an IRA section");
+await p.locator(".tp-modal select").first().selectOption("solo401k");
+await p.waitForTimeout(300);
+ok((await p.evaluate(() => JSON.parse(localStorage.getItem('tp_clients_v1'))[0].scenarios[0].planning.planType)) === "solo401k", "selecting a retirement plan persists to the scenario");
+await p.click(".tp-modal-x");
+await p.waitForTimeout(300);
+await openDrill("Health savings account");
+await p.waitForTimeout(300);
+ok(await p.locator(".tp-modal h3:has-text('Retirement plan')").isVisible(), "the HSA row is its own click target into the same combined editor");
+await p.click(".tp-modal-x");
+await p.waitForTimeout(300);
 
-/* ---- Setup: one real input edit, made without the ledger ----
-   The archived sections used to generate the session's first audit entries as
-   a side effect. The Change-History assertions below still need an edit to
-   have happened, so make one directly on the SE & Retirement module — same
-   engine, same audit pipeline, no ledger. */
-await gotoTab("SE & Retirement");
-await p.waitForSelector("input.tp-money");
-const seMoney = p.locator("input.tp-money").first();
-await seMoney.fill("54321");
-await seMoney.blur();
-await p.waitForTimeout(600);
-const editedValue = await p.evaluate(() => JSON.parse(localStorage.getItem('tp_clients_v1'))[0].scenarios[0]);
-ok(!!editedValue, "the edited scenario is persisted to the client store");
+/* ---- Estimated Taxes calculator ---- */
+await openDrill("Estimated tax safe harbor");
+await p.waitForTimeout(300);
+ok(await p.locator(".tp-modal h3:has-text('Estimated taxes')").isVisible(), "clicking the estimated-tax row opens the calculator");
+ok(await p.locator(".tp-modal table.tp-tbl", { hasText: "Current-year projected total tax" }).isVisible(), "calculator shows the source figures from the active scenario");
+const priorInput = p.locator(".tp-modal label:has-text('Prior-year total tax') input");
+await priorInput.fill("15000");
+await priorInput.blur();
+await p.waitForTimeout(300);
+const agiInput = p.locator(".tp-modal label:has-text('Prior-year AGI') input");
+await agiInput.fill("90000");
+await agiInput.blur();
+await p.waitForTimeout(300);
+ok(await p.locator(".tp-modal .tp-tag.green:has-text('Controls')").isVisible(), "one safe-harbor candidate is marked as controlling");
+ok(await p.locator(".tp-modal table.tp-tbl", { hasText: "Due" }).isVisible(), "quarterly installment table renders");
+await p.click(".tp-modal .tp-addbtn:has-text('Add line')");
+await p.waitForTimeout(300);
+const dateInput = p.locator(".tp-modal .tp-linerow input.tp-txt").first();
+await dateInput.fill("2026-04-15");
+const amtInput = p.locator(".tp-modal .tp-linerow .tp-money").first();
+await amtInput.fill("4000");
+await amtInput.blur();
+await p.waitForTimeout(400);
+const afterPayment = await p.evaluate(() => { const sc = JSON.parse(localStorage.getItem('tp_clients_v1'))[0].scenarios[0]; return sc.estimatedPaymentSchedule; });
+ok(Array.isArray(afterPayment) && afterPayment.length === 1 && Number(afterPayment[0].amount) === 4000, "a dated payment persists to the scenario's payment schedule (" + JSON.stringify(afterPayment) + ")");
+await p.click(".tp-modal-x");
+await p.waitForTimeout(300);
+
+/* the flat estimatedPayments field is derived, never double-written */
+const flatField = await p.evaluate(() => JSON.parse(localStorage.getItem('tp_clients_v1'))[0].scenarios[0].estimatedPayments);
+ok(flatField === 0, "the flat estimatedPayments field stays untouched — the schedule is the source of truth (" + flatField + ")");
+
+/* the ledger's Estimated payments cell now shows the schedule-derived total and is disabled */
+const estCellDisabled = await p.evaluate(() => {
+  const labs = Array.from(document.querySelectorAll(".tp-lab"));
+  const row = labs.find(l => l.textContent.includes("Estimated payments"));
+  const cell = row.nextElementSibling;
+  const input = cell.querySelector("input");
+  return { disabled: input.disabled, value: input.value };
+});
+ok(estCellDisabled.disabled === true, "the ledger's Estimated payments cell is disabled once a schedule exists, to avoid a second edit surface");
+
+/* reach the calculator from the Payments editor's jump link too */
+await p.locator("button.tp-drillchip[aria-label^='Edit Federal withholding in detail']").first().click();
+await p.waitForTimeout(300);
+ok(await p.locator(".tp-modal button:has-text('Manage estimated payments')").isVisible(), "Payments editor links to the estimated-tax calculator");
+await p.click(".tp-modal button:has-text('Manage estimated payments')");
+await p.waitForTimeout(300);
+ok(await p.locator(".tp-modal h3:has-text('Estimated taxes')").isVisible(), "the jump link opens the same calculator for the same scenario");
+await p.click(".tp-modal-x");
+await p.waitForTimeout(300);
+
+/* ---- switching scenario recalculates the estimated-tax figures ---- */
+const scenarioNames = await p.evaluate(() => JSON.parse(localStorage.getItem('tp_clients_v1'))[0].scenarios.map(s => s.name));
+await p.evaluate(t => {
+  const row = Array.from(document.querySelectorAll(".tp-lab.drill")).find(l => l.textContent.includes(t));
+  row.nextElementSibling.nextElementSibling.click(); // second scenario column
+}, "Estimated tax safe harbor");
+await p.waitForTimeout(300);
+const secondScenarioEyebrow = await p.locator(".tp-modal .tp-eyebrow").textContent();
+ok(secondScenarioEyebrow.trim() === scenarioNames[1], "opening the row on a different column opens the calculator for that scenario (" + secondScenarioEyebrow + ")");
+await p.click(".tp-modal-x");
+await p.waitForTimeout(300);
 
 /* ---- Audit & Benchmarks ---- */
 await gotoTab("Audit");
@@ -103,12 +169,10 @@ ok(auditLenAfter === auditLenBefore, "the durable audit trail is unchanged after
 /* ---- Persistence across reload ---- */
 await p.reload({ waitUntil: "domcontentloaded" });
 await p.waitForTimeout(1800);
-/* The retirement-election / prior-year / payment-schedule persistence checks
-   moved to tests/archive/ui-audit-estimated-tax-ledger.mjs with the editors
-   that set those values. What is verified here is that an ordinary engine-bound
-   edit survives a reload — the same persistence path, reached without the ledger. */
 const s0AfterReload = await p.evaluate(() => JSON.parse(localStorage.getItem('tp_clients_v1'))[0].scenarios[0]);
-ok(JSON.stringify(s0AfterReload) === JSON.stringify(editedValue), "the edited scenario persists across reload byte-for-byte");
+ok(s0AfterReload.planning.planType === "solo401k", "the retirement plan election persists across reload");
+ok(Number(s0AfterReload.priorYearTax) === 15000 && Number(s0AfterReload.priorYearAGI) === 90000, "prior-year tax/AGI persist across reload");
+ok(Array.isArray(s0AfterReload.estimatedPaymentSchedule) && s0AfterReload.estimatedPaymentSchedule.length === 1, "the estimated-payment schedule persists across reload");
 await gotoTab("Audit");
 ok(await p.locator("text=Calculation Audit & Benchmarks").isVisible(), "Audit & Benchmarks still renders after reload");
 const auditLenReload = await p.evaluate(() => (JSON.parse(localStorage.getItem('tp_clients_v1'))[0].auditLog || []).length);

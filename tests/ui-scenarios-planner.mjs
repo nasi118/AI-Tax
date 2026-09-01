@@ -1,11 +1,11 @@
-/* Acceptance tests for the Scenarios tab after the 1040 Planner module
-   replaced the comparison ledger:
+/* Acceptance tests for the "1040 Planner (TY2026)" tab:
 
      · the module mounts, loads and runs its own TY2026 engine in the frame
-     · the archived ledger is gone from the running app
+     · it sits BESIDE the Scenarios ledger rather than replacing it
      · the tab is UNLINKED from the workbench engine — driving the planner
        moves no workbench scenario, logs no audit entry, and every other tab
-       still computes off the workbench engine exactly as before
+       (the Scenarios ledger included) still computes off the workbench
+       engine exactly as before
      · the tab's own controls (height toggle, reload, full-screen) behave
      · the planner still works standalone at /planner/
 
@@ -37,8 +37,14 @@ const gotoTab = async name => {
 };
 const frame = async () => (await (await p.$("iframe.tp-planner-frame")).contentFrame());
 
+/* ---- the tab exists in its own right ---- */
+ok(await p.evaluate(() => Array.from(document.querySelectorAll(".tp-navitem")).some(b => b.textContent.includes("1040 Planner"))),
+   "the left nav carries a distinct 1040 Planner tab");
+ok(await p.evaluate(() => Array.from(document.querySelectorAll(".tp-navitem")).some(b => b.textContent.includes("Scenarios"))),
+   "the Scenarios tab is still in the nav alongside it");
+
 /* ---- the module mounts ---- */
-await gotoTab("Scenarios");
+await gotoTab("1040 Planner");
 await p.waitForSelector("iframe.tp-planner-frame", { timeout: 15000 });
 ok(await p.locator("iframe.tp-planner-frame").isVisible(), "the Scenarios tab mounts the 1040 Planner frame");
 ok((await p.getAttribute("iframe.tp-planner-frame", "src")) === "planner/", "the frame uses the directory URL, so the module's relative assets resolve");
@@ -50,18 +56,25 @@ ok((await f.locator("#app > *").count()) > 0, "the planner renders its own UI in
 ok(await f.evaluate(() => typeof window.TaxEngine === "object"), "the planner carries its own TY2026 engine");
 ok(await f.evaluate(() => typeof window.TaxEngine.PARAMS.socialSecurityWageBase === "number"), "the planner's engine exposes its TY2026 parameters");
 
-/* ---- the archived ledger is gone ---- */
-ok((await p.locator(".tp-ledger").count()) === 0, "the archived comparison ledger does not render");
-ok((await p.locator(".tp-vcard").count()) === 0, "the archived scenario verdict cards do not render");
-ok((await p.locator(".tp-lab.drill").count()) === 0, "the archived ledger drill rows do not render");
-ok(await p.evaluate(() => typeof ScenariosPage === "undefined"), "ScenariosPage is not part of the loaded bundle");
-ok(await p.evaluate(() => typeof STRATEGY_LIBRARY === "undefined"), "the ledger's strategy library is not part of the loaded bundle");
+/* ---- the planner tab does not carry the ledger, and vice versa ---- */
+ok((await p.locator(".tp-ledger").count()) === 0, "the planner tab shows no ledger of its own");
+ok((await p.locator(".tp-vcard").count()) === 0, "the planner tab shows no scenario verdict cards");
+/* ...but the Scenarios tab still has all of it. */
+await gotoTab("Scenarios");
+ok((await p.locator(".tp-ledger").count()) === 1, "the Scenarios tab still renders the comparison ledger");
+ok((await p.locator(".tp-vcard").count()) >= 1, "the Scenarios tab still renders scenario verdict cards");
+ok((await p.locator(".tp-lab.drill").count()) > 0, "the Scenarios tab still renders the ledger drill rows");
+ok((await p.locator("iframe.tp-planner-frame").count()) === 0, "the Scenarios tab does not embed the planner");
+ok(await p.evaluate(() => typeof ScenariosPage === "function"), "ScenariosPage is back in the loaded bundle");
+ok(await p.evaluate(() => Array.isArray(STRATEGY_LIBRARY)), "the ledger's strategy library is back in the loaded bundle");
+await gotoTab("1040 Planner");
+await p.waitForSelector("iframe.tp-planner-frame");
 
 /* ---- full-bleed layout ---- */
 ok(await p.$eval("main.tp-main", el => el.classList.contains("bleed")), "the padded content wrapper collapses for the module");
 await gotoTab("Dashboard");
 ok(!(await p.$eval("main.tp-main", el => el.classList.contains("bleed"))), "the padded wrapper returns on every other tab");
-await gotoTab("Scenarios");
+await gotoTab("1040 Planner");
 await p.waitForSelector("iframe.tp-planner-frame");
 
 /* ---- UNLINKED: the planner moves nothing in the workbench ---- */
@@ -99,16 +112,18 @@ await gotoTab("SE & Retirement");
 ok((await p.locator("input.tp-money").count()) > 0, "the SE & Retirement module still renders its engine-bound inputs");
 await gotoTab("QBI Workbench");
 ok((await p.locator(".tp-main").textContent()).length > 200, "the QBI workbench still renders");
+await gotoTab("Scenarios");
+ok((await p.locator(".tp-cell").count()) > 0, "the Scenarios ledger still computes its cells off the workbench engine");
 
 /* ---- the tab's own controls ---- */
-await gotoTab("Scenarios");
+await gotoTab("1040 Planner");
 await p.waitForSelector("iframe.tp-planner-frame");
 ok(!(await p.$eval(".tp-planner-wrap", el => el.classList.contains("tall"))), "the planner starts at fitted height");
 await p.click('.tp-planner-btns button:has-text("Taller")');
 await p.waitForTimeout(250);
 ok(await p.$eval(".tp-planner-wrap", el => el.classList.contains("tall")), "the height toggle applies");
 await gotoTab("Dashboard");
-await gotoTab("Scenarios");
+await gotoTab("1040 Planner");
 await p.waitForSelector("iframe.tp-planner-frame");
 ok(await p.$eval(".tp-planner-wrap", el => el.classList.contains("tall")), "the height preference persists across navigation");
 await p.click('.tp-planner-btns button:has-text("Fit height")');

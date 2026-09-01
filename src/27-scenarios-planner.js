@@ -1,35 +1,35 @@
 /* ==== 27-scenarios-planner ==== */
 /* ============================================================================
-   SCENARIOS TAB — 1040 PLANNER (TY2026)
+   1040 PLANNER (TY2026) — its own tab
 
-   The Scenarios tab used to host a line-by-line ledger that compared the
-   workbench's own scenarios side by side. That ledger is archived, not
-   deleted: it lives at src/archive/08a-scenarios-ledger.js and is no longer
-   loaded by index.html.
+   A self-contained module: its own UI, its own multi-year engine
+   (planner/js/engine.js — TY2024 through TY2028, opening on TY2026) and its
+   own saved projects, running in an iframe (planner/index.html) on the
+   "1040 Planner (TY2026)" tab. The tab keeps its TY2026 name because that is
+   the year the planner opens on; the year is selected inside the module.
 
-   In its place the tab hosts the 1040 Planner module, which runs in an iframe
-   (planner/index.html) and is entirely self-contained — its own UI, its own
-   TY2026 engine (planner/js/engine.js) and its own saved projects.
+   STANDALONE
+   ----------
+   The module reads no client profile and needs no client to exist first: it
+   opens on its own project and computes with its own engine whether it is
+   loaded here or directly at /planner/. Bringing an outside return in is an
+   explicit action taken inside the module, never something that happens when
+   the tab is opened.
 
    DELIBERATELY UNLINKED
    ---------------------
    Nothing here passes workbench scenarios into the planner, and nothing the
-   planner computes flows back out. The tab is disconnected from the
+   planner computes flows back out. This tab is disconnected from the
    workbench's calculation pipeline by design: the planner's engine is the
-   only thing that computes a number on this tab, and the workbench engine
+   only thing that computes a number on it, and the workbench engine
    (src/02-engine.js / src/03-scenario.js) is the only thing that computes a
-   number everywhere else. The two never mix, so a figure on screen is never
-   half from one and half from the other.
+   number everywhere else — the Scenarios ledger included. The two never mix,
+   so a figure on screen is never half from one and half from the other.
 
-   Every other tab — Dashboard, the SE / MAGI / QBI / SEHI modules, Report,
-   Audit — is untouched and still runs on the workbench engine.
+   The Scenarios tab keeps its line-by-line comparison ledger and its own
+   editors; this tab sits beside it rather than replacing it.
    ========================================================================== */
 
-/* The directory URL, not "planner/index.html": static hosts (and Vercel)
-   rewrite the explicit index path to an extensionless "/planner", and the
-   browser then resolves the planner's relative script paths against the
-   site root instead of the module folder — every one of them 404s and the
-   frame comes up blank. A trailing slash keeps the base correct. */
 const PLANNER_SRC = "planner/";
 
 /* The single-file standalone build (tools/build-standalone.mjs) inlines the
@@ -67,7 +67,7 @@ function ScenariosPlannerPage() {
     EL("div", { className: "tp-planner-bar" },
       EL("span", { className: "tp-planner-title" }, I.layers, " 1040 Planner (TY2026)"),
       EL("span", { className: "tp-planner-note" },
-        "Self-contained module — it computes with its own engine and keeps its own saved projects."),
+        "Self-contained module — it computes with its own engine, keeps its own saved projects, and reads no client profile. The tax year is selected inside it."),
       EL("div", { className: "tp-planner-btns" },
         EL("button", {
           type: "button",

@@ -80,12 +80,17 @@ jobs:
           CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
             node tests/ui-workbench.mjs
           CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
+            node tests/ui-planning-scenarios.mjs
+          CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
+            node tests/ui-strategy-library.mjs
+          CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
             node tests/ui-audit-estimated-tax.mjs
-          # Scenarios tab: the embedded 1040 Planner module. The suites that
-          # drove the ledger it replaced are retained, but not run, in
-          # tests/archive/ — see that directory's README.
+          # The 1040 Planner tab (embedded module) and the Settings panel.
           CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
             node tests/ui-scenarios-planner.mjs
+          # The planner's scenario matrix and its multi-year engine.
+          CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
+            node tests/ui-planner-matrix.mjs
           CHROMIUM_PATH="$(node -e 'console.log(require("playwright").chromium.executablePath())')" \
             node tests/ui-settings.mjs
 

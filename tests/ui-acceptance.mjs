@@ -98,25 +98,37 @@ ok(!(await page.$(".tp-sec .tp-svg")), "Collapse all closes every section");
 await page.click('button.tp-mini:has-text("Expand all")');
 await page.waitForTimeout(250);
 
-/* ---- scenarios tab: the embedded 1040 Planner module ---- */
-/* The ledger that used to live here is archived (src/archive/) and unlinked
-   from the workbench engine; the tab now hosts the planner in an iframe. */
+/* ---- scenarios ---- */
 await nav("Scenarios");
-await page.waitForSelector("iframe.tp-planner-frame", { timeout: 15000 });
-ok(await page.$(".tp-planner-frame"), "Scenarios tab mounts the 1040 Planner frame");
-ok(!(await page.$(".tp-ledger")), "the archived comparison ledger no longer renders");
-ok(!(await page.$(".tp-vcard")), "the archived scenario verdict cards no longer render");
-const pframe = await (await page.$("iframe.tp-planner-frame")).contentFrame();
-await pframe.waitForSelector("#app > *", { timeout: 20000 });
-ok(await pframe.$("#app > *"), "the planner renders its own UI inside the frame");
-ok(await pframe.evaluate(() => typeof window.TaxEngine === "object"), "the planner carries its own TY2026 engine");
-ok(await page.$eval("main.tp-main", el => el.classList.contains("bleed")), "the padded content wrapper collapses for the full-bleed module");
-ok((await page.textContent(".tp-planner-bar")).includes("Self-contained"), "the tab states that the module is self-contained");
+ok((await page.$$(".tp-vcard")).length >= 3, "scenario cards render");
+ok(await page.$('.tp-vcard >> nth=0 >> .tp-tag:has-text("Base")'), "base scenario is badged");
+ok(await page.$('.tp-badge:has-text("Lowest modeled tax")'), "lowest-tax badge present");
+ok((await page.textContent(".tp-vcard >> nth=0")).includes("Spendable after-tax cash"), "cards show economic outcomes, not just tax");
+await page.click('.tp-vcard >> nth=0 >> button:has-text("Analyze with AI")');
+await page.waitForTimeout(250);
+ok(await page.$(".tp-scai"), "scenario AI panel expands inline");
+ok((await page.textContent(".tp-scai-ctx")).includes("TY2025"), "AI panel states its context (year and status)");
+const inputsBefore = await page.$$eval(".tp-in input", els => els.map(e => e.value).join("|"));
+ok((await page.$$(".tp-scai-quick .tp-mini")).length >= 6, "AI panel offers the quick analyses");
+const inputsAfter = await page.$$eval(".tp-in input", els => els.map(e => e.value).join("|"));
+ok(inputsBefore === inputsAfter, "opening the AI panel changes no inputs");
+await page.click('.tp-scai button:has-text("Close")');
+// density + groups
+await page.click('button:has-text("Compact")');
+await page.waitForTimeout(150);
+ok(await page.$(".tp-ledger-wrap.density-compact"), "ledger density switches to compact");
+await page.click('button:has-text("Standard")');
+await page.click('button:has-text("Collapse all groups")');
+await page.waitForTimeout(200);
+const cellsCollapsed = (await page.$$(".tp-cell")).length;
+await page.click('button:has-text("Expand all groups")');
+await page.waitForTimeout(200);
+ok((await page.$$(".tp-cell")).length > cellsCollapsed, "ledger groups collapse and expand together");
+ok(await page.$eval(".tp-schead", el => getComputedStyle(el).position === "sticky"), "scenario headers are sticky");
+ok(await page.$eval(".tp-lab", el => getComputedStyle(el).position === "sticky"), "line-item column is sticky");
 
 /* ---- calculators ---- */
-/* Scenario count now comes from app state: with the ledger archived there
-   are no scenario cards in the DOM to count. */
-const scount = await page.evaluate(() => TP_ACTIVE_CLIENT.scenarios.length);
+const scount = (await page.$$(".tp-vcard")).length;
 await page.click('.tp-launchbtn:has-text("S-Corp Salary")');
 await page.waitForTimeout(1500);
 ok(await page.$(".tp-drawer"), "S-Corp Salary calculator opens in a drawer");
@@ -126,12 +138,13 @@ ok((await page.textContent(".tp-drawer")).includes("not automatically the optima
 await page.click('.tp-drawer button:has-text("Create test scenario")');
 await page.waitForTimeout(600);
 ok(!(await page.$(".tp-drawer")), "Create test scenario closes the calculator");
-ok(await page.evaluate(s => TP_ACTIVE_CLIENT.scenarios.length === s + 1, scount), "a new scenario was created through the engine pipeline");
+ok((await page.$$(".tp-vcard")).length === scount + 1, "a new scenario was created through the engine pipeline");
 await nav("Audit Trail");
 ok((await page.textContent(".tp-main")).includes("Scenario created from calculator"), "calculator scenario creation is in the audit trail");
-/* The created scenario is left in place: deleting it used the ledger's
-   column header, which is archived along with the rest of that UI. Nothing
-   below depends on the scenario count. */
+await nav("Scenarios");
+// delete the created scenario to restore state
+await page.click(".tp-schead >> nth=3 >> button[title=Delete]");
+await page.waitForTimeout(300);
 // audit risk calculator is qualitative
 await page.click('.tp-launchbtn:has-text("Audit Risk")');
 await page.waitForTimeout(500);
@@ -227,16 +240,19 @@ await page.click('button:has-text("Clear this tab")');
 await page.keyboard.press("Escape");
 await page.waitForTimeout(200);
 ok(!(await page.$(".tp-root.ap-dark")), "clearing the tab override restores the global theme");
-// planner height toggle (replaces the archived ledger's column resize)
+// ledger column resize
 await page.click('button.tp-navitem:has-text("Scenarios")');
-await page.waitForSelector("iframe.tp-planner-frame", { timeout: 15000 });
-const tall0 = await page.$eval(".tp-planner-wrap", el => el.classList.contains("tall"));
-await page.click('.tp-planner-btns button:has-text("Taller")');
+await page.waitForTimeout(300);
+const grid0 = await page.$eval(".tp-ledger", el => el.style.gridTemplateColumns);
+await page.$eval('.tp-colsize input[aria-label="Scenario column width"]', el => {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+  setter.call(el, "250");
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+});
 await page.waitForTimeout(250);
-ok(!tall0 && await page.$eval(".tp-planner-wrap", el => el.classList.contains("tall")), "the planner height toggle applies");
-await page.click('.tp-planner-btns button:has-text("Fit height")');
-await page.waitForTimeout(200);
-ok(!(await page.$eval(".tp-planner-wrap", el => el.classList.contains("tall"))), "the planner height toggle reverts");
+const grid1 = await page.$eval(".tp-ledger", el => el.style.gridTemplateColumns);
+ok(grid0 !== grid1 && grid1.includes("250px"), "scenario columns resize within limits and rerender");
 
 ok(errors.length === 0, "no page errors during the run" + (errors.length ? " — " + errors[0] : ""));
 console.log(`\n${passed} passed, ${failed} failed`);

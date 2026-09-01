@@ -327,8 +327,8 @@
       defaultAmount: 50000,
       amountLabel: 'Unreimbursed loss',
       estimated: true,
-      apply: function (inputs, amount) {
-        var agi = window.TaxEngine.computeProjection(inputs).agi;
+      apply: function (inputs, amount, ctx) {
+        var agi = window.TaxEngine.computeProjection(inputs, { taxYear: (ctx || {}).taxYear }).agi;
         var deductible = Math.max(0, amount - 100 - Math.round(agi * 0.10));
         inputs.itemizedDeductions.other += deductible;
         return track(inputs, 'Disaster casualty loss (net of floors)', 'casualtyLoss', deductible,
