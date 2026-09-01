@@ -63,15 +63,15 @@ await close();
 ok(await setting("startTab") === "last", "startTab defaults to the last-visited tab");
 ok(await setting("recalcScope") === "affected", "recalcScope defaults to affected");
 ok(await setting("aiEnabled") === true, "the AI layer is enabled by default");
-ok(await setting("aiModel") === "claude-opus-5", "the AI model defaults to Claude Opus 5");
+ok(await setting("aiModel") === "gpt-5.6-sol", "the AI model defaults to GPT-5.6 Sol");
 
 /* ---- a corrupt stored value falls back rather than breaking the app ---- */
 ok(await p.evaluate(() => {
   const prev = getUIPref("settings", {});
-  setUIPref("settings", { recalcScope: "../../etc", aiModel: "gpt-9", startTab: "no-such-tab" });
+  setUIPref("settings", { recalcScope: "../../etc", aiModel: "claude-opus-5", startTab: "no-such-tab" });
   const out = [readSetting("recalcScope"), readSetting("aiModel"), readSetting("startTab")].join("|");
   setUIPref("settings", prev);
-  return out === "affected|claude-opus-5|last";
+  return out === "affected|gpt-5.6-sol|last";
 }), "an out-of-range stored value falls back to its default");
 
 /* ---- AI master switch actually removes the affordances ---- */
@@ -96,13 +96,13 @@ ok((await p.locator('.tp-dockbtn:has-text("Ask AI")').count()) === 1, "turning A
 
 /* ---- the model choice reaches the request builder ---- */
 await open();
-await p.getByRole("button", { name: "Haiku 4.5" }).click();
+await p.getByRole("button", { name: "Luna" }).click();
 await p.waitForTimeout(400);
-ok(await setting("aiModel") === "claude-haiku-4-5", "the model choice is stored");
-ok(await p.evaluate(() => aiRequestModel()) === "claude-haiku-4-5", "the stored model is what the request builder sends");
-await p.getByRole("button", { name: "Opus 5" }).click();
+ok(await setting("aiModel") === "gpt-5.6-luna", "the model choice is stored");
+ok(await p.evaluate(() => aiRequestModel()) === "gpt-5.6-luna", "the stored model is what the request builder sends");
+await p.getByRole("button", { name: "Sol" }).click();
 await p.waitForTimeout(400);
-ok(await p.evaluate(() => aiRequestModel()) === "claude-opus-5", "switching back takes effect without a reload");
+ok(await p.evaluate(() => aiRequestModel()) === "gpt-5.6-sol", "switching back takes effect without a reload");
 await close();
 
 /* ---- recalculation scope seeds the header control ---- */
@@ -172,7 +172,7 @@ await p.waitForTimeout(300);
 ok(await p.locator('button:has-text("Reset settings")').count() === 1, "reset asks for confirmation first");
 await p.click('button:has-text("Reset settings")');
 await p.waitForTimeout(500);
-ok(await setting("recalcScope") === "affected" && await setting("aiModel") === "claude-opus-5" && await setting("startTab") === "last",
+ok(await setting("recalcScope") === "affected" && await setting("aiModel") === "gpt-5.6-sol" && await setting("startTab") === "last",
   "reset restores every setting to its default");
 ok(await p.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem("tp_clients_v1"))[0].scenarios)) === scenariosBefore,
   "reset leaves client data untouched");

@@ -44,8 +44,8 @@ jobs:
           node-version: "22"
       - run: node tests/golden.test.mjs
       - run: node tests/client-identity.test.mjs
-      # Claude proxy handler — offline: stubs fetch, needs no key.
-      - run: node tests/api-claude-proxy.test.mjs
+      # OpenAI proxy handler — offline: stubs fetch, needs no key.
+      - run: node tests/api-openai-proxy.test.mjs
 
   standalone-build:
     name: Standalone application build

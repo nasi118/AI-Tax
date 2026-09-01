@@ -47,6 +47,12 @@ risk if deferred.
   original releases never actually received.
 
 ### P0-3 · Unify the AI proxy on the Anthropic port (key handling) — ✅ RESOLVED
+> **Superseded 2026-09-01.** The provider changed again: the AI layer now runs
+> on the OpenAI API (`api/_lib/openai-proxy.js`, `OPENAI_API_KEY`,
+> `gpt-5.6-sol` by default). The unification this entry records still holds —
+> one proxy, one provider, one env var — only the provider differs. The record
+> below is left as written, describing the state at the time it was resolved.
+> The Python agent runtime remains Anthropic-backed and is unaffected.
 
 **Resolved 2026-08-30.** `api/_lib/claude-proxy.js` is back-ported verbatim
 from AI-Tax-APP, so one implementation now serves both repositories.

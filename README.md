@@ -60,31 +60,43 @@ npm test
 python -m pytest
 ```
 
-The JavaScript suite covers deterministic golden cases, client-identity/data-flow behavior, and the Claude API proxy handler (offline — it stubs `fetch` and needs no key). The Python suite covers calculation, lifecycle, isolation, reconciliation, import, persistence, and governance controls. CI also runs the cross-engine contract, UI acceptance, standalone-build, and audit-workbook checks described in [CI](docs/CI.md).
+The JavaScript suite covers deterministic golden cases, client-identity/data-flow behavior, and the OpenAI API proxy handler (offline — it stubs `fetch` and needs no key). The Python suite covers calculation, lifecycle, isolation, reconciliation, import, persistence, and governance controls. CI also runs the cross-engine contract, UI acceptance, standalone-build, and audit-workbook checks described in [CI](docs/CI.md).
 
 ### AI backend
 
-The AI advisory features call the **Anthropic Claude API** through a
-server-side proxy, so the credential never reaches the browser.
+The AI advisory features call the **OpenAI API** through a server-side
+proxy, so the credential never reaches the browser.
 
 | | |
 |---|---|
-| Environment variable | `ANTHROPIC_API_KEY` (set it on the deployment, not in the repo) |
-| Default model | `claude-opus-5` |
-| Proxy | `api/_lib/claude-proxy.js` — POST-only, request-size ceiling, per-IP rate limit, sanitized history, upstream timeout, refusal handling |
+| Environment variable | `OPENAI_API_KEY` (set it on the deployment, not in the repo) |
+| Endpoint | `POST https://api.openai.com/v1/responses` — the Responses API, which is what OpenAI recommends for these reasoning models |
+| Models | `gpt-5.6-sol` (default, most capable) · `gpt-5.6-terra` (lower cost) · `gpt-5.6-luna` (fastest); chosen in Settings → AI advisory layer |
+| Proxy | `api/_lib/openai-proxy.js` — POST-only, request-size ceiling, per-IP rate limit, sanitized history, upstream timeout, refusal handling |
 | Routes | `/api/ai/chat` (reviewer), `/api/ai/analyze`, `/api/ai/optimize`, `/api/ai/build-report` |
 
+The proxy pins explicit model ids rather than the floating `gpt-5.6` alias, so
+a change on OpenAI's side cannot silently move which model produced a piece of
+tax analysis. A model id it does not serve — a stale one from an older cached
+client, a hand-edited preference — falls back to the default, and the response
+says which model actually ran.
+
 `/api/grok` is a deprecated alias of `/api/ai/chat`, retained so an older
-cached client build keeps working; it runs the same Claude-backed handler.
-Each route sets its own token budget and effort level, and every one must
+cached client build keeps working; it runs the same OpenAI-backed handler.
+Each route sets its own token budget and reasoning effort, and every one must
 finish inside the function duration in `vercel.json` (60s) — the proxy's own
 50s budget leaves margin so a slow request returns a readable error instead of
 a bare platform timeout.
 
 Without the key the routes answer `501` and the app falls back to its
-bring-your-own-key path, where a user's own Claude, OpenAI or Grok key is kept
-in that browser's `localStorage` and sent only to that provider. Send
+bring-your-own-key path, where a user's own OpenAI or Grok key is kept in that
+browser's `localStorage` and sent only to that provider. Send
 `GET /api/ai/chat` to check whether a deployment is configured.
+
+> The Python agent runtime (`ai_tax/agent/runtime.py`, the optional `[agent]`
+> extra) is a **separate** subsystem and still uses the Anthropic SDK with its
+> own tool-calling loop and `ANTHROPIC_API_KEY`. It is not part of the web
+> app's AI layer and was not moved to OpenAI.
 
 ### Data and deployment boundaries
 
@@ -137,7 +149,7 @@ src/                Application code (plain JS, React.createElement — no JSX b
 planner/            Self-contained 1040 Planner module (TY2024–TY2028): its
                     own UI, engine and vendored libraries. Runs on its own tab
                     and standalone at /planner/
-api/                Vercel serverless AI routes (Anthropic Claude proxy)
+api/                Vercel serverless AI routes (OpenAI proxy)
 tools/              Build script for the standalone single-file version
 ```
 
