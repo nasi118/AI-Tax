@@ -190,16 +190,85 @@ const APPEARANCE_SIZES = [{
   label: "Extra large"
 }];
 
+/* Accent color — independent of "Color theme": theme picks the sidebar/navy
+   palette, accent recolors buttons, highlights and chart fills on top of it.
+   "theme" (the default) makes no override, so the theme's own indigo stands.
+   Each override carries its own light/dark pair plus a fixed, contrast-safe
+   "deep" shade for solid fills with white text/icons — the same fix applied
+   to the Claude Design prototype's dark theme, so a light/pastel accent in
+   dark mode never washes out white text again. */
+const APPEARANCE_ACCENTS = [{
+  id: "theme",
+  label: "Theme default"
+}, {
+  id: "indigo",
+  label: "Indigo",
+  swatch: "#4338ca",
+  light: { indigo: "#4338ca", indigoDeep: "#3730a3", indigoBg: "#eef2ff", indigoLine: "#c7d2fe" },
+  dark: { indigo: "#a5b4fc", indigoDeep: "#4338ca", indigoBg: "#1e1b4b", indigoLine: "#3730a3" }
+}, {
+  id: "teal",
+  label: "Teal",
+  swatch: "#0f766e",
+  light: { indigo: "#0f766e", indigoDeep: "#0b4f4a", indigoBg: "#f0fdfa", indigoLine: "#99f6e4" },
+  dark: { indigo: "#5eead4", indigoDeep: "#0f766e", indigoBg: "#042f2e", indigoLine: "#115e59" }
+}, {
+  id: "plum",
+  label: "Plum",
+  swatch: "#a21caf",
+  light: { indigo: "#a21caf", indigoDeep: "#701a75", indigoBg: "#fdf4ff", indigoLine: "#f5d0fe" },
+  dark: { indigo: "#f0abfc", indigoDeep: "#a21caf", indigoBg: "#3b0764", indigoLine: "#86198f" }
+}, {
+  id: "slate",
+  label: "Slate",
+  swatch: "#334155",
+  light: { indigo: "#334155", indigoDeep: "#1e293b", indigoBg: "#f1f5f9", indigoLine: "#cbd5e1" },
+  dark: { indigo: "#cbd5e1", indigoDeep: "#475569", indigoBg: "#1e293b", indigoLine: "#334155" }
+}];
+
+/* Text color/tone — recolors body text (ink/muted) independent of the accent
+   and the theme. "neutral" (the default) makes no override. */
+const APPEARANCE_TEXT_TONES = [{
+  id: "neutral",
+  label: "Neutral"
+}, {
+  id: "warm",
+  label: "Warm",
+  swatch: "#55483a",
+  light: { ink: "#292118", ink2: "#55483a", muted: "#8a7a68", muted2: "#b7a996" },
+  dark: { ink: "#f5efe7", ink2: "#ddd0c0", muted: "#ab9a86", muted2: "#766555" }
+}, {
+  id: "cool",
+  label: "Cool",
+  swatch: "#33414f",
+  light: { ink: "#0f1b2d", ink2: "#33414f", muted: "#64748a", muted2: "#94a3b8" },
+  dark: { ink: "#eef2f7", ink2: "#c9d3de", muted: "#8f9db0", muted2: "#5f6b7c" }
+}];
+
+/* Spacing — a calmer, airier layout (more breathing room around cards, KPIs
+   and sections, bigger KPI numbers) or a tighter one for people who prefer
+   to see more on screen. "airy" is the default. */
+const APPEARANCE_SPACINGS = [{
+  id: "airy",
+  label: "Airy"
+}, {
+  id: "compact",
+  label: "Compact"
+}];
+
 const APPEARANCE_DEFAULTS = {
   theme: "classic",
   background: "theme",
   customBackground: "",
+  accent: "theme",     // theme | indigo | teal | plum | slate
+  textTone: "neutral", // neutral | warm | cool
   font: "system",
   numberFont: "same",     // "same" = follow the text font
   numberWeight: "default", // default | medium | bold
   numberSize: "default",   // default | sm | lg
   numberFormat: {},        // patch over TP_NUMFMT_DEFAULTS (00-format.js)
   size: "md",
+  spacing: "airy", // airy | compact
   borderTone: "light", // light | medium | strong
   borderWidth: "1", // 1 | 2
   radius: "rounded", // rounded | soft | square
@@ -238,6 +307,33 @@ function appearanceStyle(eff) {
     style["--line"] = theme.dark ? "#64748b" : "#94a3b8";
     style["--line2"] = theme.dark ? "#475569" : "#cbd5e1";
   }
+  /* Accent color override: recolors buttons/highlights/chart fills on top of
+     whichever Color theme is active, independent of it. --indigo-deep is the
+     fixed, contrast-safe shade every solid-fill + white-text/icon surface
+     (buttons, dock, active nav item) is styled from, so an accent that reads
+     light in dark mode never makes that text unreadable. */
+  if (eff.accent && eff.accent !== "theme") {
+    const acc = APPEARANCE_ACCENTS.find(a => a.id === eff.accent);
+    if (acc) {
+      const v = theme.dark ? acc.dark : acc.light;
+      style["--indigo"] = v.indigo;
+      style["--indigo-deep"] = v.indigoDeep;
+      style["--indigo-bg"] = v.indigoBg;
+      style["--indigo-line"] = v.indigoLine;
+    }
+  }
+  /* Text tone override: recolors body ink/muted independent of accent and
+     theme — e.g. a warmer or cooler read on the same colors and layout. */
+  if (eff.textTone && eff.textTone !== "neutral") {
+    const tone = APPEARANCE_TEXT_TONES.find(t => t.id === eff.textTone);
+    if (tone) {
+      const v = theme.dark ? tone.dark : tone.light;
+      style["--ink"] = v.ink;
+      style["--ink2"] = v.ink2;
+      style["--muted"] = v.muted;
+      style["--muted2"] = v.muted2;
+    }
+  }
   return style;
 }
 function appearanceClasses(eff) {
@@ -245,7 +341,9 @@ function appearanceClasses(eff) {
   return ["ap-fs-" + eff.size, "ap-bw-" + eff.borderWidth, "ap-rad-" + eff.radius,
     eff.numberWeight && eff.numberWeight !== "default" ? "ap-numw-" + eff.numberWeight : "",
     eff.numberSize && eff.numberSize !== "default" ? "ap-nums-" + eff.numberSize : "",
-    eff.gridlines ? "ap-gridv" : "", theme.dark ? "ap-dark" : ""].filter(Boolean).join(" ");
+    eff.gridlines ? "ap-gridv" : "",
+    eff.spacing === "compact" ? "ap-spacing-compact" : "",
+    theme.dark ? "ap-dark" : ""].filter(Boolean).join(" ");
 }
 
 /* ---- The Customize drawer ---- */
@@ -348,6 +446,34 @@ function AppearancePanel({ appearance, setAppearance, tab, tabLabel, onClose }) 
       border: "1px solid #cbd5e1"
     }
   }), t.label))), EL(SwatchRow, {
+    label: "Accent color"
+  }, APPEARANCE_ACCENTS.map(a => EL("button", {
+    key: a.id,
+    type: "button",
+    className: "tp-ap-swatch" + (eff.accent === a.id ? " on" : ""),
+    title: a.label,
+    "aria-pressed": eff.accent === a.id,
+    style: {
+      background: a.id === "theme"
+        ? (APPEARANCE_THEMES.find(t => t.id === eff.theme) || APPEARANCE_THEMES[0]).vars["--indigo"] || "#1d4ed8"
+        : a.swatch,
+      color: "#fff"
+    },
+    onClick: () => set({ accent: a.id })
+  }, a.id === "theme" ? "Auto" : (eff.accent === a.id ? "✓" : "")))), EL(SwatchRow, {
+    label: "Text color"
+  }, APPEARANCE_TEXT_TONES.map(t => EL("button", {
+    key: t.id,
+    type: "button",
+    className: "tp-ap-swatch" + (eff.textTone === t.id ? " on" : ""),
+    title: t.label,
+    "aria-pressed": eff.textTone === t.id,
+    style: {
+      background: t.id === "neutral" ? "#18181b" : t.swatch,
+      color: "#fff"
+    },
+    onClick: () => set({ textTone: t.id })
+  }, eff.textTone === t.id ? "✓" : ""))), EL(SwatchRow, {
     label: "Background"
   }, APPEARANCE_BACKGROUNDS.map(b => EL("button", {
     key: b.id,
@@ -419,6 +545,16 @@ function AppearancePanel({ appearance, setAppearance, tab, tabLabel, onClose }) 
       l: s.label
     }))
   })), EL(SwatchRow, {
+    label: "Spacing"
+  }, EL(Seg, {
+    small: true,
+    value: eff.spacing,
+    onChange: v => set({ spacing: v }),
+    options: APPEARANCE_SPACINGS.map(s => ({
+      v: s.id,
+      l: s.label
+    }))
+  })), EL(Note, null, "Airy adds breathing room around cards, KPIs and sections and enlarges KPI figures; Compact is closer to the previous layout."), EL(SwatchRow, {
     label: "Border strength"
   }, EL(Seg, {
     small: true,
