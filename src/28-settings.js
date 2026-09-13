@@ -3,7 +3,7 @@
    APPLICATION SETTINGS
 
    Behaviour, not presentation. How the app starts, what it recalculates by
-   default, whether the AI layer is available at all, and which Claude model
+   default, whether the AI layer is available at all, and which OpenAI model
    the secure endpoint is asked for. Presentation — themes, fonts, borders,
    sizing and number formatting — stays in Customize appearance
    (src/22-appearance.js), which this panel links to rather than duplicates.
@@ -34,9 +34,9 @@ const SETTINGS_DEFAULTS = {
      users or engagements where no client data may reach a model. */
   aiEnabled: true,
   /* Which model the secure server-side endpoint is asked for. The proxy keeps
-     its own allowlist and default (api/_lib/claude-proxy.js); an unknown value
+     its own allowlist and default (api/_lib/openai-proxy.js); an unknown value
      here is simply ignored by the server. */
-  aiModel: "claude-opus-5",
+  aiModel: "gpt-5.6-sol",
   /* Confirm before a recalculation that spans every client. */
   confirmRecalcAll: true
 };
@@ -46,14 +46,14 @@ const SETTINGS_DEFAULTS = {
 const SETTINGS_ALLOWED = {
   recalcScope: ["tab", "affected", "all"],
   aiEnabled: [true, false],
-  aiModel: ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"],
+  aiModel: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
   confirmRecalcAll: [true, false]
 };
 
 const AI_MODEL_CHOICES = [
-  { v: "claude-opus-5", l: "Opus 5", hint: "Most capable — the default for tax analysis" },
-  { v: "claude-sonnet-5", l: "Sonnet 5", hint: "Faster and cheaper; good for routine questions" },
-  { v: "claude-haiku-4-5", l: "Haiku 4.5", hint: "Fastest; best for short, simple questions" }
+  { v: "gpt-5.6-sol", l: "Sol", hint: "GPT-5.6 Sol — most capable; the default for tax analysis" },
+  { v: "gpt-5.6-terra", l: "Terra", hint: "GPT-5.6 Terra — strong at lower cost; good for routine questions" },
+  { v: "gpt-5.6-luna", l: "Luna", hint: "GPT-5.6 Luna — fastest and cheapest; short, simple questions" }
 ];
 
 /* Read one setting, bounded. Safe to call before React mounts. */

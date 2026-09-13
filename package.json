@@ -6,7 +6,7 @@
   "scripts": {
     "start": "npx --yes serve -l 3000 .",
     "build:standalone": "node tools/build-standalone.mjs",
-    "test": "node tests/golden.test.mjs && node tests/client-identity.test.mjs && node tests/api-claude-proxy.test.mjs"
+    "test": "node tests/golden.test.mjs && node tests/client-identity.test.mjs && node tests/api-openai-proxy.test.mjs"
   },
   "license": "UNLICENSED"
 }

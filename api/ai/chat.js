@@ -4,9 +4,9 @@
 
    Replaces the old /api/grok, which is kept as a thin alias in api/grok.js so
    an older cached client build or an external caller does not break. */
-const { makeHandler } = require("../_lib/claude-proxy.js");
+const { makeHandler } = require("../_lib/openai-proxy.js");
 module.exports = makeHandler({
   requestType: "chat",
   maxTokens: 4000,
-  outputConfig: { effort: "low" }
+  effort: "low"
 });

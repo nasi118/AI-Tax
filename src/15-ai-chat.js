@@ -10,23 +10,17 @@
 
    Transport, in order of preference:
      1. /api/ai/chat — a secure server-side proxy (Vercel function) onto the
-        Anthropic Claude API. The Anthropic key lives only in the deployment
-        environment, never in browser code.
+        OpenAI API. The OpenAI key lives only in the deployment environment,
+        never in browser code.
      2. Bring-your-own-key fallback for offline/standalone use: the user's own
-        Claude / OpenAI / Grok key, entered at runtime, stored in this
-        browser's localStorage only, and sent only to that provider.
+        OpenAI or Grok key, entered at runtime, stored in this browser's
+        localStorage only, and sent only to that provider.
    ========================================================================== */
 
 const AI_PROVIDERS = {
-  claude: {
-    label: "Claude",
-    defaultModel: "claude-opus-5",
-    keyHint: "sk-ant-...",
-    keyUrl: "console.anthropic.com"
-  },
   openai: {
     label: "OpenAI",
-    defaultModel: "gpt-5.5",
+    defaultModel: "gpt-5.6-sol",
     keyHint: "sk-...",
     keyUrl: "platform.openai.com"
   },
@@ -40,14 +34,14 @@ const AI_PROVIDERS = {
 
 /* The model the secure server-side endpoint is asked for. Settings → AI
    advisory layer chooses it (src/28-settings.js); the proxy keeps its own
-   allowlist and default (api/_lib/claude-proxy.js), so an unrecognised value
+   allowlist and default (api/_lib/openai-proxy.js), so an unrecognised value
    is ignored server-side rather than failing the request.
 
    Read through a function, not a constant: the preference can change while
    the page is open, and a constant captured at load would keep sending the
    model the user just switched away from. */
 function aiRequestModel() {
-  return typeof aiEndpointModel === "function" ? aiEndpointModel() : "claude-opus-5";
+  return typeof aiEndpointModel === "function" ? aiEndpointModel() : "gpt-5.6-sol";
 }
 
 const AI_SETTINGS_KEY = "tp-ai-settings";
@@ -61,9 +55,9 @@ function loadAISettings() {
     };
   } catch (e) {}
   return {
-    /* Claude by default: it is what the secure endpoint runs, so the
+    /* OpenAI by default: it is what the secure endpoint runs, so the
        bring-your-own-key fallback stays on the same model family. */
-    provider: "claude",
+    provider: "openai",
     models: {},
     keys: {}
   };
@@ -266,42 +260,11 @@ async function streamSSE(resp, onData) {
     }
   }
 }
-async function askClaude({
-  apiKey,
-  model,
-  system,
-  messages,
-  onText,
-  signal
-}) {
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    signal,
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true"
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 16000,
-      stream: true,
-      system,
-      messages: messages.map(m => ({
-        role: m.role,
-        content: m.content
-      }))
-    })
-  });
-  if (!resp.ok) throw new Error(await aiErrorText(resp));
-  let refused = false;
-  await streamSSE(resp, ev => {
-    if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") onText(ev.delta.text);
-    if (ev.type === "message_delta" && ev.delta && ev.delta.stop_reason === "refusal") refused = true;
-  });
-  if (refused) onText("\n\n[The model declined to answer this request.]");
-}
+/* The bring-your-own-key path streams over /chat/completions rather than the
+   Responses API the server proxy uses. Two reasons: this same function serves
+   Grok, whose API is Chat-Completions-shaped, and the Chat Completions stream
+   is one well-understood event shape rather than two. The server proxy is
+   where the reasoning-effort controls matter, and it has them. */
 async function askOpenAICompatible(baseUrl, {
   apiKey,
   model,
@@ -348,7 +311,6 @@ async function aiErrorText(resp) {
   return "HTTP " + resp.status + (detail ? " — " + String(detail).slice(0, 300) : "");
 }
 function askOwnKey(provider, opts) {
-  if (provider === "claude") return askClaude(opts);
   if (provider === "openai") return askOpenAICompatible("https://api.openai.com/v1", opts);
   return askOpenAICompatible("https://api.x.ai/v1", opts);
 }
@@ -891,7 +853,7 @@ async function callAI(requestType, {
   const provider = settings.provider;
   const key = settings.keys[provider];
   if (!key) {
-    const err = new Error("The secure AI endpoint is unavailable and no personal API key is saved. Open Ask AI → Settings to add one, or configure ANTHROPIC_API_KEY on the deployment.");
+    const err = new Error("The secure AI endpoint is unavailable and no personal API key is saved. Open Ask AI → Settings to add one, or configure OPENAI_API_KEY on the deployment.");
     err.needsKey = true;
     throw err;
   }
